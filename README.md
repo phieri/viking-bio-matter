@@ -173,6 +173,7 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
 4. Connect to the Pico's USB serial to view commissioning info:
    ```bash
    screen /dev/ttyACM0 115200
+   # Or use Thonny IDE (Tools > Serial)
    ```
    
    You'll see:
@@ -180,24 +181,42 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
    ====================================
        Matter Commissioning Info
    ====================================
-   Setup PIN Code: 20202021
+   Device MAC:     28:CD:C1:00:00:01
+   Setup PIN Code: 24890840
    Discriminator:  3840 (0x0F00)
    
-   Manual Pairing Code:
-     34970112332
-   
-   QR Code URL:
-     MT:Y.K9042C00KA0648G00
+   ⚠️  IMPORTANT:
+      PIN is derived from device MAC.
+      Use tools/derive_pin.py to compute
+      the PIN from the MAC address above.
    ====================================
    ```
-
-5. Commission the device using chip-tool:
+   
+   **Note**: The Setup PIN is unique per device, derived from its MAC address.
+   You can compute it offline using:
    ```bash
-   chip-tool pairing code 1 34970112332
+   python3 tools/derive_pin.py 28:CD:C1:00:00:01
+   ```
+
+5. Commission the device using chip-tool with the **printed PIN**:
+   ```bash
+   # Use the PIN from your device's serial output
+   chip-tool pairing ble-wifi 1 MySSID MyPassword 24890840 3840
    ```
 
 6. Control and monitor attributes:
    ```bash
+   # Read flame status (OnOff cluster)
+   chip-tool onoff read on-off 1 1
+   
+   # Read fan speed (LevelControl cluster)
+   chip-tool levelcontrol read current-level 1 1
+   
+   # Read temperature (TemperatureMeasurement cluster)
+   chip-tool temperaturemeasurement read measured-value 1 1
+   ```
+
+For detailed Matter configuration and troubleshooting, see [platform/pico_w_chip_port/README.md](platform/pico_w_chip_port/README.md).
    # Read flame status (OnOff cluster)
    chip-tool onoff read on-off 1 1
    
@@ -213,7 +232,12 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
 - **LevelControl (0x0008)**: Fan speed (0-100%)
 - **TemperatureMeasurement (0x0402)**: Burner temperature
 
-⚠️ **Security Note:** Default commissioning credentials (PIN 20202021, discriminator 3840) are for **testing only**. For production deployments, generate unique per-device credentials and update `platform/pico_w_chip_port/CHIPDevicePlatformConfig.h`.
+⚠️ **Security Note:** 
+- The Setup PIN is **unique per device**, derived from the device MAC address using SHA-256 with product salt `VIKINGBIO-2026`.
+- The discriminator 3840 is for **testing only**. For production deployments, use unique discriminators per device (0-4095, excluding reserved ranges) and update `platform/pico_w_chip_port/CHIPDevicePlatformConfig.h`.
+- The PIN derivation algorithm is documented in `tools/derive_pin.py` and can be computed offline from a printed MAC address.
+
+For detailed Matter configuration and troubleshooting, see [platform/pico_w_chip_port/README.md](platform/pico_w_chip_port/README.md).
 
 ## Development
 
