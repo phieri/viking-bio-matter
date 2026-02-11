@@ -1,0 +1,36 @@
+[Unit]
+Description=Viking Bio Matter Bridge (Host)
+After=network-online.target avahi-daemon.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=dialout
+
+# Path to the host bridge executable
+# Update this to match your installation path
+ExecStart=/usr/local/bin/host_bridge --device /dev/ttyUSB0 --setup-code 20202021
+
+# Environment variables
+Environment="MATTER_ROOT=/home/pi/connectedhomeip"
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+
+# Security hardening (optional)
+# Uncomment these for additional security
+# PrivateTmp=yes
+# NoNewPrivileges=true
+# ProtectSystem=strict
+# ProtectHome=true
+# ReadWritePaths=/var/lib/viking-bio-matter
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=viking-bio-matter
+
+[Install]
+WantedBy=multi-user.target

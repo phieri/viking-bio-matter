@@ -1,15 +1,28 @@
 # Viking Bio Matter Bridge
 
-A Matter (CHIP) bridge for the Viking Bio 20 burner, built for Raspberry Pi Pico. This firmware reads TTL serial data from the burner and exposes flame status and fan speed through the Matter protocol.
+A Matter (CHIP) bridge for the Viking Bio 20 burner with two implementations:
+1. **Pico Firmware**: For Raspberry Pi Pico/Pico W (embedded)
+2. **Host Bridge**: For Raspberry Pi Zero (Linux user-space with full Matter stack)
+
+This project reads TTL serial data from the Viking Bio 20 burner and exposes flame status, fan speed, and temperature through the Matter protocol.
 
 ## Features
 
 - **Serial Communication**: Reads TTL serial data at 9600 baud from Viking Bio 20 burner
-- **Flame Detection**: Reports real-time flame status
-- **Fan Speed Monitoring**: Reports current fan speed (0-100%)
-- **Temperature Monitoring**: Reports burner temperature
-- **Matter Bridge**: Exposes burner data through Matter protocol
-- **Status LED**: Visual feedback of operation status
+- **Flame Detection**: Reports real-time flame status via Matter On/Off cluster
+- **Fan Speed Monitoring**: Reports current fan speed (0-100%) via Matter Level Control cluster
+- **Temperature Monitoring**: Reports burner temperature via Matter Temperature Measurement cluster
+- **Matter Bridge**: Exposes burner data through Matter protocol for smart home integration
+- **Status LED**: Visual feedback of operation status (Pico only)
+- **Dual Implementation**: Choose between Pico firmware or Raspberry Pi host bridge
+
+## Quick Start
+
+### For Pico Firmware (Default)
+See [Building Firmware](#building-firmware) section below.
+
+### For Raspberry Pi Zero Host Bridge
+See [Host-based Matter Bridge (Raspberry Pi Zero)](#host-based-matter-bridge-raspberry-pi-zero) section below or check the [host_bridge/README.md](host_bridge/README.md) for detailed instructions.
 
 ## Hardware Requirements
 
@@ -127,21 +140,66 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
    # Windows (use PuTTY or similar)
    ```
 
+## Host-based Matter Bridge (Raspberry Pi Zero)
+
+For a full Matter implementation running on Raspberry Pi Zero (or any Raspberry Pi/Linux system), use the host bridge instead of the Pico firmware.
+
+### Why Use the Host Bridge?
+
+The host bridge provides:
+- **Full Matter SDK Integration**: Uses the complete Project CHIP/connectedhomeip SDK
+- **WiFi Commissioning**: Standard Matter commissioning with QR codes
+- **Better Performance**: More processing power for complex Matter operations
+- **Easy Updates**: Update software without flashing firmware
+- **Production Ready**: Complete Matter stack with proper attribute reporting
+
+### Quick Setup
+
+1. **Hardware**: Raspberry Pi Zero W/2W with USB-to-serial adapter connected to Viking Bio 20
+2. **Software**: Install dependencies and build Matter SDK (see [host_bridge/README.md](host_bridge/README.md))
+3. **Build**: 
+   ```bash
+   export MATTER_ROOT=/path/to/connectedhomeip
+   mkdir build_host && cd build_host
+   cmake .. -DENABLE_MATTER=ON
+   make
+   ```
+4. **Run**:
+   ```bash
+   ./host_bridge/host_bridge --device /dev/ttyUSB0 --setup-code 20202021
+   ```
+
+### Commissioning
+
+Commission with any Matter controller (Google Home, Apple Home, chip-tool, etc.) using setup code `20202021`.
+
+For detailed instructions, see **[host_bridge/README.md](host_bridge/README.md)**.
+
 ## Development
 
 ### Project Structure
 
 ```
 viking-bio-matter/
-├── src/
+├── src/                       # Pico firmware source
 │   ├── main.c                 # Main application entry point
 │   ├── serial_handler.c       # UART/serial communication
 │   ├── viking_bio_protocol.c  # Viking Bio protocol parser
-│   └── matter_bridge.c        # Matter bridge implementation
+│   └── matter_bridge.c        # Matter bridge stub (Pico)
 ├── include/
 │   ├── serial_handler.h
 │   ├── viking_bio_protocol.h
 │   └── matter_bridge.h
+├── host_bridge/               # Raspberry Pi host bridge
+│   ├── main.cpp               # Host bridge entry point
+│   ├── matter_bridge.cpp      # Full Matter SDK integration
+│   ├── viking_bio_protocol_linux.c  # Protocol parser (Linux)
+│   ├── CMakeLists.txt         # Host bridge build config
+│   ├── README.md              # Host bridge documentation
+│   └── host_bridge.service   # Systemd service file
+├── examples/
+│   ├── viking_bio_simulator.py    # Serial data simulator
+│   └── run_host_bridge.sh         # Host bridge run script
 ├── CMakeLists.txt             # Build configuration
 └── .github/
     └── workflows/

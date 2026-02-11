@@ -170,6 +170,124 @@ Matter: Fan speed changed to 80%
    - Bidirectional communication (control burner)
    - Enhanced diagnostics
 
+## Host Bridge Architecture (Raspberry Pi Zero)
+
+The host bridge provides a full Matter implementation running on Linux (Raspberry Pi Zero or similar).
+
+### Architecture Overview
+
+```
+Viking Bio 20 Burner
+    ↓ (TTL Serial 9600 baud)
+USB-to-Serial Adapter (or direct UART)
+    ↓ (/dev/ttyUSB0 or /dev/ttyAMA0)
+┌─────────────────────────────────────────┐
+│  Host Bridge (Linux User Space)         │
+│                                          │
+│  ┌────────────────────────────────────┐ │
+│  │  Serial Reader (POSIX termios)     │ │
+│  │  - Opens serial device             │ │
+│  │  - Non-blocking reads              │ │
+│  │  - 8N1, 9600 baud                  │ │
+│  └─────────────┬──────────────────────┘ │
+│                ↓                         │
+│  ┌────────────────────────────────────┐ │
+│  │  Protocol Parser                   │ │
+│  │  (viking_bio_protocol_linux.c)     │ │
+│  │  - Binary format: [AA][FLAGS]...   │ │
+│  │  - Text format: F:1,S:50,T:75      │ │
+│  └─────────────┬──────────────────────┘ │
+│                ↓                         │
+│  ┌────────────────────────────────────┐ │
+│  │  Matter Bridge (matter_bridge.cpp) │ │
+│  │  ┌──────────────────────────────┐  │ │
+│  │  │ Matter SDK (connectedhomeip) │  │ │
+│  │  │ - Device Layer               │  │ │
+│  │  │ - Cluster implementations    │  │ │
+│  │  │ - Commissioning              │  │ │
+│  │  │ - Event loop (threaded)      │  │ │
+│  │  └──────────────────────────────┘  │ │
+│  └─────────────┬──────────────────────┘ │
+└────────────────┼───────────────────────┘
+                 ↓ (Matter over WiFi)
+         Matter Controller
+     (Google Home, Apple Home, etc.)
+```
+
+### Matter Cluster Mapping
+
+The host bridge exposes one endpoint (Endpoint 1) with three clusters:
+
+| Cluster | ID | Attribute | Viking Bio Field | Mapping |
+|---------|-----|-----------|------------------|---------|
+| On/Off | 0x0006 | OnOff (0x0000) | flame_detected | true = flame ON, false = flame OFF |
+| Level Control | 0x0008 | CurrentLevel (0x0000) | fan_speed | 0-100% → 0-254 Matter level |
+| Temperature Measurement | 0x0402 | MeasuredValue (0x0000) | temperature | °C × 100 (Matter uses 0.01°C units) |
+
+### Key Differences from Pico Firmware
+
+| Aspect | Pico Firmware | Host Bridge |
+|--------|---------------|-------------|
+| **Platform** | RP2040 microcontroller | Linux (Raspberry Pi) |
+| **Matter Stack** | Stub/Placeholder | Full connectedhomeip SDK |
+| **Serial API** | Pico SDK UART | POSIX termios |
+| **Threading** | Single-threaded | Matter event loop in separate thread |
+| **Commissioning** | Not implemented | Full commissioning with persistent storage |
+| **Network** | Requires Pico W | Uses system WiFi |
+| **Updates** | Flash new firmware | Standard software update |
+| **Resources** | 264KB RAM, 2MB Flash | Full Linux resources |
+
+### Data Flow
+
+1. **Serial Reading**: Main loop polls serial device using `read()` with non-blocking I/O
+2. **Protocol Parsing**: `viking_bio_parse_data()` identifies packets and extracts fields
+3. **Change Detection**: Only updates Matter attributes when values actually change
+4. **Matter Updates**: Calls `MatterBridge::updateXxx()` methods which use CHIP APIs
+5. **Attribute Reporting**: Matter SDK automatically sends reports to subscribed controllers
+
+### Build System Integration
+
+The host bridge is opt-in via CMake:
+
+```cmake
+# Default: Build Pico firmware
+cmake ..
+
+# Host bridge: Build for Raspberry Pi
+cmake .. -DENABLE_MATTER=ON
+```
+
+When `ENABLE_MATTER=ON`:
+- Top-level CMakeLists.txt switches to host mode
+- Skips Pico SDK initialization
+- Adds `host_bridge/` subdirectory
+- Requires `MATTER_ROOT` environment variable
+
+### Matter SDK Integration
+
+The host bridge integrates with connectedhomeip at build time:
+
+1. User clones and builds Matter SDK separately
+2. Sets `MATTER_ROOT` environment variable
+3. CMake finds required headers and libraries
+4. Links against Matter static libraries
+5. Executable contains full Matter stack
+
+### Security Considerations
+
+- **Setup Code**: Default code (20202021) is for testing only
+- **Production**: Use secure, randomly generated setup codes
+- **Commissioning**: Matter standard security (PASE, CASE)
+- **Persistent Storage**: Fabric information stored by Matter SDK
+- **Network**: Relies on WiFi security (WPA2/WPA3)
+
+### Performance
+
+- **Latency**: Serial read → Matter update typically < 200ms
+- **CPU Usage**: < 5% on Raspberry Pi Zero (when idle)
+- **Memory**: ~50MB resident (includes Matter SDK)
+- **Network**: Minimal traffic (attribute reports on change only)
+
 ## References
 
 - [Matter Specification](https://csa-iot.org/all-solutions/matter/)
