@@ -175,7 +175,7 @@ third_party/
 
 **Default Commissioning Credentials** (TEST ONLY - from CHIPDevicePlatformConfig.h):
 - PIN: 20202021
-- Discriminator: 3840 (0x0F00) - **Reserved for testing per Matter spec 5.1.3.1**
+- Discriminator: 3840 (0x0F00) - **Reserved for testing per Matter Core Specification 5.1.3.1**
 - Manual Code: 34970112332
 - QR Code: MT:Y.K9042C00KA0648G00 (generated from PIN/discriminator; regenerate if values change)
 
