@@ -86,6 +86,7 @@ if(ENABLE_MATTER)
     target_link_libraries(viking_bio_matter
         pico_unique_id
         pico_cyw43_arch_lwip_threadsafe_background
+        pico_mbedtls
         hardware_flash
     )
 endif()
