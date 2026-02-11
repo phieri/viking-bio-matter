@@ -11,7 +11,8 @@ env:
   PICO_SDK_VERSION: 1.5.1
 
 jobs:
-  build:
+  build-standard:
+    name: Build Standard (Matter Disabled)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -20,7 +21,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v6
       with:
-        submodules: recursive
+        submodules: false  # Don't need connectedhomeip for standard build
     
     - name: Install dependencies
       run: |
@@ -47,9 +48,9 @@ jobs:
     - name: Create build directory
       run: mkdir -p build
     
-    - name: Configure CMake
+    - name: Configure CMake (Matter Disabled)
       working-directory: build
-      run: cmake .. -DCMAKE_BUILD_TYPE=Release
+      run: cmake .. -DCMAKE_BUILD_TYPE=Release -DENABLE_MATTER=OFF
     
     - name: Build firmware
       working-directory: build
@@ -64,7 +65,7 @@ jobs:
     - name: Upload firmware artifacts
       uses: actions/upload-artifact@v6
       with:
-        name: viking-bio-matter-firmware
+        name: viking-bio-matter-firmware-standard
         path: |
           build/*.uf2
           build/*.elf
@@ -75,14 +76,104 @@ jobs:
     - name: Create release info
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
-        echo "## Build Information" > build-info.txt
-        echo "Commit: ${{ github.sha }}" >> build-info.txt
-        echo "Date: $(date)" >> build-info.txt
-        echo "Pico SDK Version: ${{ env.PICO_SDK_VERSION }}" >> build-info.txt
+        echo "## Build Information (Standard)" > build-info-standard.txt
+        echo "Commit: ${{ github.sha }}" >> build-info-standard.txt
+        echo "Date: $(date)" >> build-info-standard.txt
+        echo "Pico SDK Version: ${{ env.PICO_SDK_VERSION }}" >> build-info-standard.txt
+        echo "Matter Support: Disabled" >> build-info-standard.txt
     
     - name: Upload build info
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: actions/upload-artifact@v6
       with:
-        name: build-info
-        path: build-info.txt
+        name: build-info-standard
+        path: build-info-standard.txt
+
+  build-matter:
+    name: Build Matter-Enabled (Pico W)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      with:
+        submodules: recursive  # Need connectedhomeip for Matter build
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake gcc-arm-none-eabi libnewlib-arm-none-eabi build-essential
+    
+    - name: Cache Pico SDK
+      id: cache-pico-sdk
+      uses: actions/cache@v5
+      with:
+        path: ${{ github.workspace }}/pico-sdk
+        key: pico-sdk-${{ env.PICO_SDK_VERSION }}
+    
+    - name: Clone Pico SDK
+      if: steps.cache-pico-sdk.outputs.cache-hit != 'true'
+      run: |
+        git clone --depth 1 --branch ${{ env.PICO_SDK_VERSION }} https://github.com/raspberrypi/pico-sdk.git
+        cd pico-sdk
+        git submodule update --init
+    
+    - name: Set Pico SDK path
+      run: echo "PICO_SDK_PATH=${{ github.workspace }}/pico-sdk" >> $GITHUB_ENV
+    
+    - name: Verify connectedhomeip submodule
+      run: |
+        if [ -d "third_party/connectedhomeip/src" ]; then
+          echo "✓ connectedhomeip submodule initialized"
+          ls -la third_party/connectedhomeip/src | head -5
+        else
+          echo "✗ connectedhomeip submodule missing"
+          exit 1
+        fi
+    
+    - name: Create build directory
+      run: mkdir -p build-matter
+    
+    - name: Configure CMake (Matter Enabled)
+      working-directory: build-matter
+      run: cmake .. -DCMAKE_BUILD_TYPE=Release -DENABLE_MATTER=ON
+    
+    - name: Build firmware
+      working-directory: build-matter
+      run: make -j$(nproc)
+    
+    - name: List build artifacts
+      working-directory: build-matter
+      run: |
+        echo "Build artifacts:"
+        ls -lh *.uf2 *.elf *.bin 2>/dev/null || echo "No artifacts found"
+    
+    - name: Upload firmware artifacts
+      uses: actions/upload-artifact@v6
+      with:
+        name: viking-bio-matter-firmware-matter
+        path: |
+          build-matter/*.uf2
+          build-matter/*.elf
+          build-matter/*.bin
+          build-matter/*.hex
+        if-no-files-found: warn
+    
+    - name: Create release info
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        echo "## Build Information (Matter)" > build-info-matter.txt
+        echo "Commit: ${{ github.sha }}" >> build-info-matter.txt
+        echo "Date: $(date)" >> build-info-matter.txt
+        echo "Pico SDK Version: ${{ env.PICO_SDK_VERSION }}" >> build-info-matter.txt
+        echo "Matter Support: Enabled" >> build-info-matter.txt
+        echo "Target: Raspberry Pi Pico W" >> build-info-matter.txt
+    
+    - name: Upload build info
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: actions/upload-artifact@v6
+      with:
+        name: build-info-matter
+        path: build-info-matter.txt
