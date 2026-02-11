@@ -2,6 +2,7 @@
 #include "pico/stdlib.h"
 #include "hardware/uart.h"
 #include "hardware/gpio.h"
+#include "hardware/sync.h"
 #include "serial_handler.h"
 #include "viking_bio_protocol.h"
 
