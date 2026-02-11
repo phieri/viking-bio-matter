@@ -74,6 +74,7 @@ if(ENABLE_MATTER)
     endif()
     
     target_include_directories(viking_bio_matter PRIVATE
+        platform/pico_w_chip_port/config
         platform/pico_w_chip_port
         ${CHIP_ROOT}/src
         ${CHIP_ROOT}/src/include
