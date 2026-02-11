@@ -8,18 +8,18 @@
 #include "matter_bridge.h"
 
 // LED control abstraction for different boards
-// For Matter builds (Pico W), LED is controlled via CYW43 after Matter init
-// For standard builds, LED is on GPIO 25
-#ifdef ENABLE_MATTER
-    // Pico W with Matter: LED controlled via CYW43 WiFi chip
-    #include "pico/cyw43_arch.h"
-    #define LED_INIT() do { /* CYW43 initialized by Matter platform */ } while(0)
-    #define LED_SET(state) cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, state)
-#else
-    // Standard Pico or Pico W without Matter: Direct GPIO control
+// Note: LED control is disabled for Matter builds due to CYW43 dependencies
+#ifndef ENABLE_MATTER
+    // Standard Pico: Direct GPIO control on pin 25
     #define LED_PIN 25
+    #define LED_ENABLED 1
     #define LED_INIT() do { gpio_init(LED_PIN); gpio_set_dir(LED_PIN, GPIO_OUT); } while(0)
     #define LED_SET(state) gpio_put(LED_PIN, state)
+#else
+    // Matter builds: LED control disabled (CYW43 requires complex lwIP setup)
+    #define LED_ENABLED 0
+    #define LED_INIT() do { /* LED disabled for Matter builds */ } while(0)
+    #define LED_SET(state) do { /* LED disabled */ } while(0)
 #endif
 
 int main() {
