@@ -1,6 +1,7 @@
 # Build directories
 build/
 build_host/
+build_stub/
 cmake-build-*/
 
 # Pico SDK
@@ -42,3 +43,4 @@ Thumbs.db
 *.log
 *.tmp
 /tmp/
+build_stub/
