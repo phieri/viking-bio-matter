@@ -5,6 +5,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Viking Bio 20 serial protocol definitions
 #define VIKING_BIO_BAUD_RATE 9600
 #define VIKING_BIO_DATA_BITS 8
@@ -23,5 +27,9 @@ typedef struct {
 void viking_bio_init(void);
 bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data_t *data);
 void viking_bio_get_current_data(viking_bio_data_t *data);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // VIKING_BIO_PROTOCOL_H

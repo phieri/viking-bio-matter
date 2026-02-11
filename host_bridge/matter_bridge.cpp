@@ -1,6 +1,7 @@
 #include "matter_bridge.h"
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>  // For usleep in stub mode
 
 #if MATTER_ENABLED
 
@@ -143,6 +144,9 @@ bool matter_bridge_get_qr_code(char *buffer, size_t buffer_size) {
 
 // Stub implementations when Matter is not enabled
 bool matter_bridge_init(const char *setup_code, uint16_t discriminator) {
+    (void)setup_code;  // Unused in stub mode
+    (void)discriminator;  // Unused in stub mode
+    
     printf("Matter bridge not enabled (ENABLE_MATTER not defined)\n");
     printf("This is a stub implementation. To enable Matter:\n");
     printf("  1. Install connectedhomeip SDK\n");
