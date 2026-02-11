@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 
+# Matter support option (OFF by default)
+option(ENABLE_MATTER "Enable Matter (connectedhomeip) support" OFF)
+
 # Initialize the Pico SDK
 include(pico_sdk_import.cmake)
 
@@ -10,6 +13,15 @@ set(CMAKE_CXX_STANDARD 17)
 
 # Initialize the Pico SDK
 pico_sdk_init()
+
+# Conditionally include Matter platform port
+if(ENABLE_MATTER)
+    message(STATUS "Matter support ENABLED")
+    add_subdirectory(platform/pico_w_chip_port)
+    add_compile_definitions(ENABLE_MATTER=1)
+else()
+    message(STATUS "Matter support DISABLED (use -DENABLE_MATTER=ON to enable)")
+endif()
 
 add_executable(viking_bio_matter
     src/main.c
@@ -25,6 +37,13 @@ target_link_libraries(viking_bio_matter
     hardware_gpio
     hardware_sync
 )
+
+# Link Matter platform libraries if enabled
+if(ENABLE_MATTER)
+    target_link_libraries(viking_bio_matter
+        pico_chip_port
+    )
+endif()
 
 # Enable USB output, disable UART output
 pico_enable_stdio_usb(viking_bio_matter 1)

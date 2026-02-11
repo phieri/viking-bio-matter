@@ -37,3 +37,7 @@ Thumbs.db
 *.log
 *.tmp
 /tmp/
+
+# Third-party dependencies
+third_party/connectedhomeip/
+third_party/build/

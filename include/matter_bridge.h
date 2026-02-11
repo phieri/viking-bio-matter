@@ -19,4 +19,9 @@ void matter_bridge_update_attributes(const viking_bio_data_t *data);
 void matter_bridge_task(void);
 void matter_bridge_get_attributes(matter_attributes_t *attrs);
 
+// Individual attribute update functions for Matter clusters
+void matter_bridge_update_flame(bool flame_on);
+void matter_bridge_update_fan_speed(uint8_t speed);
+void matter_bridge_update_temperature(uint16_t temp);
+
 #endif // MATTER_BRIDGE_H
