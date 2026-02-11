@@ -45,13 +45,18 @@ make -j$(nproc)
 # Initialize Matter SDK submodule (one-time, ~10-15 minutes)
 git submodule update --init --recursive third_party/connectedhomeip
 
-# Configure WiFi credentials in platform/pico_w_chip_port/network_adapter.cpp:
+# Configure WiFi credentials (RECOMMENDED: use CMake to avoid committing secrets)
+# Option 1 (Recommended): Pass via CMake
+cmake .. -DENABLE_MATTER=ON -DWIFI_SSID="YourNetwork" -DWIFI_PASSWORD="YourPassword"
+
+# Option 2 (Alternative): Edit source file platform/pico_w_chip_port/network_adapter.cpp:
 # #define WIFI_SSID "YourNetwork"
 # #define WIFI_PASSWORD "YourPassword"
+# WARNING: Be careful not to commit credentials when editing source files
 
 mkdir build-matter && cd build-matter
 export PICO_SDK_PATH=/path/to/pico-sdk  # REQUIRED
-cmake .. -DENABLE_MATTER=ON
+cmake .. -DENABLE_MATTER=ON -DWIFI_SSID="YourNetwork" -DWIFI_PASSWORD="YourPassword"
 make -j$(nproc)
 ```
 
@@ -174,7 +179,7 @@ third_party/
 - PIN: 20202021
 - Discriminator: 3840 (0x0F00)
 - Manual Code: 34970112332
-- QR Code: MT:Y.K9042C00KA0648G00 (verify format if modifying)
+- QR Code: MT:Y.K9042C00KA0648G00 (as documented; verify against Matter spec if modifying)
 
 ## CI/CD Pipeline
 
@@ -226,9 +231,10 @@ third_party/
 - Update `src/serial_handler.c` (UART configuration)
 - Update README.md wiring diagrams
 
-### WiFi Configuration
-- Edit `platform/pico_w_chip_port/network_adapter.cpp` (WIFI_SSID/PASSWORD)
-- Or use CMake: `cmake -DWIFI_SSID="..." -DWIFI_PASSWORD="..." ..`
+### WiFi Configuration (Matter builds only)
+- **Recommended**: Pass via CMake: `cmake -DENABLE_MATTER=ON -DWIFI_SSID="..." -DWIFI_PASSWORD="..."`
+- **Alternative**: Edit `platform/pico_w_chip_port/network_adapter.cpp` (WIFI_SSID/PASSWORD defines)
+  - ⚠️ WARNING: Be careful not to commit credentials to version control
 
 ## Essential Validation Before PR
 
