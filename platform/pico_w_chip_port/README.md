@@ -67,25 +67,16 @@ The port consists of several adapter layers:
 
 ### Build Configuration
 
-Enable Matter support during CMake configuration:
+Build the firmware (Matter support is always enabled):
 
 ```bash
 mkdir build
 cd build
-cmake -DENABLE_MATTER=ON ..
-make
-```
-
-This produces `viking_bio_matter.uf2` with full Matter support.
-
-To build **without** Matter (original functionality):
-
-```bash
-cmake -DENABLE_MATTER=OFF ..
-# or simply:
 cmake ..
 make
 ```
+
+This produces `viking_bio_matter.uf2` with full Matter support for Pico W.
 
 ### WiFi Configuration
 
