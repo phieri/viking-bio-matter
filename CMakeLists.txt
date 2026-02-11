@@ -23,6 +23,7 @@ target_link_libraries(viking_bio_matter
     pico_stdlib
     hardware_uart
     hardware_gpio
+    hardware_sync
 )
 
 # Enable USB output, disable UART output
