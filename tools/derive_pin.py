@@ -11,15 +11,12 @@ Algorithm:
 2. Take first 4 bytes of hash as big-endian uint32
 3. Compute PIN = (hash_value % 100000000)
 4. Format as zero-padded 8-digit string
-
-Usage:
-    python3 tools/derive_pin.py AA:BB:CC:DD:EE:FF
-    python3 tools/derive_pin.py AABBCCDDEEFF
 """
 
 import sys
 import hashlib
 import re
+import argparse
 
 # Must match PRODUCT_SALT in platform/pico_w_chip_port/platform_manager.cpp
 PRODUCT_SALT = b"VIKINGBIO-2026"
@@ -81,19 +78,24 @@ def derive_pin_from_mac(mac_bytes):
 
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: python3 derive_pin.py <MAC_ADDRESS>", file=sys.stderr)
-        print("", file=sys.stderr)
-        print("Examples:", file=sys.stderr)
-        print("  python3 derive_pin.py AA:BB:CC:DD:EE:FF", file=sys.stderr)
-        print("  python3 derive_pin.py AABBCCDDEEFF", file=sys.stderr)
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Derive Matter setup PIN from device MAC address",
+        epilog="Examples:\n"
+               "  %(prog)s AA:BB:CC:DD:EE:FF\n"
+               "  %(prog)s AABBCCDDEEFF\n"
+               "  %(prog)s 28:CD:C1:00:00:01",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        'mac_address',
+        help='Device MAC address (formats: AA:BB:CC:DD:EE:FF, AA-BB-CC-DD-EE-FF, or AABBCCDDEEFF)'
+    )
     
-    mac_str = sys.argv[1]
+    args = parser.parse_args()
     
     try:
         # Parse MAC address
-        mac_bytes = parse_mac(mac_str)
+        mac_bytes = parse_mac(args.mac_address)
         
         # Derive PIN
         pin = derive_pin_from_mac(mac_bytes)

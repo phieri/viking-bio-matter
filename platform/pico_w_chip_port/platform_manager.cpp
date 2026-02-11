@@ -29,6 +29,9 @@ void crypto_adapter_deinit(void);
 // Product salt for PIN derivation - change this for production deployments
 static const char *PRODUCT_SALT = "VIKINGBIO-2026";
 
+// Maximum salt length for PIN derivation buffer
+#define MAX_SALT_LENGTH 64
+
 static bool platform_initialized = false;
 
 /**
@@ -50,10 +53,10 @@ static int derive_setup_pin_from_mac(const uint8_t mac[6], char out_pin8[9]) {
     }
 
     // Prepare input: MAC || PRODUCT_SALT
-    uint8_t input[6 + 64]; // 6 bytes MAC + salt (max 64 bytes)
+    uint8_t input[6 + MAX_SALT_LENGTH]; // 6 bytes MAC + salt
     size_t salt_len = strlen(PRODUCT_SALT);
-    if (salt_len > 64) {
-        salt_len = 64; // Limit salt length
+    if (salt_len > MAX_SALT_LENGTH) {
+        salt_len = MAX_SALT_LENGTH; // Limit salt length
     }
     
     memcpy(input, mac, 6);
