@@ -40,7 +40,8 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
 /**
  * Get the current cached Viking Bio data
  * Returns the last successfully parsed data
- * Thread-safe: reads cached data without interrupt disable (data is always written atomically)
+ * Thread-safe: reads structure using memcpy which is safe for concurrent access
+ * Note: Individual field reads may not be consistent during concurrent writes
  * 
  * @param data Output structure to receive cached data (must not be NULL)
  */
