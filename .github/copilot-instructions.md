@@ -45,14 +45,12 @@ make -j$(nproc)
 # Initialize Matter SDK submodule (one-time, ~10-15 minutes)
 git submodule update --init --recursive third_party/connectedhomeip
 
-# Configure WiFi credentials (RECOMMENDED: use CMake to avoid committing secrets)
-# Option 1 (Recommended): Pass via CMake
+# Configure WiFi credentials (use CMake to avoid committing secrets)
 cmake .. -DENABLE_MATTER=ON -DWIFI_SSID="YourNetwork" -DWIFI_PASSWORD="YourPassword"
 
-# Option 2 (Alternative): Edit source file platform/pico_w_chip_port/network_adapter.cpp:
-# #define WIFI_SSID "YourNetwork"
-# #define WIFI_PASSWORD "YourPassword"
-# WARNING: Be careful not to commit credentials when editing source files
+# Alternative (NOT RECOMMENDED): Edit source file platform/pico_w_chip_port/network_adapter.cpp
+# This method risks accidentally committing credentials. Only use for local testing.
+# If you must edit the source file, ensure credentials are in .gitignore patterns.
 
 mkdir build-matter && cd build-matter
 export PICO_SDK_PATH=/path/to/pico-sdk  # REQUIRED
@@ -175,11 +173,13 @@ third_party/
 - **LevelControl (0x0008)**: Fan speed 0-100%
 - **TemperatureMeasurement (0x0402)**: Temperature (centidegrees)
 
-**Default Commissioning Credentials** (TEST ONLY, from CHIPDevicePlatformConfig.h):
+**Default Commissioning Credentials** (TEST ONLY - from CHIPDevicePlatformConfig.h):
 - PIN: 20202021
-- Discriminator: 3840 (0x0F00)
+- Discriminator: 3840 (0x0F00) - **Reserved for testing per Matter spec 5.1.3.1**
 - Manual Code: 34970112332
-- QR Code: MT:Y.K9042C00KA0648G00 (as documented; verify against Matter spec if modifying)
+- QR Code: MT:Y.K9042C00KA0648G00 (generated from PIN/discriminator; regenerate if values change)
+
+⚠️ **PRODUCTION WARNING**: Discriminator 3840 is reserved for testing. Production devices MUST use unique discriminators in the range 0-4095 (excluding reserved ranges). Update CHIPDevicePlatformConfig.h and regenerate QR code/manual code for production.
 
 ## CI/CD Pipeline
 
@@ -232,9 +232,9 @@ third_party/
 - Update README.md wiring diagrams
 
 ### WiFi Configuration (Matter builds only)
-- **Recommended**: Pass via CMake: `cmake -DENABLE_MATTER=ON -DWIFI_SSID="..." -DWIFI_PASSWORD="..."`
-- **Alternative**: Edit `platform/pico_w_chip_port/network_adapter.cpp` (WIFI_SSID/PASSWORD defines)
-  - ⚠️ WARNING: Be careful not to commit credentials to version control
+- **ALWAYS use CMake method**: `cmake -DENABLE_MATTER=ON -DWIFI_SSID="..." -DWIFI_PASSWORD="..."`
+- **Do NOT hardcode credentials in source files** - high risk of accidental commits to version control
+- If you must edit `platform/pico_w_chip_port/network_adapter.cpp` for testing, verify credentials won't be committed
 
 ## Essential Validation Before PR
 
