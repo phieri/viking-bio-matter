@@ -75,11 +75,10 @@ if(ENABLE_MATTER)
         ${CHIP_ROOT}/zzz_generated/app-common
     )
     
+    # Link WiFi library which includes lwIP and mbedTLS with proper configuration
     target_link_libraries(viking_bio_matter
         pico_unique_id
         pico_cyw43_arch_lwip_threadsafe_background
-        pico_lwip
-        pico_mbedtls
         hardware_flash
     )
 endif()
