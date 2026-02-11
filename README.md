@@ -93,6 +93,8 @@ F:1,S:50,T:75\n
 
 ### Build Steps
 
+#### Standard Build (Matter Disabled)
+
 ```bash
 mkdir build
 cd build
@@ -100,7 +102,41 @@ cmake ..
 make
 ```
 
-This will generate `viking_bio_matter.uf2` in the build directory.
+This will generate `viking_bio_matter.uf2` in the build directory with basic functionality (serial parsing and stub Matter bridge).
+
+#### Matter-Enabled Build (Pico W Only)
+
+For full Matter protocol support on Raspberry Pi Pico W:
+
+1. **Initialize the connectedhomeip submodule:**
+   ```bash
+   git submodule update --init --recursive third_party/connectedhomeip
+   ```
+
+2. **Configure WiFi credentials** in `platform/pico_w_chip_port/network_adapter.cpp`:
+   ```cpp
+   #define WIFI_SSID "YourNetworkName"
+   #define WIFI_PASSWORD "YourPassword"
+   ```
+
+3. **Build with Matter enabled:**
+   ```bash
+   mkdir build
+   cd build
+   cmake -DENABLE_MATTER=ON ..
+   make
+   ```
+
+This generates a Matter-enabled firmware that:
+- Connects to WiFi on boot
+- Initializes the Matter stack
+- Prints commissioning QR code and PIN
+- Exposes Viking Bio data as Matter attributes
+- Can be commissioned by Matter controllers (e.g., chip-tool)
+
+**Note:** Matter support requires Pico W for WiFi. Standard Pico is not supported for Matter builds.
+
+See [platform/pico_w_chip_port/README.md](platform/pico_w_chip_port/README.md) for detailed Matter configuration and commissioning instructions.
 
 ### Flashing the Firmware
 
@@ -115,6 +151,8 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
 
 ## Usage
 
+### Standard Mode (Matter Disabled)
+
 1. Flash the firmware to your Raspberry Pi Pico
 2. Connect the Viking Bio 20 serial output to the Pico (see Wiring section)
 3. Power the Pico via USB
@@ -127,6 +165,56 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
    # Windows (use PuTTY or similar)
    ```
 
+### Matter Mode (Pico W with ENABLE_MATTER=ON)
+
+1. Flash the Matter-enabled firmware to your Raspberry Pi Pico W
+2. Connect the Viking Bio 20 serial output to the Pico (see Wiring section)
+3. Power the Pico via USB
+4. Connect to the Pico's USB serial to view commissioning info:
+   ```bash
+   screen /dev/ttyACM0 115200
+   ```
+   
+   You'll see:
+   ```
+   ====================================
+       Matter Commissioning Info
+   ====================================
+   Setup PIN Code: 20202021
+   Discriminator:  3840 (0x0F00)
+   
+   Manual Pairing Code:
+     34970112332
+   
+   QR Code URL:
+     MT:Y.K9042C00KA0648G00
+   ====================================
+   ```
+
+5. Commission the device using chip-tool:
+   ```bash
+   chip-tool pairing code 1 34970112332
+   ```
+
+6. Control and monitor attributes:
+   ```bash
+   # Read flame status (OnOff cluster)
+   chip-tool onoff read on-off 1 1
+   
+   # Read fan speed (LevelControl cluster)
+   chip-tool levelcontrol read current-level 1 1
+   
+   # Read temperature (TemperatureMeasurement cluster)
+   chip-tool temperaturemeasurement read measured-value 1 1
+   ```
+
+**Matter Clusters Exposed:**
+- **OnOff (0x0006)**: Flame detected state
+- **LevelControl (0x0008)**: Fan speed (0-100%)
+- **TemperatureMeasurement (0x0402)**: Burner temperature
+
+⚠️ **Security Note:** Default commissioning credentials (PIN 20202021, discriminator 3840) are for **testing only**. For production deployments, generate unique per-device credentials and update `platform/pico_w_chip_port/CHIPDevicePlatformConfig.h`.
+
 ## Development
 
 ### Project Structure
@@ -137,12 +225,23 @@ viking-bio-matter/
 │   ├── main.c                 # Main application entry point
 │   ├── serial_handler.c       # UART/serial communication
 │   ├── viking_bio_protocol.c  # Viking Bio protocol parser
-│   └── matter_bridge.c        # Matter bridge implementation
+│   └── matter_bridge.c        # Matter bridge implementation (with/without Matter)
 ├── include/
 │   ├── serial_handler.h
 │   ├── viking_bio_protocol.h
 │   └── matter_bridge.h
-├── CMakeLists.txt             # Build configuration
+├── platform/
+│   └── pico_w_chip_port/      # Matter platform port for Pico W
+│       ├── network_adapter.cpp    # WiFi/lwIP integration
+│       ├── storage_adapter.cpp    # Flash storage for fabrics
+│       ├── crypto_adapter.cpp     # mbedTLS crypto
+│       ├── platform_manager.cpp   # Platform coordination
+│       └── README.md              # Detailed Matter documentation
+├── third_party/
+│   └── connectedhomeip/       # Matter SDK submodule (when initialized)
+├── examples/
+│   └── viking_bio_simulator.py # Serial data simulator for testing
+├── CMakeLists.txt             # Build configuration with ENABLE_MATTER option
 └── .github/
     └── workflows/
         └── build-firmware.yml # CI/CD pipeline
