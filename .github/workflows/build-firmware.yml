@@ -40,7 +40,7 @@ jobs:
       run: |
         git clone --depth 1 --branch ${{ env.PICO_SDK_VERSION }} https://github.com/raspberrypi/pico-sdk.git
         cd pico-sdk
-        git submodule update --init
+        git submodule update --init --recursive
     
     - name: Set Pico SDK path
       run: echo "PICO_SDK_PATH=${{ github.workspace }}/pico-sdk" >> $GITHUB_ENV
@@ -118,7 +118,7 @@ jobs:
       run: |
         git clone --depth 1 --branch ${{ env.PICO_SDK_VERSION }} https://github.com/raspberrypi/pico-sdk.git
         cd pico-sdk
-        git submodule update --init
+        git submodule update --init --recursive
     
     - name: Set Pico SDK path
       run: echo "PICO_SDK_PATH=${{ github.workspace }}/pico-sdk" >> $GITHUB_ENV
