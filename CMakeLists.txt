@@ -47,9 +47,26 @@ set(CONFIG_CHIP_ENABLE_PAIRING_AUTOSTART ON)
 set(CHIP_ROOT "${CMAKE_SOURCE_DIR}/third_party/connectedhomeip")
 if(NOT EXISTS "${CHIP_ROOT}/src")
     message(FATAL_ERROR 
-        "connectedhomeip submodule not found at ${CHIP_ROOT}\n"
-        "Please run: git submodule update --init --recursive third_party/connectedhomeip\n"
-        "Or clone with: git clone --recurse-submodules --branch v1.3-branch https://github.com/project-chip/connectedhomeip.git third_party/connectedhomeip")
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "  ERROR: Matter SDK (connectedhomeip) not found\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "\n"
+        "The Matter SDK is required to build this firmware.\n"
+        "Location checked: ${CHIP_ROOT}\n"
+        "\n"
+        "To fix this, run ONE of the following:\n"
+        "\n"
+        "Option 1 - Initialize submodule (RECOMMENDED):\n"
+        "  git submodule update --init --recursive third_party/connectedhomeip\n"
+        "  (This will take 10-15 minutes on first run)\n"
+        "\n"
+        "Option 2 - Manual clone:\n"
+        "  git clone --depth 1 --branch v1.3-branch \\\n"
+        "    https://github.com/project-chip/connectedhomeip.git \\\n"
+        "    third_party/connectedhomeip\n"
+        "\n"
+        "After initialization, re-run cmake.\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 endif()
 
 target_include_directories(viking_bio_matter PRIVATE

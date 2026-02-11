@@ -26,7 +26,11 @@ int crypto_adapter_init(void);
 int crypto_adapter_random(uint8_t *buffer, size_t length);
 void crypto_adapter_deinit(void);
 
-// Product salt for PIN derivation - change this for production deployments
+// Product salt for PIN derivation
+// This constant is combined with the device MAC address to derive a unique
+// setup PIN for Matter commissioning. Change this value for production
+// deployments to ensure product-specific PINs.
+// Must match PRODUCT_SALT in tools/derive_pin.py for offline PIN computation.
 static const char *PRODUCT_SALT = "VIKINGBIO-2026";
 
 // Maximum salt length for PIN derivation buffer
@@ -37,15 +41,26 @@ static bool platform_initialized = false;
 /**
  * @brief Derive an 8-digit setup PIN from device MAC address
  * 
- * Algorithm:
- * 1. Hash MAC || PRODUCT_SALT with SHA-256
- * 2. Take first 4 bytes of hash as big-endian uint32
- * 3. Compute PIN = (hash_value % 100000000)
- * 4. Format as zero-padded 8-digit string
+ * This function computes a deterministic 8-digit Matter setup PIN from the
+ * device's MAC address. Each device with a unique MAC gets a unique PIN.
  * 
- * @param mac 6-byte MAC address
- * @param out_pin8 Output buffer for 8-digit PIN + null terminator (9 bytes)
- * @return 0 on success, -1 on failure
+ * Algorithm:
+ * 1. Concatenate MAC address with PRODUCT_SALT constant
+ * 2. Compute SHA-256 hash of the concatenated data
+ * 3. Extract first 4 bytes of hash as big-endian uint32
+ * 4. Compute PIN = (hash_value % 100000000) to get 8-digit number
+ * 5. Format as zero-padded string "00000000" to "99999999"
+ * 
+ * The PRODUCT_SALT constant ensures different products using this code
+ * get different PINs even with the same MAC address. For production,
+ * change PRODUCT_SALT to a product-specific value.
+ * 
+ * Note: The Python tool tools/derive_pin.py implements the same algorithm
+ * and can be used to compute PINs offline from MAC addresses.
+ * 
+ * @param mac 6-byte MAC address (must not be NULL)
+ * @param out_pin8 Output buffer for 8-digit PIN + null terminator (9 bytes, must not be NULL)
+ * @return 0 on success, -1 on failure (NULL parameters)
  */
 static int derive_setup_pin_from_mac(const uint8_t mac[6], char out_pin8[9]) {
     if (!mac || !out_pin8) {

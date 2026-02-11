@@ -36,6 +36,7 @@ void matter_bridge_task(void);
 
 /**
  * Get current Matter attributes
+ * Returns cached attributes without locking (safe for read-only access)
  * 
  * @param attrs Output structure to receive attributes (must not be NULL)
  */
