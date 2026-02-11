@@ -1,6 +1,7 @@
 #include "matter_bridge.h"
 #include <iostream>
 #include <cstring>
+#include <unistd.h>  // for usleep
 
 #ifdef ENABLE_MATTER
 // Include Matter SDK headers when available
@@ -121,7 +122,8 @@ void MatterBridge::updateFanSpeed(uint8_t speedPercent) {
     
     // Update Level Control cluster attribute (Cluster 0x0008)
     // Map 0-100% to 0-254 (Matter level range)
-    uint8_t matterLevel = (speedPercent * 254) / 100;
+    // Use wider type to prevent overflow
+    uint8_t matterLevel = (static_cast<uint16_t>(speedPercent) * 254) / 100;
     
     EmberAfStatus status = LevelControl::Attributes::CurrentLevel::Set(1, matterLevel);
     if (status != EMBER_ZCL_STATUS_SUCCESS) {
@@ -155,13 +157,9 @@ void MatterBridge::updateTemperature(int16_t tempCelsius) {
 
 void MatterBridge::processEvents() {
 #ifdef ENABLE_MATTER
-    using namespace chip::DeviceLayer;
-    
     // The event loop is running in its own thread, so we don't need to do much here
-    // Just yield to allow other threads to run
-    PlatformMgr().ScheduleWork([](intptr_t) {
-        // Periodic work can be done here if needed
-    });
+    // Just a small yield to allow other threads to run
+    usleep(1000); // 1ms
 #endif
 }
 

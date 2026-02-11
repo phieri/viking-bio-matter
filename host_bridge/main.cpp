@@ -190,7 +190,13 @@ int main(int argc, char** argv) {
     
     // Main loop
     uint8_t buffer[256];
-    viking_bio_data_t last_data = {0};
+    viking_bio_data_t last_data = {
+        .flame_detected = false,
+        .fan_speed = 0,
+        .temperature = 0,
+        .error_code = 0,
+        .valid = false
+    };
     
     while (g_running) {
         // Read from serial port

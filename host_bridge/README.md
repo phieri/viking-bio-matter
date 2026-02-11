@@ -53,8 +53,9 @@ The bridge implements the following Matter clusters for the burner:
    # Build the SDK (this takes a while on Pi Zero - consider cross-compiling)
    ./scripts/build/build_examples.py --target linux-x64-chip-tool build
    
-   # Or for ARM (Raspberry Pi):
-   # ./scripts/build/build_examples.py --target linux-arm64-chip-tool build
+   # Or for ARM 32-bit (Raspberry Pi Zero, which uses ARMv6):
+   # Note: Pi Zero uses 32-bit ARM, not ARM64
+   ./scripts/build/build_examples.py --target linux-arm-chip-tool build
    
    # Set MATTER_ROOT environment variable
    export MATTER_ROOT=$(pwd)

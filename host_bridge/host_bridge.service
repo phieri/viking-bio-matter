@@ -9,6 +9,9 @@ User=pi
 Group=pi
 WorkingDirectory=/home/pi/viking-bio-matter
 Environment="MATTER_ROOT=/home/pi/connectedhomeip"
+# IMPORTANT: Change the setup code to a unique value for production!
+# The default 20202021 is for testing only and is insecure.
+# Generate a secure code: python3 -c "import random; print(random.randint(10000000, 99999999))"
 ExecStart=/home/pi/viking-bio-matter/build_host/host_bridge/host_bridge --device /dev/ttyUSB0 --setup-code 20202021
 Restart=on-failure
 RestartSec=10
