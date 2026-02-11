@@ -216,17 +216,6 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
    chip-tool temperaturemeasurement read measured-value 1 1
    ```
 
-For detailed Matter configuration and troubleshooting, see [platform/pico_w_chip_port/README.md](platform/pico_w_chip_port/README.md).
-   # Read flame status (OnOff cluster)
-   chip-tool onoff read on-off 1 1
-   
-   # Read fan speed (LevelControl cluster)
-   chip-tool levelcontrol read current-level 1 1
-   
-   # Read temperature (TemperatureMeasurement cluster)
-   chip-tool temperaturemeasurement read measured-value 1 1
-   ```
-
 **Matter Clusters Exposed:**
 - **OnOff (0x0006)**: Flame detected state
 - **LevelControl (0x0008)**: Fan speed (0-100%)
