@@ -99,7 +99,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v6
       with:
-        submodules: recursive  # Need connectedhomeip for Matter build
+        submodules: false  # We'll manually checkout connectedhomeip
     
     - name: Install dependencies
       run: |
@@ -122,6 +122,13 @@ jobs:
     
     - name: Set Pico SDK path
       run: echo "PICO_SDK_PATH=${{ github.workspace }}/pico-sdk" >> $GITHUB_ENV
+    
+    - name: Checkout connectedhomeip
+      run: |
+        echo "Cloning connectedhomeip (v1.3-branch)..."
+        mkdir -p third_party
+        git clone --depth 1 --branch v1.3-branch https://github.com/project-chip/connectedhomeip.git third_party/connectedhomeip
+        echo "✓ connectedhomeip cloned successfully"
     
     - name: Verify connectedhomeip submodule
       run: |
