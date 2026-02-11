@@ -7,20 +7,11 @@
 #include "viking_bio_protocol.h"
 #include "matter_bridge.h"
 
-// LED control abstraction for different boards
-// Note: LED control is disabled for Matter builds due to CYW43 dependencies
-#ifndef ENABLE_MATTER
-    // Standard Pico: Direct GPIO control on pin 25
-    #define LED_PIN 25
-    #define LED_ENABLED 1
-    #define LED_INIT() do { gpio_init(LED_PIN); gpio_set_dir(LED_PIN, GPIO_OUT); } while(0)
-    #define LED_SET(state) gpio_put(LED_PIN, state)
-#else
-    // Matter builds: LED control disabled (CYW43 requires complex lwIP setup)
-    #define LED_ENABLED 0
-    #define LED_INIT() do { /* LED disabled for Matter builds */ } while(0)
-    #define LED_SET(state) do { /* LED disabled */ } while(0)
-#endif
+// LED control for Pico W (CYW43 chip controls the LED, but requires complex setup)
+// LED is disabled for Matter builds to avoid lwIP dependency issues in main
+#define LED_ENABLED 0
+#define LED_INIT() do { /* LED disabled for Matter builds */ } while(0)
+#define LED_SET(state) do { /* LED disabled */ } while(0)
 
 int main() {
     // Initialize standard I/O

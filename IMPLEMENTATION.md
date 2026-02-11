@@ -15,22 +15,14 @@ Created a complete Matter platform port at `platform/pico_w_chip_port/` with:
 
 ### 2. Build System Integration
 
-- Added `ENABLE_MATTER` CMake option (default: OFF)
-- Conditional compilation ensures backward compatibility
-- When enabled, links Pico W libraries (pico_cyw43_arch, pico_mbedtls, pico_lwip)
-- Standard builds unchanged, work on both Pico and Pico W
+- Pico W board required (PICO_BOARD=pico_w automatically set)
+- Links Pico W libraries (pico_cyw43_arch, pico_mbedtls, pico_lwip)
+- Matter support is always enabled
 
 ### 3. Matter Bridge Implementation
 
-Updated `src/matter_bridge.c` with two modes:
+Updated `src/matter_bridge.c`:
 
-**Stub Mode (ENABLE_MATTER=OFF):**
-- Basic attribute tracking
-- Console logging only
-- No network required
-- Compatible with Pico and Pico W
-
-**Full Mode (ENABLE_MATTER=ON):**
 - Complete Matter stack initialization
 - WiFi connectivity
 - Commissioning flow with QR code display
@@ -81,20 +73,20 @@ Comprehensive documentation added:
 
 ### 7. CI/CD Integration
 
-Updated `.github/workflows/build-firmware.yml` with parallel build jobs:
+Updated `.github/workflows/build-firmware.yml`:
 
-- **build-standard**: Builds with ENABLE_MATTER=OFF (default)
-- **build-matter**: Builds with ENABLE_MATTER=ON (Pico W)
-
-Both jobs produce separate firmware artifacts.
+- Single build job that always builds with Matter enabled
+- Produces firmware artifacts for Pico W
 
 ## Build Instructions
 
-### Standard Build (Matter Disabled)
-
 ```bash
+# Initialize Matter SDK submodule
+git submodule update --init --recursive third_party/connectedhomeip
+
+# Build
 mkdir build && cd build
-cmake .. -DENABLE_MATTER=OFF
+cmake ..
 make
 ```
 
@@ -106,16 +98,7 @@ Produces `viking_bio_matter.uf2` for Pico or Pico W with stub Matter bridge.
 # Initialize submodule
 git submodule update --init --recursive third_party/connectedhomeip
 
-# Configure WiFi in platform/pico_w_chip_port/network_adapter.cpp
-# Update WIFI_SSID and WIFI_PASSWORD
-
-# Build
-mkdir build && cd build
-cmake .. -DENABLE_MATTER=ON
-make
-```
-
-Produces `viking_bio_matter.uf2` with full Matter support.
+**Produces** `viking_bio_matter.uf2` with full Matter support.
 
 ## Commissioning
 
@@ -193,10 +176,10 @@ viking-bio-matter/
 ├── src/matter_bridge.c            # Updated with Matter integration
 ├── third_party/connectedhomeip/   # Matter SDK submodule
 ├── .gitmodules                    # Submodule configuration
-├── CMakeLists.txt                 # Updated with ENABLE_MATTER
+├── CMakeLists.txt                 # Build configuration
 ├── run.sh                         # Helper script
 └── .github/workflows/
-    └── build-firmware.yml         # CI with dual build jobs
+    └── build-firmware.yml         # CI build pipeline
 ```
 
 ## Next Steps

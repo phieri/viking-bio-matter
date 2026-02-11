@@ -15,8 +15,7 @@ typedef struct {
 
 /**
  * Initialize the Matter bridge
- * In full mode (ENABLE_MATTER=ON): Initializes platform, connects WiFi, prints commissioning info
- * In stub mode: Just logs initialization message
+ * Initializes platform, connects WiFi, and prints commissioning info
  */
 void matter_bridge_init(void);
 
@@ -30,7 +29,7 @@ void matter_bridge_update_attributes(const viking_bio_data_t *data);
 
 /**
  * Periodic task for Matter bridge processing
- * Processes platform tasks when in full Matter mode
+ * Processes Matter platform tasks
  * Call regularly in main loop
  */
 void matter_bridge_task(void);
