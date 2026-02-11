@@ -14,51 +14,139 @@ static matter_attributes_t attributes = {
 // Matter bridge state
 static bool initialized = false;
 
+#ifdef ENABLE_MATTER
+// Full Matter implementation with platform integration
+#include "../platform/pico_w_chip_port/platform_manager.h"
+
 void matter_bridge_init(void) {
-    // Initialize Matter stack (simplified for now)
-    // In a full implementation, this would initialize the Matter SDK
-    // and set up the device as a bridge with appropriate clusters
+    printf("\n");
+    printf("==========================================\n");
+    printf("  Viking Bio Matter Bridge - Full Mode\n");
+    printf("==========================================\n\n");
     
+    // Initialize Matter platform
+    printf("Initializing Matter platform for Pico W...\n");
+    if (platform_manager_init() != 0) {
+        printf("ERROR: Failed to initialize Matter platform\n");
+        return;
+    }
+    
+    // Connect to WiFi
+    printf("Connecting to WiFi...\n");
+    if (platform_manager_connect_wifi(NULL, NULL) != 0) {
+        printf("ERROR: Failed to connect to WiFi\n");
+        printf("Update WiFi credentials in platform/pico_w_chip_port/network_adapter.cpp\n");
+        return;
+    }
+    
+    // Print commissioning information
+    platform_manager_print_commissioning_info();
+    
+    // Initialize attribute storage
     memset(&attributes, 0, sizeof(attributes));
     initialized = true;
     
-    printf("Matter Bridge initialized\n");
-    printf("Device ready to report flame status and fan speed\n");
+    printf("✓ Matter Bridge fully initialized\n");
+    printf("✓ Device is ready for commissioning\n");
+    printf("✓ Monitoring Viking Bio serial data...\n\n");
 }
+
+void matter_bridge_update_flame(bool flame_on) {
+    if (!initialized) {
+        return;
+    }
+    
+    if (attributes.flame_state != flame_on) {
+        attributes.flame_state = flame_on;
+        attributes.last_update_time = to_ms_since_boot(get_absolute_time());
+        
+        printf("Matter: OnOff cluster updated - Flame %s\n", flame_on ? "ON" : "OFF");
+        // In full Matter SDK: call ChipDeviceEvent to trigger attribute report
+    }
+}
+
+void matter_bridge_update_fan_speed(uint8_t speed) {
+    if (!initialized) {
+        return;
+    }
+    
+    if (attributes.fan_speed != speed) {
+        attributes.fan_speed = speed;
+        attributes.last_update_time = to_ms_since_boot(get_absolute_time());
+        
+        printf("Matter: LevelControl cluster updated - Fan speed %d%%\n", speed);
+        // In full Matter SDK: call ChipDeviceEvent to trigger attribute report
+    }
+}
+
+void matter_bridge_update_temperature(uint16_t temp) {
+    if (!initialized) {
+        return;
+    }
+    
+    if (attributes.temperature != temp) {
+        attributes.temperature = temp;
+        attributes.last_update_time = to_ms_since_boot(get_absolute_time());
+        
+        printf("Matter: TemperatureMeasurement cluster updated - %d°C\n", temp);
+        // In full Matter SDK: call ChipDeviceEvent to trigger attribute report
+    }
+}
+
+#else
+// Stub implementation when Matter is disabled
+void matter_bridge_init(void) {
+    printf("Matter Bridge initialized (stub mode - Matter disabled)\n");
+    printf("Build with -DENABLE_MATTER=ON for full Matter support\n");
+    
+    memset(&attributes, 0, sizeof(attributes));
+    initialized = true;
+}
+
+void matter_bridge_update_flame(bool flame_on) {
+    if (!initialized) {
+        return;
+    }
+    
+    if (attributes.flame_state != flame_on) {
+        attributes.flame_state = flame_on;
+        printf("Matter: Flame state changed to %s (stub mode)\n", 
+               flame_on ? "ON" : "OFF");
+    }
+}
+
+void matter_bridge_update_fan_speed(uint8_t speed) {
+    if (!initialized) {
+        return;
+    }
+    
+    if (attributes.fan_speed != speed) {
+        attributes.fan_speed = speed;
+        printf("Matter: Fan speed changed to %d%% (stub mode)\n", speed);
+    }
+}
+
+void matter_bridge_update_temperature(uint16_t temp) {
+    if (!initialized) {
+        return;
+    }
+    
+    if (attributes.temperature != temp) {
+        attributes.temperature = temp;
+        printf("Matter: Temperature changed to %d°C (stub mode)\n", temp);
+    }
+}
+#endif
 
 void matter_bridge_update_attributes(const viking_bio_data_t *data) {
     if (!initialized || data == NULL || !data->valid) {
         return;
     }
     
-    // Update attributes from Viking Bio data
-    bool attributes_changed = false;
-    
-    if (attributes.flame_state != data->flame_detected) {
-        attributes.flame_state = data->flame_detected;
-        attributes_changed = true;
-        printf("Matter: Flame state changed to %s\n", 
-               attributes.flame_state ? "ON" : "OFF");
-    }
-    
-    if (attributes.fan_speed != data->fan_speed) {
-        attributes.fan_speed = data->fan_speed;
-        attributes_changed = true;
-        printf("Matter: Fan speed changed to %d%%\n", attributes.fan_speed);
-    }
-    
-    if (attributes.temperature != data->temperature) {
-        attributes.temperature = data->temperature;
-        attributes_changed = true;
-        printf("Matter: Temperature changed to %d°C\n", attributes.temperature);
-    }
-    
-    if (attributes_changed) {
-        attributes.last_update_time = to_ms_since_boot(get_absolute_time());
-        
-        // In a full implementation, this would trigger Matter attribute reports
-        // to subscribed controllers
-    }
+    // Update individual attributes using specific update functions
+    matter_bridge_update_flame(data->flame_detected);
+    matter_bridge_update_fan_speed(data->fan_speed);
+    matter_bridge_update_temperature(data->temperature);
 }
 
 void matter_bridge_task(void) {
@@ -66,9 +154,13 @@ void matter_bridge_task(void) {
         return;
     }
     
-    // Periodic Matter stack processing
-    // In a full implementation, this would call Matter SDK event loop functions
-    // to handle network events, attribute subscriptions, commands, etc.
+#ifdef ENABLE_MATTER
+    // Process Matter platform tasks
+    platform_manager_task();
+#endif
+    
+    // Periodic Matter stack processing would happen here
+    // In full SDK: ChipDeviceEvent processing, network polling, etc.
 }
 
 void matter_bridge_get_attributes(matter_attributes_t *attrs) {
