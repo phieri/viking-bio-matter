@@ -28,9 +28,14 @@ int main() {
     
     printf("Viking Bio Matter Bridge starting...\n");
     
-    // Initialize components
+    // Initialize components in order
+    printf("Initializing Viking Bio protocol parser...\n");
     viking_bio_init();
+    
+    printf("Initializing serial handler...\n");
     serial_handler_init();
+    
+    printf("Initializing Matter bridge...\n");
     matter_bridge_init();
     
     printf("Initialization complete. Reading serial data...\n");

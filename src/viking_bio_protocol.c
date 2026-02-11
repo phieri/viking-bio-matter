@@ -12,10 +12,13 @@ static viking_bio_data_t current_data = {
     .valid = false
 };
 
-// Protocol constants
+// Protocol constants for Viking Bio 20 burner
 #define VIKING_BIO_START_BYTE 0xAA
 #define VIKING_BIO_END_BYTE 0x55
-#define VIKING_BIO_MIN_PACKET_SIZE 6
+#define VIKING_BIO_MIN_PACKET_SIZE 6  // START + FLAGS + SPEED + TEMP_H + TEMP_L + END
+#define VIKING_BIO_MAX_TEMPERATURE 500  // Maximum valid temperature in Celsius
+#define VIKING_BIO_MIN_TEMPERATURE -50   // Minimum valid temperature in Celsius (for text protocol)
+#define VIKING_BIO_MAX_TEXT_LENGTH 256   // Maximum text protocol message length
 
 void viking_bio_init(void) {
     // Initialize data structure
@@ -28,12 +31,21 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
         return false;
     }
     
+    // Initialize output data to safe defaults
+    memset(data, 0, sizeof(viking_bio_data_t));
+    data->valid = false;
+    
     // Simple protocol parser
     // Format: [START_BYTE] [FLAGS] [FAN_SPEED] [TEMP_HIGH] [TEMP_LOW] [END_BYTE]
     // FLAGS bit 0: flame detected
     // FLAGS bit 1-7: error codes
     
-    for (size_t i = 0; i < length - VIKING_BIO_MIN_PACKET_SIZE + 1; i++) {
+    // Ensure we don't read past buffer end
+    if (length < VIKING_BIO_MIN_PACKET_SIZE) {
+        return false;
+    }
+    
+    for (size_t i = 0; i <= length - VIKING_BIO_MIN_PACKET_SIZE; i++) {
         if (buffer[i] == VIKING_BIO_START_BYTE) {
             // Check for valid end byte
             if (buffer[i + 5] == VIKING_BIO_END_BYTE) {
@@ -45,12 +57,16 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
                 // Parse data
                 data->flame_detected = (flags & 0x01) != 0;
                 // Clamp fan speed to valid range 0-100
-                if (fan_speed > 100) {
-                    data->fan_speed = 100;
-                } else {
-                    data->fan_speed = fan_speed;
+                data->fan_speed = (fan_speed > 100) ? 100 : fan_speed;
+                
+                // Parse temperature (16-bit value)
+                uint16_t temp = ((uint16_t)temp_high << 8) | temp_low;
+                // Validate temperature is within reasonable range
+                if (temp > VIKING_BIO_MAX_TEMPERATURE) {
+                    // Invalid temperature, skip this packet
+                    continue;
                 }
-                data->temperature = ((uint16_t)temp_high << 8) | temp_low;
+                data->temperature = temp;
                 data->error_code = (flags >> 1) & 0x7F;
                 data->valid = true;
                 
@@ -64,13 +80,14 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
     
     // If no valid packet found, try simple text protocol fallback
     // Format: "F:1,S:50,T:75\n" (Flame:bool, Speed:%, Temp:°C)
-    if (length > 10) {
-        char str_buffer[256];
+    if (length > 10 && length < VIKING_BIO_MAX_TEXT_LENGTH) {  // Sanity check on input length
+        char str_buffer[VIKING_BIO_MAX_TEXT_LENGTH];
         size_t copy_len = length < sizeof(str_buffer) - 1 ? length : sizeof(str_buffer) - 1;
         memcpy(str_buffer, buffer, copy_len);
         str_buffer[copy_len] = '\0';
         
         int flame = 0, speed = 0, temp = 0;
+        // Use explicit format with length limits to prevent overflow
         if (sscanf(str_buffer, "F:%d,S:%d,T:%d", &flame, &speed, &temp) == 3) {
             data->flame_detected = flame != 0;
             // Clamp fan speed to valid range 0-100
@@ -79,9 +96,13 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
             } else if (speed > 100) {
                 data->fan_speed = 100;
             } else {
-                data->fan_speed = speed;
+                data->fan_speed = (uint8_t)speed;
             }
-            data->temperature = temp;
+            // Validate temperature is within reasonable range
+            if (temp < VIKING_BIO_MIN_TEMPERATURE || temp > VIKING_BIO_MAX_TEMPERATURE) {
+                return false;
+            }
+            data->temperature = (uint16_t)temp;
             data->error_code = 0;
             data->valid = true;
             

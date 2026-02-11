@@ -55,10 +55,18 @@ void serial_handler_task(void) {
 }
 
 bool serial_handler_data_available(void) {
-    return buffer_count > 0;
+    // Read buffer_count atomically to avoid race condition
+    uint32_t interrupts = save_and_disable_interrupts();
+    bool has_data = buffer_count > 0;
+    restore_interrupts(interrupts);
+    return has_data;
 }
 
 size_t serial_handler_read(uint8_t *buffer, size_t max_length) {
+    if (buffer == NULL || max_length == 0) {
+        return 0;
+    }
+    
     size_t bytes_read = 0;
     
     // Disable interrupts while reading from buffer
