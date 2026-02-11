@@ -16,8 +16,8 @@ static viking_bio_data_t current_data = {
 #define VIKING_BIO_START_BYTE 0xAA
 #define VIKING_BIO_END_BYTE 0x55
 #define VIKING_BIO_MIN_PACKET_SIZE 6  // START + FLAGS + SPEED + TEMP_H + TEMP_L + END
-#define VIKING_BIO_MAX_TEMPERATURE 500  // Maximum valid temperature in Celsius
-#define VIKING_BIO_MIN_TEMPERATURE -50   // Minimum valid temperature in Celsius (for text protocol)
+#define VIKING_BIO_MAX_TEMPERATURE 500  // Maximum valid temperature in Celsius (burner operational limit)
+#define VIKING_BIO_MIN_TEXT_TEMPERATURE -50   // Text protocol allows negative temps for error reporting
 #define VIKING_BIO_MAX_TEXT_LENGTH 256   // Maximum text protocol message length
 
 void viking_bio_init(void) {
@@ -61,7 +61,7 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
                 
                 // Parse temperature (16-bit value)
                 uint16_t temp = ((uint16_t)temp_high << 8) | temp_low;
-                // Validate temperature is within reasonable range
+                // Validate temperature is within reasonable range (binary protocol uses unsigned, so min is 0)
                 if (temp > VIKING_BIO_MAX_TEMPERATURE) {
                     // Invalid temperature, skip this packet
                     continue;
@@ -99,7 +99,7 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
                 data->fan_speed = (uint8_t)speed;
             }
             // Validate temperature is within reasonable range
-            if (temp < VIKING_BIO_MIN_TEMPERATURE || temp > VIKING_BIO_MAX_TEMPERATURE) {
+            if (temp < VIKING_BIO_MIN_TEXT_TEMPERATURE || temp > VIKING_BIO_MAX_TEMPERATURE) {
                 return false;
             }
             data->temperature = (uint16_t)temp;
