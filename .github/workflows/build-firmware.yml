@@ -18,7 +18,7 @@ jobs:
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         submodules: recursive
     
@@ -29,7 +29,7 @@ jobs:
     
     - name: Cache Pico SDK
       id: cache-pico-sdk
-      uses: actions/cache@v3
+      uses: actions/cache@v5
       with:
         path: ${{ github.workspace }}/pico-sdk
         key: pico-sdk-${{ env.PICO_SDK_VERSION }}
@@ -62,7 +62,7 @@ jobs:
         ls -lh *.uf2 *.elf *.bin 2>/dev/null || echo "No artifacts found"
     
     - name: Upload firmware artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v6
       with:
         name: viking-bio-matter-firmware
         path: |
@@ -82,7 +82,7 @@ jobs:
     
     - name: Upload build info
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v6
       with:
         name: build-info
         path: build-info.txt
