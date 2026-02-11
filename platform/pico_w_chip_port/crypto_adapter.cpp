@@ -24,7 +24,9 @@ int crypto_adapter_init(void) {
 
     printf("Initializing crypto adapter (mbedTLS stub)...\n");
 
-    // TODO: Initialize proper DRBG when SDK issues are resolved
+    // TODO: Initialize proper DRBG when Pico SDK mbedTLS issues are resolved
+    // Current issue: SDK 1.5.1 mbedTLS has missing limits.h includes in CTR_DRBG
+    // Workaround: Using stub mode without DRBG for now
     // For now, mark as initialized
     crypto_initialized = true;
 
@@ -37,8 +39,10 @@ int crypto_adapter_random(uint8_t *buffer, size_t length) {
         return -1;
     }
 
-    // TODO: Implement proper RNG when SDK issues resolved
-    // For now, return error
+    // TODO: Implement proper RNG when Pico SDK mbedTLS issues are resolved
+    // Current issue: DRBG initialization requires entropy source setup
+    // Workaround: RNG currently unavailable, returns error
+    // For testing only - Matter commissioning does not currently use this
     return -1;
 }
 
@@ -137,7 +141,8 @@ void crypto_adapter_deinit(void) {
         return;
     }
 
-    // TODO: Free resources when DRBG is implemented
+    // TODO: Free DRBG/entropy resources when implemented
+    // Currently no resources to free in stub mode
     crypto_initialized = false;
     printf("Crypto adapter deinitialized (stub)\n");
 }

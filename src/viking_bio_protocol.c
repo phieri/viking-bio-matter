@@ -17,7 +17,6 @@ static viking_bio_data_t current_data = {
 #define VIKING_BIO_END_BYTE 0x55
 #define VIKING_BIO_MIN_PACKET_SIZE 6  // START + FLAGS + SPEED + TEMP_H + TEMP_L + END
 #define VIKING_BIO_MAX_TEMPERATURE 500  // Maximum valid temperature in Celsius (burner operational limit)
-#define VIKING_BIO_MIN_TEXT_TEMPERATURE -50   // Text protocol allows negative temps for error reporting
 #define VIKING_BIO_MAX_TEXT_LENGTH 256   // Maximum text protocol message length
 
 void viking_bio_init(void) {
@@ -98,8 +97,8 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
             } else {
                 data->fan_speed = (uint8_t)speed;
             }
-            // Validate temperature is within reasonable range
-            if (temp < VIKING_BIO_MIN_TEXT_TEMPERATURE || temp > VIKING_BIO_MAX_TEMPERATURE) {
+            // Validate temperature is within reasonable range (0-500°C for burner)
+            if (temp < 0 || temp > VIKING_BIO_MAX_TEMPERATURE) {
                 return false;
             }
             data->temperature = (uint16_t)temp;
