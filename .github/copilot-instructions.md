@@ -50,7 +50,10 @@ mkdir build-matter && cd build-matter
 export PICO_SDK_PATH=/path/to/pico-sdk  # REQUIRED
 
 # Configure with WiFi credentials (use CMake to avoid committing secrets)
-cmake .. -DENABLE_MATTER=ON -DWIFI_SSID="YourNetwork" -DWIFI_PASSWORD="YourPassword"
+# RECOMMENDED: Use environment variables to avoid shell history exposure
+export WIFI_SSID="YourNetwork"
+export WIFI_PASSWORD="YourPassword"
+cmake .. -DENABLE_MATTER=ON -DWIFI_SSID="$WIFI_SSID" -DWIFI_PASSWORD="$WIFI_PASSWORD"
 
 # Alternative (NOT RECOMMENDED): Edit source file platform/pico_w_chip_port/network_adapter.cpp
 # This method risks accidentally committing credentials. Only use for local testing.
@@ -232,7 +235,13 @@ third_party/
 - Update README.md wiring diagrams
 
 ### WiFi Configuration (Matter builds only)
-- **ALWAYS use CMake method**: `cmake -DENABLE_MATTER=ON -DWIFI_SSID="..." -DWIFI_PASSWORD="..."`
+- **ALWAYS use CMake with environment variables**: 
+  ```bash
+  export WIFI_SSID="YourNetwork"
+  export WIFI_PASSWORD="YourPassword"
+  cmake -DENABLE_MATTER=ON -DWIFI_SSID="$WIFI_SSID" -DWIFI_PASSWORD="$WIFI_PASSWORD"
+  ```
+  This avoids shell history exposure and credential commits
 - **Do NOT hardcode credentials in source files** - high risk of accidental commits to version control
 - If you must edit `platform/pico_w_chip_port/network_adapter.cpp` for testing, verify credentials won't be committed
 
