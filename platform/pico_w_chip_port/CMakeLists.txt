@@ -45,6 +45,7 @@ target_include_directories(pico_chip_port PUBLIC
 # Link required Pico SDK libraries for Matter
 target_link_libraries(pico_chip_port PUBLIC
     pico_stdlib
+    pico_unique_id
     pico_cyw43_arch_lwip_threadsafe_background
     pico_lwip
     pico_mbedtls
