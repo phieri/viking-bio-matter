@@ -47,8 +47,6 @@ target_link_libraries(pico_chip_port PUBLIC
     pico_stdlib
     pico_unique_id
     pico_cyw43_arch_lwip_threadsafe_background
-    pico_lwip
-    pico_mbedtls
     hardware_flash
     hardware_sync
 )
