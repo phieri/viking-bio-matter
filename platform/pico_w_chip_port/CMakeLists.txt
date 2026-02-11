@@ -1,10 +1,5 @@
 # Platform CMake for Pico W Matter (CHIP) port
 
-if(NOT ENABLE_MATTER)
-    message(STATUS "Matter support disabled (ENABLE_MATTER=OFF)")
-    return()
-endif()
-
 message(STATUS "Configuring Matter (connectedhomeip) for Pico W...")
 
 # Check for connectedhomeip submodule

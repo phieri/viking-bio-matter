@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "matter_bridge.h"
+#include "../platform/pico_w_chip_port/platform_manager.h"
 
 // Matter attributes storage
 static matter_attributes_t attributes = {
@@ -13,10 +14,6 @@ static matter_attributes_t attributes = {
 
 // Matter bridge state
 static bool initialized = false;
-
-#ifdef ENABLE_MATTER
-// Full Matter implementation with platform integration
-#include "../platform/pico_w_chip_port/platform_manager.h"
 
 void matter_bridge_init(void) {
     printf("\n");
@@ -97,51 +94,6 @@ void matter_bridge_update_temperature(uint16_t temp) {
     }
 }
 
-#else
-// Stub implementation when Matter is disabled
-void matter_bridge_init(void) {
-    printf("Matter Bridge initialized (stub mode - Matter disabled)\n");
-    printf("Build with -DENABLE_MATTER=ON for full Matter support\n");
-    
-    memset(&attributes, 0, sizeof(attributes));
-    initialized = true;
-}
-
-void matter_bridge_update_flame(bool flame_on) {
-    if (!initialized) {
-        return;
-    }
-    
-    if (attributes.flame_state != flame_on) {
-        attributes.flame_state = flame_on;
-        printf("Matter: Flame state changed to %s (stub mode)\n", 
-               flame_on ? "ON" : "OFF");
-    }
-}
-
-void matter_bridge_update_fan_speed(uint8_t speed) {
-    if (!initialized) {
-        return;
-    }
-    
-    if (attributes.fan_speed != speed) {
-        attributes.fan_speed = speed;
-        printf("Matter: Fan speed changed to %d%% (stub mode)\n", speed);
-    }
-}
-
-void matter_bridge_update_temperature(uint16_t temp) {
-    if (!initialized) {
-        return;
-    }
-    
-    if (attributes.temperature != temp) {
-        attributes.temperature = temp;
-        printf("Matter: Temperature changed to %d°C (stub mode)\n", temp);
-    }
-}
-#endif
-
 void matter_bridge_update_attributes(const viking_bio_data_t *data) {
     if (!initialized || data == NULL || !data->valid) {
         return;
@@ -158,10 +110,8 @@ void matter_bridge_task(void) {
         return;
     }
     
-#ifdef ENABLE_MATTER
     // Process Matter platform tasks
     platform_manager_task();
-#endif
     
     // Periodic Matter stack processing would happen here
     // In full SDK: ChipDeviceEvent processing, network polling, etc.

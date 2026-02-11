@@ -1,6 +1,6 @@
 # Viking Bio Matter Bridge
 
-A Matter (CHIP) bridge for the Viking Bio 20 burner, built for Raspberry Pi Pico. This firmware reads TTL serial data from the burner and exposes flame status and fan speed through the Matter protocol.
+A Matter (CHIP) bridge for the Viking Bio 20 burner, built for Raspberry Pi Pico W. This firmware reads TTL serial data from the burner and exposes flame status and fan speed through the Matter protocol.
 
 ## Features
 
@@ -8,18 +8,18 @@ A Matter (CHIP) bridge for the Viking Bio 20 burner, built for Raspberry Pi Pico
 - **Flame Detection**: Reports real-time flame status
 - **Fan Speed Monitoring**: Reports current fan speed (0-100%)
 - **Temperature Monitoring**: Reports burner temperature
-- **Matter Bridge**: Exposes burner data through Matter protocol
-- **Status LED**: Visual feedback of operation status
+- **Matter Bridge**: Exposes burner data through Matter protocol over WiFi
+- **WiFi Connectivity**: Connects to your local network for Matter communication
 
 ## Hardware Requirements
 
-- Raspberry Pi Pico or Pico W
+- **Raspberry Pi Pico W** (WiFi required for Matter)
 - Viking Bio 20 burner with TTL serial output
 - USB cable for power and debugging
 
 ## Wiring
 
-Connect the Viking Bio 20 TTL serial output to the Raspberry Pi Pico:
+Connect the Viking Bio 20 TTL serial output to the Raspberry Pi Pico W:
 
 ```mermaid
 graph LR
@@ -28,9 +28,8 @@ graph LR
         VB_GND[GND]
     end
     
-    subgraph PICO[Raspberry Pi Pico]
+    subgraph PICO[Raspberry Pi Pico W]
         PICO_GP1[GP1 - UART0 RX]
-        PICO_GP25[GP25 - Status LED]
         PICO_GND[GND]
         PICO_USB[USB Port]
     end
@@ -45,10 +44,11 @@ graph LR
     style PICO_GP1 fill:#90EE90
     style VB_GND fill:#FFD700
     style PICO_GND fill:#FFD700
-    style PICO_GP25 fill:#FFA500
-```
+    
+    style VB fill:#e1f5ff
 
-**Note**: The Pico RX pin (GP1) expects 3.3V logic levels. If the Viking Bio 20 outputs 5V TTL, use a level shifter or voltage divider.
+```
+**Note**: The Pico W RX pin (GP1) expects 3.3V logic levels. If the Viking Bio 20 outputs 5V TTL, use a level shifter or voltage divider.
 
 ## Serial Protocol
 
@@ -93,21 +93,6 @@ F:1,S:50,T:75\n
 
 ### Build Steps
 
-#### Standard Build (Matter Disabled)
-
-```bash
-mkdir build
-cd build
-cmake ..
-make
-```
-
-This will generate `viking_bio_matter.uf2` in the build directory with basic functionality (serial parsing and stub Matter bridge).
-
-#### Matter-Enabled Build (Pico W Only)
-
-For full Matter protocol support on Raspberry Pi Pico W:
-
 1. **Initialize the connectedhomeip submodule:**
    ```bash
    git submodule update --init --recursive third_party/connectedhomeip
@@ -119,31 +104,29 @@ For full Matter protocol support on Raspberry Pi Pico W:
    #define WIFI_PASSWORD "YourPassword"
    ```
 
-3. **Build with Matter enabled:**
+3. **Build the firmware:**
    ```bash
    mkdir build
    cd build
-   cmake -DENABLE_MATTER=ON ..
+   cmake ..
    make
    ```
 
-This generates a Matter-enabled firmware that:
+This generates Matter-enabled firmware that:
 - Connects to WiFi on boot
 - Initializes the Matter stack
 - Prints commissioning QR code and PIN
 - Exposes Viking Bio data as Matter attributes
 - Can be commissioned by Matter controllers (e.g., chip-tool)
 
-**Note:** Matter support requires Pico W for WiFi. Standard Pico is not supported for Matter builds.
-
 See [platform/pico_w_chip_port/README.md](platform/pico_w_chip_port/README.md) for detailed Matter configuration and commissioning instructions.
 
 ### Flashing the Firmware
 
-1. Hold the BOOTSEL button on the Pico while connecting it via USB
-2. The Pico will appear as a mass storage device
-3. Copy `build/viking_bio_matter.uf2` to the Pico
-4. The Pico will automatically reboot with the new firmware
+1. Hold the BOOTSEL button on the Pico W while connecting it via USB
+2. The Pico W will appear as a mass storage device
+3. Copy `build/viking_bio_matter.uf2` to the Pico W
+4. The Pico W will automatically reboot with the new firmware
 
 ## GitHub Actions
 
@@ -151,25 +134,9 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
 
 ## Usage
 
-### Standard Mode (Matter Disabled)
-
-1. Flash the firmware to your Raspberry Pi Pico
-2. Connect the Viking Bio 20 serial output to the Pico (see Wiring section)
-3. Power the Pico via USB
-4. The onboard LED will blink to indicate activity
-5. Connect to the Pico's USB serial port to see debug output:
-   ```bash
-   # Linux/macOS
-   screen /dev/ttyACM0 115200
-   
-   # Windows (use PuTTY or similar)
-   ```
-
-### Matter Mode (Pico W with ENABLE_MATTER=ON)
-
-1. Flash the Matter-enabled firmware to your Raspberry Pi Pico W
-2. Connect the Viking Bio 20 serial output to the Pico (see Wiring section)
-3. Power the Pico via USB
+1. Flash the firmware to your Raspberry Pi Pico W
+2. Connect the Viking Bio 20 serial output to the Pico W (see Wiring section)
+3. Power the Pico W via USB
 4. Connect to the Pico's USB serial to view commissioning info:
    ```bash
    screen /dev/ttyACM0 115200
@@ -238,7 +205,7 @@ viking-bio-matter/
 │   ├── main.c                 # Main application entry point
 │   ├── serial_handler.c       # UART/serial communication
 │   ├── viking_bio_protocol.c  # Viking Bio protocol parser
-│   └── matter_bridge.c        # Matter bridge implementation (with/without Matter)
+│   └── matter_bridge.c        # Matter bridge implementation
 ├── include/
 │   ├── serial_handler.h
 │   ├── viking_bio_protocol.h
@@ -254,7 +221,7 @@ viking-bio-matter/
 │   └── connectedhomeip/       # Matter SDK submodule (when initialized)
 ├── examples/
 │   └── viking_bio_simulator.py # Serial data simulator for testing
-├── CMakeLists.txt             # Build configuration with ENABLE_MATTER option
+├── CMakeLists.txt             # Build configuration
 └── .github/
     └── workflows/
         └── build-firmware.yml # CI/CD pipeline

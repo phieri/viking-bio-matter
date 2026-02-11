@@ -37,19 +37,10 @@ F:1,S:50,T:75\n
 
 ### 3. Matter Bridge (`matter_bridge.c`)
 
-Exposes burner data via Matter protocol:
+Exposes burner data via Matter protocol over WiFi:
 
-**Two Operating Modes:**
-
-#### Stub Mode (ENABLE_MATTER=OFF, default)
-- Basic attribute storage and change detection
-- Prints Matter attribute changes to console
-- No network connectivity required
-- Works on both Pico and Pico W
-
-#### Full Matter Mode (ENABLE_MATTER=ON, Pico W only)
 - Complete Matter/CHIP stack integration
-- WiFi connectivity via CYW43439 chip
+- WiFi connectivity via CYW43439 chip (Pico W)
 - Matter commissioning with QR code
 - Persistent fabric storage in flash
 - Exposes three standard Matter clusters:
@@ -96,9 +87,8 @@ Protocol Parser
 Matter Bridge (Stub)
     ↓ (Console Output)
 Debug Serial (USB)
-```
+## Data Flow
 
-### Full Matter Mode (Pico W, Matter Enabled)
 ```
 Viking Bio 20
     ↓ (TTL Serial 9600 baud)
@@ -106,7 +96,7 @@ Serial Handler (UART0)
     ↓ (Circular Buffer)
 Protocol Parser
     ↓ (viking_bio_data_t)
-Matter Bridge (Full)
+Matter Bridge
     ↓ (Matter Attributes)
 Platform Manager
     ├─→ Network (WiFi/lwIP)
@@ -124,7 +114,8 @@ Matter Controller (chip-tool, etc.)
 |------|----------|-------------|
 | GP0  | UART0 TX | Serial output (unused) |
 | GP1  | UART0 RX | Serial input from Viking Bio |
-| GP25 | LED      | Status indicator |
+
+**Note**: The Pico W LED is controlled via the CYW43 chip, not GPIO 25.
 
 ## Matter Device Type
 
@@ -134,35 +125,22 @@ The bridge implements a **Temperature Sensor** device type with additional custo
 - **Vendor ID**: TBD
 - **Product ID**: TBD
 
-## Building with Full Matter SDK
+## Building the Firmware
 
-### Build Modes
+### Build Steps
 
-#### Standard Build (Default)
-```bash
-mkdir build && cd build
-cmake ..
-make
-```
-- Matter support: **Disabled**
-- Target platform: Pico or Pico W
-- Network: None
-- Output: Basic serial-to-console bridge
-
-#### Matter-Enabled Build (Pico W Only)
 ```bash
 # Initialize Matter SDK submodule
 git submodule update --init --recursive third_party/connectedhomeip
 
 # Configure and build
 mkdir build && cd build
-cmake -DENABLE_MATTER=ON ..
+cmake ..
 make
 ```
-- Matter support: **Enabled**
-- Target platform: **Pico W only** (requires WiFi)
-- Network: WiFi via CYW43439
-- Output: Full Matter device with commissioning
+
+**Target platform**: Raspberry Pi Pico W (WiFi required for Matter)  
+**Output**: Full Matter device firmware with commissioning support
 
 ### Configuration
 
@@ -241,15 +219,15 @@ Expected output:
 Viking Bio Matter Bridge starting...
 Initialization complete. Reading serial data...
 Flame: ON, Fan Speed: 80%, Temp: 75°C
-Matter: Flame state changed to ON (stub mode)
-Matter: Fan speed changed to 80% (stub mode)
+Matter: OnOff cluster updated - Flame ON
+Matter: LevelControl cluster updated - Fan speed 80%
 ```
 
-### Matter Testing (Full Mode)
+### Testing
 
-1. **Build and flash Matter-enabled firmware:**
+1. **Build and flash firmware:**
    ```bash
-   cmake -DENABLE_MATTER=ON .. && make
+   cmake .. && make
    # Flash viking_bio_matter.uf2 to Pico W
    ```
 
@@ -308,7 +286,7 @@ Matter: Fan speed changed to 80% (stub mode)
    - ⏳ OTA firmware updates (future)
 
 2. **Network Connectivity**
-   - ✅ WiFi support (Pico W with ENABLE_MATTER=ON)
+   - ✅ WiFi support (Pico W)
    - ⏳ Thread support (with external radio)
    - ⏳ Ethernet support (with W5500 module)
 
