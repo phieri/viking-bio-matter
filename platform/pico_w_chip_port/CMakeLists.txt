@@ -24,19 +24,17 @@ set(CONFIG_CHIP_ENABLE_PAIRING_AUTOSTART ON)
 
 # Platform sources
 set(PICO_CHIP_PORT_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/CHIPDevicePlatformConfig.h
     ${CMAKE_CURRENT_SOURCE_DIR}/network_adapter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/storage_adapter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/crypto_adapter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/platform_manager.cpp
 )
 
-# Create platform library
-add_library(pico_chip_port INTERFACE)
+# Create platform library as a static library (not INTERFACE)
+# This ensures sources are compiled with proper include paths from linked libraries
+add_library(pico_chip_port STATIC ${PICO_CHIP_PORT_SOURCES})
 
-target_sources(pico_chip_port INTERFACE ${PICO_CHIP_PORT_SOURCES})
-
-target_include_directories(pico_chip_port INTERFACE
+target_include_directories(pico_chip_port PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CHIP_ROOT}/src
     ${CHIP_ROOT}/src/include
@@ -45,7 +43,7 @@ target_include_directories(pico_chip_port INTERFACE
 )
 
 # Link required Pico SDK libraries for Matter
-target_link_libraries(pico_chip_port INTERFACE
+target_link_libraries(pico_chip_port PUBLIC
     pico_cyw43_arch_lwip_threadsafe_background
     pico_lwip
     pico_mbedtls

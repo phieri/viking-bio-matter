@@ -3,6 +3,16 @@ cmake_minimum_required(VERSION 3.13)
 # Matter support option (OFF by default)
 option(ENABLE_MATTER "Enable Matter (connectedhomeip) support" OFF)
 
+# Matter requires Pico W board
+if(ENABLE_MATTER)
+    if(NOT DEFINED PICO_BOARD OR PICO_BOARD STREQUAL "")
+        set(PICO_BOARD pico_w CACHE STRING "Board type" FORCE)
+        message(STATUS "Setting PICO_BOARD to pico_w (required for Matter)")
+    elseif(NOT PICO_BOARD STREQUAL "pico_w")
+        message(FATAL_ERROR "Matter support requires PICO_BOARD=pico_w (current: ${PICO_BOARD})")
+    endif()
+endif()
+
 # Initialize the Pico SDK
 include(pico_sdk_import.cmake)
 

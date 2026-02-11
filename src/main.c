@@ -7,24 +7,24 @@
 #include "viking_bio_protocol.h"
 #include "matter_bridge.h"
 
-// LED pin for status indication
-#define LED_PIN PICO_DEFAULT_LED_PIN
+// LED control abstraction for different boards
+// Note: LED control is disabled for Matter builds due to CYW43 dependencies
+#ifndef ENABLE_MATTER
+    // Standard Pico: Direct GPIO control on pin 25
+    #define LED_PIN 25
+    #define LED_ENABLED 1
+    #define LED_INIT() do { gpio_init(LED_PIN); gpio_set_dir(LED_PIN, GPIO_OUT); } while(0)
+    #define LED_SET(state) gpio_put(LED_PIN, state)
+#else
+    // Matter builds: LED control disabled (CYW43 requires complex lwIP setup)
+    #define LED_ENABLED 0
+    #define LED_INIT() do { /* LED disabled for Matter builds */ } while(0)
+    #define LED_SET(state) do { /* LED disabled */ } while(0)
+#endif
 
 int main() {
     // Initialize standard I/O
     stdio_init_all();
-    
-    // Initialize LED for status indication
-    gpio_init(LED_PIN);
-    gpio_set_dir(LED_PIN, GPIO_OUT);
-    
-    // Blink LED to indicate startup
-    for (int i = 0; i < 3; i++) {
-        gpio_put(LED_PIN, 1);
-        sleep_ms(200);
-        gpio_put(LED_PIN, 0);
-        sleep_ms(200);
-    }
     
     printf("Viking Bio Matter Bridge starting...\n");
     
@@ -37,6 +37,17 @@ int main() {
     
     printf("Initializing Matter bridge...\n");
     matter_bridge_init();
+    
+    // Initialize LED for status indication (after Matter init for Pico W)
+    LED_INIT();
+    
+    // Blink LED to indicate startup complete
+    for (int i = 0; i < 3; i++) {
+        LED_SET(1);
+        sleep_ms(200);
+        LED_SET(0);
+        sleep_ms(200);
+    }
     
     printf("Initialization complete. Reading serial data...\n");
     
@@ -76,7 +87,7 @@ int main() {
         uint32_t now = to_ms_since_boot(get_absolute_time());
         if (now - last_blink >= 1000) {
             led_state = !led_state;
-            gpio_put(LED_PIN, led_state);
+            LED_SET(led_state);
             last_blink = now;
         }
         
