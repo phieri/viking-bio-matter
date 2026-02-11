@@ -24,12 +24,29 @@ set(CMAKE_CXX_STANDARD 17)
 # Initialize the Pico SDK
 pico_sdk_init()
 
-add_executable(viking_bio_matter
+# Define source files
+set(SOURCES
     src/main.c
     src/serial_handler.c
     src/matter_bridge.c
     src/viking_bio_protocol.c
 )
+
+# Add Matter platform sources if enabled
+if(ENABLE_MATTER)
+    message(STATUS "Matter support ENABLED")
+    list(APPEND SOURCES
+        platform/pico_w_chip_port/network_adapter.cpp
+        platform/pico_w_chip_port/storage_adapter.cpp
+        platform/pico_w_chip_port/crypto_adapter.cpp
+        platform/pico_w_chip_port/platform_manager.cpp
+    )
+    add_compile_definitions(ENABLE_MATTER=1)
+else()
+    message(STATUS "Matter support DISABLED (use -DENABLE_MATTER=ON to enable)")
+endif()
+
+add_executable(viking_bio_matter ${SOURCES})
 
 # Pull in common dependencies
 target_link_libraries(viking_bio_matter
@@ -41,18 +58,29 @@ target_link_libraries(viking_bio_matter
 
 # Conditionally include Matter platform port
 if(ENABLE_MATTER)
-    message(STATUS "Matter support ENABLED")
-    add_subdirectory(platform/pico_w_chip_port)
-    add_compile_definitions(ENABLE_MATTER=1)
-else()
-    message(STATUS "Matter support DISABLED (use -DENABLE_MATTER=ON to enable)")
-endif()
-
-# Link Matter platform libraries if enabled
-if(ENABLE_MATTER)
+    # Check for connectedhomeip submodule
+    set(CHIP_ROOT "${CMAKE_SOURCE_DIR}/third_party/connectedhomeip")
+    if(NOT EXISTS "${CHIP_ROOT}/src")
+        message(FATAL_ERROR 
+            "connectedhomeip submodule not found at ${CHIP_ROOT}\n"
+            "Please run: git submodule update --init --recursive third_party/connectedhomeip\n"
+            "Or clone with: git clone --recurse-submodules --branch v1.3-branch https://github.com/project-chip/connectedhomeip.git third_party/connectedhomeip")
+    endif()
+    
+    target_include_directories(viking_bio_matter PRIVATE
+        platform/pico_w_chip_port
+        ${CHIP_ROOT}/src
+        ${CHIP_ROOT}/src/include
+        ${CHIP_ROOT}/src/lib
+        ${CHIP_ROOT}/zzz_generated/app-common
+    )
+    
     target_link_libraries(viking_bio_matter
+        pico_unique_id
         pico_cyw43_arch_lwip_threadsafe_background
-        pico_chip_port
+        pico_lwip
+        pico_mbedtls
+        hardware_flash
     )
 endif()
 
