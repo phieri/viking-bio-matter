@@ -24,15 +24,6 @@ set(CMAKE_CXX_STANDARD 17)
 # Initialize the Pico SDK
 pico_sdk_init()
 
-# Conditionally include Matter platform port
-if(ENABLE_MATTER)
-    message(STATUS "Matter support ENABLED")
-    add_subdirectory(platform/pico_w_chip_port)
-    add_compile_definitions(ENABLE_MATTER=1)
-else()
-    message(STATUS "Matter support DISABLED (use -DENABLE_MATTER=ON to enable)")
-endif()
-
 add_executable(viking_bio_matter
     src/main.c
     src/serial_handler.c
@@ -48,9 +39,19 @@ target_link_libraries(viking_bio_matter
     hardware_sync
 )
 
+# Conditionally include Matter platform port
+if(ENABLE_MATTER)
+    message(STATUS "Matter support ENABLED")
+    add_subdirectory(platform/pico_w_chip_port)
+    add_compile_definitions(ENABLE_MATTER=1)
+else()
+    message(STATUS "Matter support DISABLED (use -DENABLE_MATTER=ON to enable)")
+endif()
+
 # Link Matter platform libraries if enabled
 if(ENABLE_MATTER)
     target_link_libraries(viking_bio_matter
+        pico_cyw43_arch_lwip_threadsafe_background
         pico_chip_port
     )
 endif()
