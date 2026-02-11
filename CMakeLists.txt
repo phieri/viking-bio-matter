@@ -58,6 +58,12 @@ target_link_libraries(viking_bio_matter
 
 # Conditionally include Matter platform port
 if(ENABLE_MATTER)
+    # Matter build configuration
+    set(CONFIG_CHIP_PROJECT_CONFIG ON)
+    set(CONFIG_CHIP_ENABLE_WIFI ON)
+    set(CONFIG_CHIP_ENABLE_ICD_SERVER OFF)
+    set(CONFIG_CHIP_ENABLE_PAIRING_AUTOSTART ON)
+    
     # Check for connectedhomeip submodule
     set(CHIP_ROOT "${CMAKE_SOURCE_DIR}/third_party/connectedhomeip")
     if(NOT EXISTS "${CHIP_ROOT}/src")
