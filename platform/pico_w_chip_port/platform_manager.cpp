@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "pico/stdlib.h"
+#include "mbedtls/sha256.h"
 
 // Forward declarations of adapter functions (internal C++ functions)
 int network_adapter_init(void);
@@ -25,7 +26,65 @@ int crypto_adapter_init(void);
 int crypto_adapter_random(uint8_t *buffer, size_t length);
 void crypto_adapter_deinit(void);
 
+// Product salt for PIN derivation - change this for production deployments
+static const char *PRODUCT_SALT = "VIKINGBIO-2026";
+
+// Maximum salt length for PIN derivation buffer
+#define MAX_SALT_LENGTH 64
+
 static bool platform_initialized = false;
+
+/**
+ * @brief Derive an 8-digit setup PIN from device MAC address
+ * 
+ * Algorithm:
+ * 1. Hash MAC || PRODUCT_SALT with SHA-256
+ * 2. Take first 4 bytes of hash as big-endian uint32
+ * 3. Compute PIN = (hash_value % 100000000)
+ * 4. Format as zero-padded 8-digit string
+ * 
+ * @param mac 6-byte MAC address
+ * @param out_pin8 Output buffer for 8-digit PIN + null terminator (9 bytes)
+ * @return 0 on success, -1 on failure
+ */
+static int derive_setup_pin_from_mac(const uint8_t mac[6], char out_pin8[9]) {
+    if (!mac || !out_pin8) {
+        return -1;
+    }
+
+    // Prepare input: MAC || PRODUCT_SALT
+    uint8_t input[6 + MAX_SALT_LENGTH]; // 6 bytes MAC + salt
+    size_t salt_len = strlen(PRODUCT_SALT);
+    if (salt_len > MAX_SALT_LENGTH) {
+        salt_len = MAX_SALT_LENGTH; // Limit salt length
+    }
+    
+    memcpy(input, mac, 6);
+    memcpy(input + 6, PRODUCT_SALT, salt_len);
+    
+    // Compute SHA-256 hash
+    uint8_t hash[32];
+    mbedtls_sha256_context ctx;
+    mbedtls_sha256_init(&ctx);
+    mbedtls_sha256_starts(&ctx, 0); // 0 = SHA-256 (not SHA-224)
+    mbedtls_sha256_update(&ctx, input, 6 + salt_len);
+    mbedtls_sha256_finish(&ctx, hash);
+    mbedtls_sha256_free(&ctx);
+    
+    // Take first 4 bytes as big-endian uint32
+    uint32_t hash_value = ((uint32_t)hash[0] << 24) |
+                          ((uint32_t)hash[1] << 16) |
+                          ((uint32_t)hash[2] << 8) |
+                          ((uint32_t)hash[3]);
+    
+    // Compute PIN = hash_value % 100000000 (8-digit decimal)
+    uint32_t pin = hash_value % 100000000;
+    
+    // Format as zero-padded 8-digit string
+    snprintf(out_pin8, 9, "%08lu", (unsigned long)pin);
+    
+    return 0;
+}
 
 // Export platform manager functions with C linkage for use from C code
 extern "C" {
@@ -113,22 +172,33 @@ int platform_manager_generate_qr_code(char *buffer, size_t buffer_len) {
 }
 
 void platform_manager_print_commissioning_info(void) {
+    // Get device MAC address
+    uint8_t mac[6] = {0};
+    platform_manager_get_network_info(NULL, 0, mac);
+    
+    // Derive setup PIN from MAC
+    char pin[9] = "00000000"; // Default fallback
+    if (derive_setup_pin_from_mac(mac, pin) != 0) {
+        printf("WARNING: Failed to derive setup PIN, using default\n");
+    }
+    
     printf("\n");
     printf("====================================\n");
     printf("    Matter Commissioning Info\n");
     printf("====================================\n");
-    printf("Setup PIN Code: 20202021\n");
+    printf("Device MAC:     %02X:%02X:%02X:%02X:%02X:%02X\n",
+           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    printf("Setup PIN Code: %s\n", pin);
     printf("Discriminator:  3840 (0x0F00)\n");
     printf("\n");
-    printf("Manual Pairing Code:\n");
-    printf("  34970112332\n");
+    printf("⚠️  IMPORTANT:\n");
+    printf("   PIN is derived from device MAC.\n");
+    printf("   Use tools/derive_pin.py to compute\n");
+    printf("   the PIN from the MAC address above.\n");
     printf("\n");
-    printf("QR Code URL:\n");
-    printf("  MT:Y.K9042C00KA0648G00\n");
-    printf("\n");
-    printf("⚠️  WARNING: These are TEST credentials!\n");
-    printf("   For production, use device-specific\n");
-    printf("   setup codes and discriminators.\n");
+    printf("⚠️  WARNING: Discriminator 3840 is for\n");
+    printf("   testing only. Use unique values for\n");
+    printf("   production devices.\n");
     printf("====================================\n\n");
 }
 

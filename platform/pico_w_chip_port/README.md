@@ -119,6 +119,7 @@ Connect to Pico's USB serial port:
 
 ```bash
 screen /dev/ttyACM0 115200
+# Or use Thonny IDE (Tools > Serial)
 ```
 
 On boot, you'll see commissioning details:
@@ -127,17 +128,38 @@ On boot, you'll see commissioning details:
 ====================================
     Matter Commissioning Info
 ====================================
-Setup PIN Code: 20202021
+Device MAC:     28:CD:C1:00:00:01
+Setup PIN Code: 24890840
 Discriminator:  3840 (0x0F00)
 
-Manual Pairing Code:
-  34970112332
-
-QR Code URL:
-  MT:Y.K9042C00KA0648G00
-
-⚠️  WARNING: These are TEST credentials!
+⚠️  IMPORTANT:
+   PIN is derived from device MAC.
+   Use tools/derive_pin.py to compute
+   the PIN from the MAC address above.
 ====================================
+```
+
+**Note**: The Setup PIN is deterministically derived from the device MAC address using SHA-256 hashing with the product salt `VIKINGBIO-2026`. This allows you to compute the PIN offline from a printed MAC address without needing device storage.
+
+To derive the PIN from a MAC address:
+
+```bash
+# From repository root
+python3 tools/derive_pin.py 28:CD:C1:00:00:01
+
+# Output:
+# Device MAC:     28:CD:C1:00:00:01
+# Setup PIN Code: 24890840
+```
+
+**Python one-liner equivalent**:
+```python
+import hashlib
+mac = bytes.fromhex("28CDC1000001")  # MAC without separators
+salt = b"VIKINGBIO-2026"
+hash_val = int.from_bytes(hashlib.sha256(mac + salt).digest()[:4], 'big')
+pin = f"{hash_val % 100000000:08d}"
+print(f"PIN: {pin}")
 ```
 
 ### 2. Commission with chip-tool
@@ -149,15 +171,14 @@ cd third_party/connectedhomeip
 ./scripts/examples/gn_build_example.sh examples/chip-tool out/host
 ```
 
-Commission the device:
+Commission the device using the **derived PIN** from the serial console:
 
 ```bash
-# Using setup PIN code
-./out/host/chip-tool pairing ble-wifi 1 MySSID MyPassword 20202021 3840
-
-# Or using manual pairing code
-./out/host/chip-tool pairing code 1 34970112332
+# Replace 24890840 with the actual PIN from your device's serial output
+./out/host/chip-tool pairing ble-wifi 1 MySSID MyPassword 24890840 3840
 ```
+
+**Important**: The PIN changes per device (derived from MAC), so always check the serial console for the correct PIN.
 
 ### 3. Verify Commissioning
 
