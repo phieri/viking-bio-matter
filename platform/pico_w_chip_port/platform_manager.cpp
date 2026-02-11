@@ -35,7 +35,7 @@ static const char *PRODUCT_SALT = "VIKINGBIO-2026";
 static bool platform_initialized = false;
 
 /**
- * Derive an 8-digit setup PIN from device MAC address
+ * @brief Derive an 8-digit setup PIN from device MAC address
  * 
  * Algorithm:
  * 1. Hash MAC || PRODUCT_SALT with SHA-256
