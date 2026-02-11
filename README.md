@@ -1,25 +1,6 @@
 # Viking Bio Matter Bridge
 
-A Matter (CHIP) bridge for the Viking Bio 20 burner. This project provides two implementations:
-
-1. **Raspberry Pi Pico firmware** - Embedded Matter bridge running on Pico microcontroller
-2. **Raspberry Pi Zero host bridge** - Linux userspace Matter bridge with full Matter SDK support ⭐ **NEW**
-
-Both implementations read TTL serial data from the burner and expose flame status, fan speed, and temperature through the Matter protocol.
-
-## Choose Your Implementation
-
-### Option 1: Raspberry Pi Pico (Embedded)
-- Runs directly on Pico/Pico W microcontroller
-- Lower power consumption
-- Currently has basic Matter stubs (full SDK integration planned)
-- See [Building Pico Firmware](#building-pico-firmware) section below
-
-### Option 2: Raspberry Pi Zero (Host Bridge) ⭐ Recommended
-- Full Matter stack with complete cluster support
-- WiFi commissioning and control
-- Easy to update and debug
-- See [Host-based Matter Bridge](#host-based-matter-bridge-raspberry-pi-zero) section below
+A Matter (CHIP) bridge for the Viking Bio 20 burner, built for Raspberry Pi Pico. This firmware reads TTL serial data from the burner and exposes flame status and fan speed through the Matter protocol.
 
 ## Features
 
@@ -89,9 +70,7 @@ F:1,S:50,T:75\n
 - `S`: Fan speed (0-100%)
 - `T`: Temperature (°C)
 
-## Building Pico Firmware
-
-This section covers building the embedded firmware for Raspberry Pi Pico. For the host bridge, see the next section.
+## Building Firmware
 
 ### Prerequisites
 
@@ -132,91 +111,9 @@ This will generate `viking_bio_matter.uf2` in the build directory.
 
 ## GitHub Actions
 
-The Pico firmware is automatically built on push to `main` or `develop` branches. Build artifacts are available in the Actions tab. The host bridge is not built in CI by default (Matter SDK is large).
+The firmware is automatically built on push to `main` or `develop` branches. Build artifacts are available in the Actions tab.
 
----
-
-## Host-based Matter Bridge (Raspberry Pi Zero)
-
-The host bridge is a Linux userspace application that provides full Matter protocol support for the Viking Bio 20 burner.
-
-### Features
-
-- **Full Matter Stack**: Complete implementation using Project CHIP (connectedhomeip) SDK
-- **WiFi Commissioning**: Supports QR code and setup code commissioning
-- **Three Matter Clusters**:
-  - On/Off (0x0006) - Flame detection state
-  - Level Control (0x0008) - Fan speed (0-100%)
-  - Temperature Measurement (0x0402) - Burner temperature
-- **Attribute Reporting**: Real-time updates when values change
-- **Flexible Configuration**: Command-line options for serial device, baud rate, and setup code
-- **Systemd Integration**: Run as a system service with automatic startup
-
-### Quick Start
-
-1. **Install dependencies** on Raspberry Pi Zero:
-   ```bash
-   sudo apt-get update
-   sudo apt-get install -y build-essential cmake git pkg-config \
-       libssl-dev libglib2.0-dev libavahi-client-dev libdbus-1-dev
-   ```
-
-2. **Get the Matter SDK** (one-time setup):
-   ```bash
-   cd ~
-   git clone --depth 1 --branch v1.2-branch \
-       https://github.com/project-chip/connectedhomeip.git
-   cd connectedhomeip
-   ./scripts/checkout_submodules.py --shallow --platform linux
-   source scripts/activate.sh
-   
-   # Build (this takes time on Pi Zero, consider cross-compiling)
-   ./scripts/build/build_examples.py --target linux-arm-chip-tool build
-   
-   export MATTER_ROOT=$(pwd)
-   ```
-
-3. **Build the host bridge**:
-   ```bash
-   cd ~/viking-bio-matter
-   mkdir -p build_host && cd build_host
-   cmake .. -DENABLE_MATTER=ON
-   make host_bridge
-   ```
-
-4. **Run the bridge**:
-   ```bash
-   # Using the helper script
-   cd ~/viking-bio-matter
-   ./examples/run_bridge.sh
-   
-   # Or run directly
-   ./build_host/host_bridge/host_bridge --device /dev/ttyUSB0
-   ```
-
-5. **Commission the device** using chip-tool, Apple Home, Google Home, or Amazon Alexa:
-   - Default setup code: `20202021`
-   - Scan QR code or enter setup code in your Matter controller app
-
-### Detailed Documentation
-
-For complete build instructions, configuration options, commissioning steps, and troubleshooting, see:
-
-📖 **[host_bridge/README.md](host_bridge/README.md)**
-
-This includes:
-- Detailed Matter SDK setup and build instructions
-- Serial device configuration (USB, GPIO UART)
-- Systemd service setup
-- Commissioning with various controllers
-- Troubleshooting common issues
-- Development and testing tips
-
----
-
-## Pico Firmware Usage
-
-This section covers using the embedded Pico firmware.
+## Usage
 
 1. Flash the firmware to your Raspberry Pi Pico
 2. Connect the Viking Bio 20 serial output to the Pico (see Wiring section)
@@ -236,29 +133,19 @@ This section covers using the embedded Pico firmware.
 
 ```
 viking-bio-matter/
-├── src/                       # Raspberry Pi Pico firmware
+├── src/
 │   ├── main.c                 # Main application entry point
 │   ├── serial_handler.c       # UART/serial communication
 │   ├── viking_bio_protocol.c  # Viking Bio protocol parser
-│   └── matter_bridge.c        # Matter bridge stubs
-├── include/                   # Pico firmware headers
+│   └── matter_bridge.c        # Matter bridge implementation
+├── include/
 │   ├── serial_handler.h
 │   ├── viking_bio_protocol.h
 │   └── matter_bridge.h
-├── host_bridge/              # Raspberry Pi Zero host bridge ⭐ NEW
-│   ├── main.cpp              # Host bridge application
-│   ├── matter_bridge.cpp     # Full Matter SDK integration
-│   ├── viking_bio_protocol_linux.c  # Protocol parser (Linux)
-│   ├── CMakeLists.txt        # Host bridge build config
-│   ├── README.md             # Detailed documentation
-│   └── host_bridge.service   # Systemd service template
-├── examples/
-│   ├── run_bridge.sh         # Helper script to run host bridge
-│   └── viking_bio_simulator.py  # Serial data simulator
-├── CMakeLists.txt            # Top-level build configuration
+├── CMakeLists.txt             # Build configuration
 └── .github/
     └── workflows/
-        └── build-firmware.yml  # CI/CD pipeline
+        └── build-firmware.yml # CI/CD pipeline
 ```
 
 ## License

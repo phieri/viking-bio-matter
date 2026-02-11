@@ -1,6 +1,5 @@
 # Build directories
 build/
-build_host/
 cmake-build-*/
 
 # Pico SDK
