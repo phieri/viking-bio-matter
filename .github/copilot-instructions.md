@@ -50,13 +50,14 @@ mkdir build-matter && cd build-matter
 export PICO_SDK_PATH=/path/to/pico-sdk  # REQUIRED
 
 # Configure with WiFi credentials (use CMake to avoid committing secrets)
-# RECOMMENDED: Use environment variables to avoid shell history exposure
+# RECOMMENDED: Use environment variables to avoid inline credential exposure
 export WIFI_SSID="YourNetwork"
 export WIFI_PASSWORD="YourPassword"
 cmake .. -DENABLE_MATTER=ON -DWIFI_SSID="$WIFI_SSID" -DWIFI_PASSWORD="$WIFI_PASSWORD"
+# Note: For maximum security, source from untracked .env file or use `read -s WIFI_PASSWORD`
 
-# Alternative (NOT RECOMMENDED): Edit source file platform/pico_w_chip_port/network_adapter.cpp
-# This method risks accidentally committing credentials. Only use for local testing.
+# Alternative (NOT RECOMMENDED): Edit WIFI_SSID/WIFI_PASSWORD defines in 
+# platform/pico_w_chip_port/network_adapter.cpp (risks credential commits)
 
 make -j$(nproc)
 ```
@@ -235,15 +236,16 @@ third_party/
 - Update README.md wiring diagrams
 
 ### WiFi Configuration (Matter builds only)
-- **ALWAYS use CMake with environment variables**: 
+- **RECOMMENDED: Use CMake with environment variables**: 
   ```bash
   export WIFI_SSID="YourNetwork"
   export WIFI_PASSWORD="YourPassword"
   cmake -DENABLE_MATTER=ON -DWIFI_SSID="$WIFI_SSID" -DWIFI_PASSWORD="$WIFI_PASSWORD"
   ```
-  This avoids shell history exposure and credential commits
-- **Do NOT hardcode credentials in source files** - high risk of accidental commits to version control
-- If you must edit `platform/pico_w_chip_port/network_adapter.cpp` for testing, verify credentials won't be committed
+  For extra security: source from untracked .env file or use `read -s WIFI_PASSWORD`
+- **Alternative (NOT RECOMMENDED)**: Edit WIFI_SSID/WIFI_PASSWORD #define constants in `platform/pico_w_chip_port/network_adapter.cpp`
+  - ⚠️ High risk of accidentally committing credentials to version control
+  - Only use for local testing, verify credentials won't be committed
 
 ## Essential Validation Before PR
 
