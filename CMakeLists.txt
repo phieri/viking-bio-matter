@@ -5,7 +5,7 @@ option(ENABLE_MATTER "Enable Matter (connectedhomeip) support" OFF)
 
 # Matter requires Pico W board
 if(ENABLE_MATTER)
-    if(NOT PICO_BOARD)
+    if(NOT DEFINED PICO_BOARD OR PICO_BOARD STREQUAL "")
         set(PICO_BOARD pico_w CACHE STRING "Board type" FORCE)
         message(STATUS "Setting PICO_BOARD to pico_w (required for Matter)")
     elseif(NOT PICO_BOARD STREQUAL "pico_w")
