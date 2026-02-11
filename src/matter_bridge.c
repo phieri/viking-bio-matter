@@ -28,6 +28,8 @@ void matter_bridge_init(void) {
     printf("Initializing Matter platform for Pico W...\n");
     if (platform_manager_init() != 0) {
         printf("ERROR: Failed to initialize Matter platform\n");
+        printf("Device will continue in degraded mode (no Matter support)\n");
+        initialized = false;
         return;
     }
     
@@ -36,6 +38,8 @@ void matter_bridge_init(void) {
     if (platform_manager_connect_wifi(NULL, NULL) != 0) {
         printf("ERROR: Failed to connect to WiFi\n");
         printf("Update WiFi credentials in platform/pico_w_chip_port/network_adapter.cpp\n");
+        printf("Device will continue without network connectivity\n");
+        initialized = false;
         return;
     }
     
