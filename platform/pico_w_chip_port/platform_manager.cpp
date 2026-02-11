@@ -7,8 +7,7 @@
 #include <string.h>
 #include "pico/stdlib.h"
 
-// Forward declarations of adapter functions
-extern "C" {
+// Forward declarations of adapter functions (internal C++ functions)
 int network_adapter_init(void);
 int network_adapter_connect(const char *ssid, const char *password);
 bool network_adapter_is_connected(void);
@@ -25,9 +24,11 @@ int storage_adapter_clear_all(void);
 int crypto_adapter_init(void);
 int crypto_adapter_random(uint8_t *buffer, size_t length);
 void crypto_adapter_deinit(void);
-}
 
 static bool platform_initialized = false;
+
+// Export platform manager functions with C linkage for use from C code
+extern "C" {
 
 int platform_manager_init(void) {
     if (platform_initialized) {
@@ -156,3 +157,5 @@ void platform_manager_deinit(void) {
     platform_initialized = false;
     printf("Platform shutdown complete\n");
 }
+
+} // extern "C"

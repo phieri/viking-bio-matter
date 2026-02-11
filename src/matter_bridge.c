@@ -16,13 +16,7 @@ static bool initialized = false;
 
 #ifdef ENABLE_MATTER
 // Full Matter implementation with platform integration
-extern "C" {
-int platform_manager_init(void);
-int platform_manager_connect_wifi(const char *ssid, const char *password);
-bool platform_manager_is_wifi_connected(void);
-void platform_manager_print_commissioning_info(void);
-void platform_manager_task(void);
-}
+#include "../platform/pico_w_chip_port/platform_manager.h"
 
 void matter_bridge_init(void) {
     printf("\n");
