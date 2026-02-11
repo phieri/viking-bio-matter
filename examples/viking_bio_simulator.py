@@ -19,6 +19,16 @@ import argparse
 import struct
 
 class VikingBioSimulator:
+    # Fan speed simulation constants
+    FAN_SPEED_STARTUP = 30
+    FAN_SPEED_TARGET = 80
+    FAN_SPEED_INCREMENT_MIN = 5
+    FAN_SPEED_INCREMENT_MAX = 15
+    FAN_SPEED_NORMAL_MIN = 70
+    FAN_SPEED_NORMAL_MAX = 90
+    FAN_SPEED_VARIATION_MIN = -5
+    FAN_SPEED_VARIATION_MAX = 5
+    
     def __init__(self, port, baudrate=9600):
         """Initialize the simulator with serial port settings."""
         self.ser = serial.Serial(
@@ -70,7 +80,7 @@ class VikingBioSimulator:
         # Simulate burner startup sequence
         if not self.flame_on and random.random() < 0.1:
             self.flame_on = True
-            self.fan_speed = 30
+            self.fan_speed = self.FAN_SPEED_STARTUP
             print("🔥 Flame ignited!")
             
         # Simulate burner shutdown
@@ -82,12 +92,15 @@ class VikingBioSimulator:
             
         # Update fan speed based on flame state
         if self.flame_on:
-            # Gradually increase fan speed
-            if self.fan_speed < 80:
-                self.fan_speed = min(80, self.fan_speed + random.randint(5, 15))
-            # Slight variations
+            # Gradually increase fan speed during startup
+            if self.fan_speed < self.FAN_SPEED_TARGET:
+                increment = random.randint(self.FAN_SPEED_INCREMENT_MIN, self.FAN_SPEED_INCREMENT_MAX)
+                self.fan_speed = min(self.FAN_SPEED_TARGET, self.fan_speed + increment)
+            # Normal operation with slight variations
             else:
-                self.fan_speed = max(70, min(90, self.fan_speed + random.randint(-5, 5)))
+                variation = random.randint(self.FAN_SPEED_VARIATION_MIN, self.FAN_SPEED_VARIATION_MAX)
+                self.fan_speed = max(self.FAN_SPEED_NORMAL_MIN, 
+                                    min(self.FAN_SPEED_NORMAL_MAX, self.fan_speed + variation))
                 
             # Heat up when flame is on
             if self.temperature < self.target_temp:

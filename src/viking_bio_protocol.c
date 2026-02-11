@@ -44,7 +44,12 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
                 
                 // Parse data
                 data->flame_detected = (flags & 0x01) != 0;
-                data->fan_speed = fan_speed > 100 ? 100 : fan_speed;
+                // Clamp fan speed to valid range 0-100
+                if (fan_speed > 100) {
+                    data->fan_speed = 100;
+                } else {
+                    data->fan_speed = fan_speed;
+                }
                 data->temperature = ((uint16_t)temp_high << 8) | temp_low;
                 data->error_code = (flags >> 1) & 0x7F;
                 data->valid = true;
@@ -68,7 +73,14 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
         int flame = 0, speed = 0, temp = 0;
         if (sscanf(str_buffer, "F:%d,S:%d,T:%d", &flame, &speed, &temp) == 3) {
             data->flame_detected = flame != 0;
-            data->fan_speed = speed > 100 ? 100 : (speed < 0 ? 0 : speed);
+            // Clamp fan speed to valid range 0-100
+            if (speed < 0) {
+                data->fan_speed = 0;
+            } else if (speed > 100) {
+                data->fan_speed = 100;
+            } else {
+                data->fan_speed = speed;
+            }
             data->temperature = temp;
             data->error_code = 0;
             data->valid = true;
