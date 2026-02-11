@@ -45,16 +45,16 @@ make -j$(nproc)
 # Initialize Matter SDK submodule (one-time, ~10-15 minutes)
 git submodule update --init --recursive third_party/connectedhomeip
 
-# Configure WiFi credentials (use CMake to avoid committing secrets)
+# Create build directory and configure
+mkdir build-matter && cd build-matter
+export PICO_SDK_PATH=/path/to/pico-sdk  # REQUIRED
+
+# Configure with WiFi credentials (use CMake to avoid committing secrets)
 cmake .. -DENABLE_MATTER=ON -DWIFI_SSID="YourNetwork" -DWIFI_PASSWORD="YourPassword"
 
 # Alternative (NOT RECOMMENDED): Edit source file platform/pico_w_chip_port/network_adapter.cpp
 # This method risks accidentally committing credentials. Only use for local testing.
-# If you must edit the source file, ensure credentials are in .gitignore patterns.
 
-mkdir build-matter && cd build-matter
-export PICO_SDK_PATH=/path/to/pico-sdk  # REQUIRED
-cmake .. -DENABLE_MATTER=ON -DWIFI_SSID="YourNetwork" -DWIFI_PASSWORD="YourPassword"
 make -j$(nproc)
 ```
 
