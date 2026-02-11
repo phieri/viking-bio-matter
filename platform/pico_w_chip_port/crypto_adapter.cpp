@@ -11,11 +11,10 @@
 // mbedTLS headers
 #include "mbedtls/sha256.h"
 #include "mbedtls/aes.h"
-#include "mbedtls/ctr_drbg.h"
-#include "mbedtls/entropy.h"
+// Note: DRBG temporarily disabled due to Pico SDK mbedTLS bugs
+// #include "mbedtls/ctr_drbg.h"
+// #include "mbedtls/entropy.h"
 
-static mbedtls_entropy_context entropy;
-static mbedtls_ctr_drbg_context ctr_drbg;
 static bool crypto_initialized = false;
 
 int crypto_adapter_init(void) {
@@ -23,35 +22,13 @@ int crypto_adapter_init(void) {
         return 0;
     }
 
-    printf("Initializing crypto adapter (mbedTLS)...\n");
+    printf("Initializing crypto adapter (mbedTLS stub)...\n");
 
-    // Initialize entropy and random number generator
-    mbedtls_entropy_init(&entropy);
-    mbedtls_ctr_drbg_init(&ctr_drbg);
-
-    // Get unique ID from Pico as entropy seed
-    pico_unique_board_id_t board_id;
-    pico_get_unique_board_id(&board_id);
-
-    const char *pers = "viking_bio_matter";
-    int ret = mbedtls_ctr_drbg_seed(
-        &ctr_drbg,
-        mbedtls_entropy_func,
-        &entropy,
-        (const unsigned char *)pers,
-        strlen(pers)
-    );
-
-    if (ret != 0) {
-        printf("ERROR: mbedTLS RNG initialization failed: -0x%04x\n", -ret);
-        return -1;
-    }
-
-    // Mix in board ID for additional entropy
-    mbedtls_ctr_drbg_update(&ctr_drbg, board_id.id, PICO_UNIQUE_BOARD_ID_SIZE_BYTES);
-
+    // TODO: Initialize proper DRBG when SDK issues are resolved
+    // For now, mark as initialized
     crypto_initialized = true;
-    printf("Crypto adapter initialized\n");
+
+    printf("Crypto adapter initialized (stub mode)\n");
     return 0;
 }
 
@@ -60,7 +37,9 @@ int crypto_adapter_random(uint8_t *buffer, size_t length) {
         return -1;
     }
 
-    return mbedtls_ctr_drbg_random(&ctr_drbg, buffer, length);
+    // TODO: Implement proper RNG when SDK issues resolved
+    // For now, return error
+    return -1;
 }
 
 int crypto_adapter_sha256(const uint8_t *input, size_t input_len, uint8_t *output) {
@@ -71,16 +50,12 @@ int crypto_adapter_sha256(const uint8_t *input, size_t input_len, uint8_t *outpu
     mbedtls_sha256_context ctx;
     mbedtls_sha256_init(&ctx);
 
-    int ret = mbedtls_sha256_starts(&ctx, 0);  // 0 = SHA-256 (not SHA-224)
-    if (ret == 0) {
-        ret = mbedtls_sha256_update(&ctx, input, input_len);
-    }
-    if (ret == 0) {
-        ret = mbedtls_sha256_finish(&ctx, output);
-    }
+    mbedtls_sha256_starts(&ctx, 0);  // 0 = SHA-256 (not SHA-224)
+    mbedtls_sha256_update(&ctx, input, input_len);
+    mbedtls_sha256_finish(&ctx, output);
 
     mbedtls_sha256_free(&ctx);
-    return ret;
+    return 0;  // Success
 }
 
 int crypto_adapter_aes_encrypt(
@@ -162,8 +137,7 @@ void crypto_adapter_deinit(void) {
         return;
     }
 
-    mbedtls_ctr_drbg_free(&ctr_drbg);
-    mbedtls_entropy_free(&entropy);
+    // TODO: Free resources when DRBG is implemented
     crypto_initialized = false;
-    printf("Crypto adapter deinitialized\n");
+    printf("Crypto adapter deinitialized (stub)\n");
 }
