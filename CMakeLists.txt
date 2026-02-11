@@ -1,5 +1,27 @@
 cmake_minimum_required(VERSION 3.13)
 
+# Option to enable host-side Matter bridge (optional, for Linux/Raspberry Pi)
+option(ENABLE_MATTER "Enable building host-side Matter bridge" OFF)
+
+# Check if building for Pico or host
+if(ENABLE_MATTER)
+    # Host build (Linux/Raspberry Pi) - skip Pico SDK
+    message(STATUS "Building host-side Matter bridge for Linux")
+    project(viking_bio_matter C CXX ASM)
+    
+    set(CMAKE_C_STANDARD 11)
+    set(CMAKE_CXX_STANDARD 17)
+    
+    # Add host bridge subdirectory
+    add_subdirectory(host_bridge)
+    
+    # Skip Pico firmware build
+    return()
+endif()
+
+# Default: Build for Raspberry Pi Pico
+message(STATUS "Building firmware for Raspberry Pi Pico")
+
 # Initialize the Pico SDK
 include(pico_sdk_import.cmake)
 

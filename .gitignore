@@ -1,9 +1,14 @@
 # Build directories
 build/
+build_host/
 cmake-build-*/
 
 # Pico SDK
 pico-sdk/
+
+# Matter SDK (should be installed separately)
+connectedhomeip/
+matter-sdk/
 
 # CMake
 CMakeCache.txt

@@ -2,9 +2,24 @@
 
 ## Overview
 
-This firmware implements a Matter bridge for the Viking Bio 20 burner, enabling integration with Matter-compatible smart home systems.
+This project provides two implementations of a Matter bridge for the Viking Bio 20 burner:
 
-## Components
+1. **Pico Firmware** (`src/`): Embedded firmware for Raspberry Pi Pico
+2. **Host Bridge** (`host_bridge/`): User-space Linux application with full Matter support
+
+Both share the same Viking Bio serial protocol parser and expose burner data through Matter clusters.
+
+## Implementations
+
+### Pico Firmware (Embedded)
+
+The Pico firmware runs on Raspberry Pi Pico/Pico W and provides a lightweight bridge with basic Matter attribute management (full SDK integration planned).
+
+### Host Bridge (Linux)
+
+The host bridge runs on Raspberry Pi Zero or any Linux system and provides complete Matter 1.3 integration using the connectedhomeip SDK. This is the **recommended implementation** for production use.
+
+## Pico Firmware Components
 
 ### 1. Serial Handler (`serial_handler.c`)
 
@@ -147,8 +162,117 @@ Matter: Flame state changed to ON
 Matter: Fan speed changed to 80%
 ```
 
+## Host Bridge Architecture (Linux)
+
+The host bridge provides full Matter integration on Linux systems. See `host_bridge/README.md` for detailed setup instructions.
+
+### Architecture Overview
+
+```
+Viking Bio 20 Burner
+    ↓ (TTL Serial 9600 baud)
+Linux Serial Device (/dev/ttyUSB0, /dev/ttyAMA0)
+    ↓ (POSIX termios)
+Viking Bio Protocol Parser
+    ↓ (viking_bio_data_t)
+Matter Bridge (connectedhomeip SDK)
+    ↓ (Matter over WiFi)
+Matter Controllers (Apple Home, Google Home, etc.)
+```
+
+### Host Bridge Components
+
+#### 1. main.cpp
+- Program entry point and main event loop
+- Parses command line arguments (serial device, setup code, discriminator)
+- Configures POSIX serial port with termios (9600 8N1)
+- Reads serial data with select() for non-blocking I/O
+- Calls Viking Bio parser and updates Matter attributes
+- Handles signals for graceful shutdown
+
+#### 2. matter_bridge.cpp/h
+- Wraps connectedhomeip SDK functionality
+- Initializes Matter stack and device layer
+- Creates endpoint with three clusters:
+  - **On/Off (0x0006)**: Maps flame_detected → OnOff attribute
+  - **Level Control (0x0008)**: Maps fan_speed (0-100) → CurrentLevel (0-254)
+  - **Temperature Measurement (0x0402)**: Maps temperature (°C) → MeasuredValue (hundredths of °C)
+- Manages commissioning with QR code generation
+- Reports attribute changes to subscribed controllers
+- Provides stub implementation when ENABLE_MATTER=OFF
+
+#### 3. viking_bio_protocol_linux.c/h
+- Linux port of Viking Bio serial protocol parser
+- Identical parsing logic to Pico version
+- No hardware dependencies (pure C standard library)
+- Supports both binary and text protocols
+
+#### 4. CMakeLists.txt
+- Detects MATTER_ROOT environment variable
+- Links against connectedhomeip SDK libraries when ENABLE_MATTER=ON
+- Builds stub version when Matter SDK not available
+- Provides clear error messages for missing dependencies
+
+#### 5. host_bridge.service
+- Systemd service unit for automatic startup
+- Runs as unprivileged user with serial port access
+- Configurable serial device and commissioning parameters
+- Journal logging for debugging
+
+### Matter Cluster Mapping
+
+| Viking Bio Field | Matter Cluster | Cluster ID | Attribute | Type | Mapping |
+|------------------|----------------|------------|-----------|------|---------|
+| flame_detected | On/Off | 0x0006 | OnOff | bool | Direct |
+| fan_speed | Level Control | 0x0008 | CurrentLevel | uint8 | 0-100% → 0-254 |
+| temperature | Temperature Measurement | 0x0402 | MeasuredValue | int16 | °C → hundredths of °C |
+
+### Data Flow
+
+1. **Serial Input**: Linux kernel receives data from UART/USB-serial device
+2. **Read**: Application reads data with POSIX read() (non-blocking with select())
+3. **Parse**: Viking Bio parser extracts flame, speed, temperature from binary/text format
+4. **Update**: Matter bridge updates cluster attributes via SDK APIs
+5. **Report**: SDK automatically sends reports to subscribed Matter controllers
+6. **Event Loop**: SDK event loop processes network events, subscriptions, commands
+
+### Commissioning Flow
+
+1. **Initialization**: Bridge starts and prints QR code / setup code
+2. **Discovery**: Matter controller discovers device via mDNS
+3. **PASE**: Controller establishes secure channel using setup code
+4. **Provisioning**: Bridge receives WiFi credentials (if needed) and operational certificate
+5. **CASE**: Ongoing encrypted communication with controller
+6. **Subscription**: Controller subscribes to attribute reports
+7. **Reporting**: Bridge sends attribute changes when Viking Bio data updates
+
+### Build Modes
+
+The host bridge supports two build modes:
+
+#### Full Matter Mode (ENABLE_MATTER=ON)
+- Requires connectedhomeip SDK installation
+- Links against Matter libraries
+- Provides complete commissioning and reporting
+- Recommended for production
+
+#### Stub Mode (ENABLE_MATTER=OFF, default)
+- No Matter SDK required
+- Prints attribute updates to console
+- Useful for testing parser without full Matter stack
+- Automatically built when MATTER_ROOT not set
+
+### Security Considerations
+
+- Default setup code (20202021) is for testing only
+- Production deployments should use unique setup codes and discriminators
+- Bridge runs as unprivileged user with serial port access only
+- Systemd service includes security hardening (NoNewPrivileges, PrivateTmp, etc.)
+- Matter stack handles all network security (PASE, CASE encryption)
+
 ## Future Enhancements
 
+### Pico Firmware
 1. **Full Matter SDK Integration**
    - Commissioning flow
    - Attribute subscriptions
@@ -159,7 +283,12 @@ Matter: Fan speed changed to 80%
    - Thread support (with external radio)
    - Ethernet support (with W5500 module)
 
-3. **Advanced Features**
+### Host Bridge
+1. **Configuration File**
+   - YAML/INI configuration instead of command line only
+   - Multiple device support
+
+2. **Advanced Features**
    - OTA firmware updates
    - Error reporting
    - Historical data logging

@@ -1,0 +1,29 @@
+[Unit]
+Description=Viking Bio Matter Bridge
+Documentation=https://github.com/phieri/viking-bio-matter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=dialout
+WorkingDirectory=/home/pi/viking-bio-matter/build_host
+ExecStart=/home/pi/viking-bio-matter/build_host/host_bridge --device /dev/ttyUSB0 --setup-code 20202021 --discriminator 3840
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/tmp
+
+# Environment
+Environment="MATTER_ROOT=/home/pi/connectedhomeip"
+
+[Install]
+WantedBy=multi-user.target

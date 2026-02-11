@@ -1,6 +1,11 @@
 # Viking Bio Matter Bridge
 
-A Matter (CHIP) bridge for the Viking Bio 20 burner, built for Raspberry Pi Pico. This firmware reads TTL serial data from the burner and exposes flame status and fan speed through the Matter protocol.
+A Matter (CHIP) bridge for the Viking Bio 20 burner. This project provides two implementations:
+
+1. **Pico Firmware** (default): Runs on Raspberry Pi Pico/Pico W
+2. **Host Bridge** (optional): Runs on Raspberry Pi Zero or any Linux system with full Matter support
+
+Both implementations read TTL serial data from the Viking Bio 20 burner and expose flame status, fan speed, and temperature through the Matter protocol.
 
 ## Features
 
@@ -70,7 +75,98 @@ F:1,S:50,T:75\n
 - `S`: Fan speed (0-100%)
 - `T`: Temperature (°C)
 
-## Building Firmware
+## Quick Start
+
+### Option 1: Raspberry Pi Pico (Default)
+
+Build and flash firmware for Raspberry Pi Pico:
+
+```bash
+# Prerequisites: Install Pico SDK
+export PICO_SDK_PATH=/path/to/pico-sdk
+
+# Build
+mkdir build && cd build
+cmake ..
+make
+
+# Flash viking_bio_matter.uf2 to Pico
+```
+
+See detailed instructions below in [Building Pico Firmware](#building-pico-firmware).
+
+### Option 2: Raspberry Pi Zero / Linux Host (Full Matter Support)
+
+Run a full Matter bridge on Raspberry Pi Zero or any Linux system:
+
+```bash
+# Prerequisites: Install Matter SDK
+export MATTER_ROOT=/path/to/connectedhomeip
+
+# Build host bridge
+mkdir build_host && cd build_host
+cmake .. -DENABLE_MATTER=ON
+make host_bridge
+
+# Run bridge
+./host_bridge --device /dev/ttyUSB0
+```
+
+See detailed instructions in [host_bridge/README.md](host_bridge/README.md).
+
+## Host-Based Matter Bridge (Raspberry Pi Zero)
+
+**New!** A complete Matter bridge implementation for Linux systems (Raspberry Pi Zero, Zero W, or any Linux host).
+
+### Features
+
+- ✅ **Full Matter 1.3 Support**: Complete connectedhomeip SDK integration
+- ✅ **WiFi Commissioning**: QR code and setup code commissioning
+- ✅ **Attribute Reporting**: Real-time updates to subscribed controllers
+- ✅ **Three Matter Clusters**:
+  - On/Off (0x0006) → Flame state
+  - Level Control (0x0008) → Fan speed
+  - Temperature Measurement (0x0402) → Temperature
+- ✅ **POSIX Serial**: Reads from any serial device (USB or UART)
+- ✅ **Systemd Integration**: Run as a system service
+- ✅ **Opt-in**: Doesn't affect Pico firmware build
+
+### Quick Start (Host Bridge)
+
+```bash
+# 1. Install Matter SDK (one-time setup)
+git clone --branch v1.3-branch https://github.com/project-chip/connectedhomeip.git ~/connectedhomeip
+cd ~/connectedhomeip
+./scripts/checkout_submodules.py --shallow --platform linux
+./scripts/build/build_examples.py --target linux-x64-all-clusters build
+export MATTER_ROOT=~/connectedhomeip
+
+# 2. Build host bridge
+cd /path/to/viking-bio-matter
+mkdir build_host && cd build_host
+cmake .. -DENABLE_MATTER=ON
+make host_bridge -j$(nproc)
+
+# 3. Run bridge
+./host_bridge --device /dev/ttyUSB0 --setup-code 20202021
+
+# 4. Commission with Matter controller (scan QR code from output)
+```
+
+**Full documentation**: See [host_bridge/README.md](host_bridge/README.md) for complete setup, commissioning, and troubleshooting instructions.
+
+### When to Use Which Implementation?
+
+| Feature | Pico Firmware | Host Bridge (Linux) |
+|---------|--------------|---------------------|
+| **Hardware** | Raspberry Pi Pico | Raspberry Pi Zero / Linux |
+| **Matter Support** | Planned/Stub | ✅ Full Matter 1.3 |
+| **Commissioning** | Not yet | ✅ QR Code / Setup Code |
+| **WiFi** | Pico W required | ✅ Built-in |
+| **Resource Usage** | Low (embedded) | Higher (user-space) |
+| **Setup Complexity** | Simple | Moderate (requires Matter SDK) |
+
+## Building Pico Firmware
 
 ### Prerequisites
 
