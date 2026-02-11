@@ -21,12 +21,31 @@ A Matter (CHIP) bridge for the Viking Bio 20 burner, built for Raspberry Pi Pico
 
 Connect the Viking Bio 20 TTL serial output to the Raspberry Pi Pico:
 
-```
-Viking Bio 20          Raspberry Pi Pico
---------------         ------------------
-TX (Serial Out) -----> GP1 (UART0 RX)
-GND ------------+-----> GND
-               |
+```mermaid
+graph LR
+    subgraph VB[Viking Bio 20 Burner]
+        VB_TX[TX - Serial Out]
+        VB_GND[GND]
+    end
+    
+    subgraph PICO[Raspberry Pi Pico]
+        PICO_GP1[GP1 - UART0 RX]
+        PICO_GP25[GP25 - Status LED]
+        PICO_GND[GND]
+        PICO_USB[USB Port]
+    end
+    
+    VB_TX -->|TTL 9600 baud| PICO_GP1
+    VB_GND --> PICO_GND
+    PICO_USB -.->|Power & Debug| PICO
+    
+    style VB fill:#e1f5ff
+    style PICO fill:#ffe1f5
+    style VB_TX fill:#90EE90
+    style PICO_GP1 fill:#90EE90
+    style VB_GND fill:#FFD700
+    style PICO_GND fill:#FFD700
+    style PICO_GP25 fill:#FFA500
 ```
 
 **Note**: The Pico RX pin (GP1) expects 3.3V logic levels. If the Viking Bio 20 outputs 5V TTL, use a level shifter or voltage divider.
