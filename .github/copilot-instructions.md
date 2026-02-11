@@ -170,11 +170,11 @@ third_party/
 - **LevelControl (0x0008)**: Fan speed 0-100%
 - **TemperatureMeasurement (0x0402)**: Temperature (centidegrees)
 
-**Default Commissioning Credentials** (TEST ONLY):
+**Default Commissioning Credentials** (TEST ONLY, from CHIPDevicePlatformConfig.h):
 - PIN: 20202021
 - Discriminator: 3840 (0x0F00)
 - Manual Code: 34970112332
-- QR Code: MT:Y.K9042C00KA0648G00
+- QR Code: MT:Y.K9042C00KA0648G00 (verify format if modifying)
 
 ## CI/CD Pipeline
 
@@ -201,7 +201,7 @@ third_party/
 
 2. **Conditional compilation**: Uses `#ifdef ENABLE_MATTER` throughout codebase
 
-3. **Interrupt-driven serial**: Uses `hardware_sync` library for interrupt safety
+3. **Interrupt-driven serial**: Uses Pico SDK `hardware_sync` library for interrupt safety (save_and_disable_interrupts, restore_interrupts)
 
 4. **No OTA support**: Firmware updates require physical USB/BOOTSEL button
 
