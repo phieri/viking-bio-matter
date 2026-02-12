@@ -201,21 +201,9 @@ int matter_message_encode(const matter_message_t *msg, uint8_t *buffer,
         offset += 8;
     }
     
-    // Encode protocol header (4 bytes)
-    // Exchange flags (1 byte) - bit 0: initiator, bit 1: ack requested, bit 2: secured extensions
-    buffer[offset++] = 0x00; // No special flags
-    
-    // Protocol opcode (1 byte)
-    buffer[offset++] = msg->protocol_opcode;
-    
-    // Exchange ID (2 bytes, little-endian)
-    write_le16(&buffer[offset], msg->exchange_id);
-    offset += 2;
-    
-    // Protocol ID (2 bytes, little-endian) - encoded as vendor ID (0) + protocol ID
-    // For Matter standard protocols, vendor ID is 0
-    write_le16(&buffer[offset], msg->protocol_id);
-    offset += 2;
+    // For Phase 2, protocol info (protocol_id, opcode, exchange_id) is metadata
+    // In a full implementation, this would be encoded in the secured payload
+    // For now, we just copy the payload directly
     
     // Copy payload
     if (msg->payload_length > 0 && msg->payload != NULL) {
@@ -291,27 +279,11 @@ int matter_message_decode(const uint8_t *buffer, size_t buffer_size,
         msg->header.dest_node_id = 0;
     }
     
-    // Decode protocol header (minimum 4 bytes)
-    if (offset + 4 > buffer_size) {
-        return MATTER_MSG_ERROR_BUFFER_UNDERFLOW;
-    }
-    
-    // Exchange flags (1 byte) - skip for now
-    offset++;
-    
-    // Protocol opcode (1 byte)
-    msg->protocol_opcode = buffer[offset++];
-    
-    // Exchange ID (2 bytes)
-    msg->exchange_id = read_le16(&buffer[offset]);
-    offset += 2;
-    
-    // Protocol ID (2 bytes) - following two bytes after exchange ID
-    if (offset + 2 > buffer_size) {
-        return MATTER_MSG_ERROR_BUFFER_UNDERFLOW;
-    }
-    msg->protocol_id = read_le16(&buffer[offset]);
-    offset += 2;
+    // For Phase 2, protocol info is metadata not encoded in message
+    // Set to default values - application layer will set these
+    msg->protocol_id = 0;
+    msg->protocol_opcode = 0;
+    msg->exchange_id = 0;
     
     // Remaining data is payload
     msg->payload = &buffer[offset];
