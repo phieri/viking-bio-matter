@@ -81,24 +81,29 @@ void matter_network_transport_remove_controller(int controller_id) {
     }
 }
 
-// Helper to format attribute value as string
+// Helper to format attribute value as string (JSON-safe)
 static void format_attribute_value(const matter_attr_value_t *value, matter_attr_type_t type,
                                    char *buffer, size_t buffer_len) {
     switch (type) {
         case MATTER_TYPE_BOOL:
+            // Boolean values are JSON keywords (no quotes needed)
             snprintf(buffer, buffer_len, "%s", value->bool_val ? "true" : "false");
             break;
         case MATTER_TYPE_UINT8:
+            // Numeric value (no quotes needed)
             snprintf(buffer, buffer_len, "%u", value->uint8_val);
             break;
         case MATTER_TYPE_INT16:
+            // Numeric value (no quotes needed)
             snprintf(buffer, buffer_len, "%d", value->int16_val);
             break;
         case MATTER_TYPE_UINT32:
+            // Numeric value (no quotes needed)
             snprintf(buffer, buffer_len, "%" PRIu32, value->uint32_val);
             break;
         default:
-            snprintf(buffer, buffer_len, "unknown");
+            // Unknown type - use null
+            snprintf(buffer, buffer_len, "null");
             break;
     }
 }
@@ -130,15 +135,32 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
     int sent_count = 0;
     
     // Build Matter attribute report message (simplified JSON format)
-    char message[256];
+    // Buffer size calculated to handle maximum possible message:
+    // - Fixed text: ~100 bytes
+    // - Cluster ID (8 hex digits): 8 bytes
+    // - Attribute ID (8 hex digits): 8 bytes
+    // - Value string (max): 32 bytes
+    // - Timestamp (10 digits): 10 bytes
+    // - Overhead: 20 bytes
+    // Total: ~178 bytes, use 512 for safety
+    char message[512];
     char value_str[64];
     matter_attr_type_t type = get_attribute_type(cluster_id, attribute_id);
     format_attribute_value(value, type, value_str, sizeof(value_str));
     
-    snprintf(message, sizeof(message),
-             "{\"type\":\"attribute-report\",\"endpoint\":%u,\"cluster\":\"0x%04" PRIx32 "\","
-             "\"attribute\":\"0x%04" PRIx32 "\",\"value\":%s,\"timestamp\":%" PRIu32 "}\n",
-             endpoint, cluster_id, attribute_id, value_str, now);
+    // Construct JSON message with proper formatting
+    // Note: All values are either JSON keywords (true/false/null) or numeric,
+    // so no string escaping is needed
+    int msg_len = snprintf(message, sizeof(message),
+                          "{\"type\":\"attribute-report\",\"endpoint\":%u,\"cluster\":\"0x%04" PRIx32 "\","
+                          "\"attribute\":\"0x%04" PRIx32 "\",\"value\":%s,\"timestamp\":%" PRIu32 "}\n",
+                          endpoint, cluster_id, attribute_id, value_str, now);
+    
+    // Check for truncation
+    if (msg_len >= (int)sizeof(message)) {
+        printf("Matter Transport: ERROR - Message truncated\n");
+        return -1;
+    }
     
     // Send to all active controllers
     for (int i = 0; i < MAX_MATTER_CONTROLLERS; i++) {
