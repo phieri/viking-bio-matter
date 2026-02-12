@@ -4,6 +4,7 @@
 #include "matter_bridge.h"
 #include "../platform/pico_w_chip_port/platform_manager.h"
 #include "../platform/pico_w_chip_port/matter_attributes.h"
+#include "../platform/pico_w_chip_port/matter_reporter.h"
 
 // Matter attributes storage
 static matter_attributes_t attributes = {
@@ -45,6 +46,12 @@ void matter_bridge_init(void) {
     
     // Print commissioning information
     platform_manager_print_commissioning_info();
+    
+    // Initialize Matter reporter (demonstrates attribute subscription)
+    printf("Initializing Matter attribute reporter...\n");
+    if (matter_reporter_init() != 0) {
+        printf("WARNING: Matter reporter initialization failed\n");
+    }
     
     // Initialize attribute storage
     memset(&attributes, 0, sizeof(attributes));

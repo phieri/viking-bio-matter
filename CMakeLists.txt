@@ -47,6 +47,7 @@ set(SOURCES
     platform/pico_w_chip_port/crypto_adapter.cpp
     platform/pico_w_chip_port/platform_manager.cpp
     platform/pico_w_chip_port/matter_attributes.cpp
+    platform/pico_w_chip_port/matter_reporter.cpp
 )
 
 # Matter is always enabled
