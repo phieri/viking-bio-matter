@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.13)
 # Create static library for Matter TLV codec
 add_library(matter_tlv STATIC
     tlv.c
+    message_codec.c
 )
 
 # Set include directories
