@@ -146,11 +146,12 @@ viking-bio-matter/
 ├── setup.sh                    # Interactive setup script
 ├── run.sh                      # Helper: monitor/simulate/commission/test
 ├── README.md                   # User documentation
-├── ARCHITECTURE.md             # Technical architecture details
 ├── CONTRIBUTING.md             # Development guidelines
-├── IMPLEMENTATION.md           # Matter implementation details
+├── CHANGELOG.md                # Version history
 ├── LICENSE                     # MIT License
 ├── .gitignore                  # Excludes: build/, pico-sdk/, *.uf2, third_party/
+├── .github/
+│   └── copilot-instructions.md # AI agent instructions (includes architecture details)
 └── (no .gitmodules)            # connectedhomeip must be cloned manually
 ```
 
@@ -483,7 +484,7 @@ Then rebuild firmware. ⚠️ Never commit credentials to version control.
 6. ✅ **Verify no new TODOs/HACKs**: `git diff | grep -E "TODO|HACK|FIXME"` (without good reason)
 7. ✅ **Update documentation if changing**:
    - Build steps → Update README.md and this file
-   - APIs → Update ARCHITECTURE.md and code comments
+   - APIs → Update code comments and this file
    - Matter configuration → Update platform/pico_w_chip_port/README.md
 
 ## Matter Platform Port Implementation
