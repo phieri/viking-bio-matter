@@ -4,6 +4,7 @@
  */
 
 #include <stdio.h>
+#include <inttypes.h>
 #include <string.h>
 #include "pico/stdlib.h"
 #include "mbedtls/sha256.h"
@@ -260,8 +261,8 @@ void platform_manager_report_attribute_change(uint32_t cluster_id,
     }
     
     // Log the attribute change for debugging
-    printf("Matter Report: Cluster 0x%04lX, Attribute 0x%04lX, Endpoint %u\n",
-           (unsigned long)cluster_id, (unsigned long)attribute_id, endpoint);
+    printf("Matter Report: Cluster 0x%04" PRIx32 ", Attribute 0x%04" PRIx32 ", Endpoint %u\n",
+           cluster_id, attribute_id, endpoint);
 }
 
 void platform_manager_report_onoff_change(uint8_t endpoint) {
