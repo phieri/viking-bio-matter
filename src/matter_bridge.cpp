@@ -53,8 +53,6 @@ void matter_bridge_init(void) {
         printf("WARNING: Matter reporter initialization failed\n");
     }
     
-    // Initialize attribute storage
-    memset(&attributes, 0, sizeof(attributes));
     initialized = true;
     
     printf("✓ Matter Bridge fully initialized\n");

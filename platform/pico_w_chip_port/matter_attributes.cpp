@@ -236,28 +236,35 @@ void matter_attributes_process_reports(void) {
         return;
     }
     
+    // First, collect all dirty attributes while holding the lock
+    matter_attribute_t dirty_attrs[MAX_ATTRIBUTES];
+    size_t dirty_count = 0;
+    
     critical_section_enter_blocking(&attr_lock);
     
-    // Process all dirty attributes
     for (size_t i = 0; i < attribute_count; i++) {
         if (attributes[i].dirty) {
-            matter_attribute_t *attr = &attributes[i];
-            
-            // Notify all active subscribers
-            for (int s = 0; s < MATTER_MAX_SUBSCRIBERS; s++) {
-                if (subscriber_active[s] && subscribers[s]) {
-                    // Call subscriber callback (with lock held - callbacks must be fast!)
-                    subscribers[s](attr->endpoint, attr->cluster_id, 
-                                 attr->attribute_id, &attr->value);
-                }
-            }
-            
-            // Clear dirty flag
-            attr->dirty = false;
+            dirty_attrs[dirty_count++] = attributes[i];
+            // Clear dirty flag now
+            attributes[i].dirty = false;
         }
     }
     
     critical_section_exit(&attr_lock);
+    
+    // Now notify subscribers without holding the lock
+    // Note: Callbacks must not call back into matter_attributes functions
+    // that acquire the lock, as that would cause deadlock
+    for (size_t i = 0; i < dirty_count; i++) {
+        matter_attribute_t *attr = &dirty_attrs[i];
+        
+        for (int s = 0; s < MATTER_MAX_SUBSCRIBERS; s++) {
+            if (subscriber_active[s] && subscribers[s]) {
+                subscribers[s](attr->endpoint, attr->cluster_id, 
+                             attr->attribute_id, &attr->value);
+            }
+        }
+    }
 }
 
 size_t matter_attributes_count(void) {
