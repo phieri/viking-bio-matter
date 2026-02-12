@@ -99,6 +99,7 @@ target_include_directories(viking_bio_matter PRIVATE
     ${CHIP_ROOT}/zzz_generated/app-common
     src/matter_minimal/codec
     src/matter_minimal/transport
+    src/matter_minimal/security
 )
 
 # Pull in all dependencies
@@ -113,6 +114,7 @@ target_link_libraries(viking_bio_matter
     hardware_flash
     matter_tlv
     matter_transport
+    matter_security
 )
 
 # Enable USB output, disable UART output
@@ -129,10 +131,12 @@ target_include_directories(viking_bio_matter PRIVATE
 # Add tests directory (only built for host, not Pico)
 add_subdirectory(tests/codec)
 add_subdirectory(tests/transport)
+add_subdirectory(tests/security)
 
 # Add matter_minimal subdirectories for Pico build
 if(PICO_PLATFORM)
     add_subdirectory(src/matter_minimal/codec)
     add_subdirectory(src/matter_minimal/transport)
+    add_subdirectory(src/matter_minimal/security)
 endif()
 
