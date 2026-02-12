@@ -20,6 +20,7 @@ target_include_directories(matter_security PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/src/matter_minimal/codec
     ${CMAKE_SOURCE_DIR}/platform/pico_w_chip_port
+    ${CMAKE_SOURCE_DIR}/platform/pico_w_chip_port/config
 )
 
 # Link dependencies
