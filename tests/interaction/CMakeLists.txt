@@ -15,8 +15,10 @@ if(NOT PICO_PLATFORM)
     add_subdirectory(${CODEC_DIR} ${CMAKE_CURRENT_BINARY_DIR}/codec)
     add_subdirectory(${INTERACTION_DIR} ${CMAKE_CURRENT_BINARY_DIR}/interaction)
     
-    # Create test executable
+    # Create test executables
     add_executable(test_read_handler test_read_handler.c)
+    add_executable(test_subscribe_handler test_subscribe_handler.c)
+    add_executable(test_report_generator test_report_generator.c)
     
     # Link to libraries
     target_link_libraries(test_read_handler 
@@ -24,8 +26,20 @@ if(NOT PICO_PLATFORM)
         matter_tlv
     )
     
-    # Add test to CTest
+    target_link_libraries(test_subscribe_handler
+        matter_interaction
+        matter_tlv
+    )
+    
+    target_link_libraries(test_report_generator
+        matter_interaction
+        matter_tlv
+    )
+    
+    # Add tests to CTest
     add_test(NAME test_read_handler COMMAND test_read_handler)
+    add_test(NAME test_subscribe_handler COMMAND test_subscribe_handler)
+    add_test(NAME test_report_generator COMMAND test_report_generator)
     
     message(STATUS "Interaction model tests enabled (host build)")
 else()

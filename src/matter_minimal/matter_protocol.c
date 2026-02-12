@@ -10,6 +10,7 @@
 #include "security/pase.h"
 #include "interaction/interaction_model.h"
 #include "interaction/read_handler.h"
+#include "interaction/subscribe_handler.h"
 #include "clusters/descriptor.h"
 #include "clusters/onoff.h"
 #include "clusters/level_control.h"
@@ -48,6 +49,10 @@ int matter_protocol_init(void) {
     
     // 4. Interaction layer
     if (read_handler_init() < 0) {
+        return -1;
+    }
+    
+    if (subscribe_handler_init() < 0) {
         return -1;
     }
     
@@ -110,6 +115,28 @@ static int process_read_request(const matter_message_t *msg,
 }
 
 /**
+ * Process SubscribeRequest (Interaction Model Protocol)
+ */
+static int process_subscribe_request(const matter_message_t *msg,
+                                     const char *source_ip, uint16_t source_port) {
+    uint8_t response_payload[1024];
+    size_t response_len;
+    
+    // Process the SubscribeRequest and generate SubscribeResponse
+    if (subscribe_handler_process_request(msg->payload, msg->payload_length,
+                                         response_payload, sizeof(response_payload),
+                                         &response_len, msg->header.session_id) < 0) {
+        return -1;
+    }
+    
+    // Send response back to controller
+    return matter_protocol_send(source_ip, source_port,
+                               PROTOCOL_INTERACTION_MODEL,
+                               OP_SUBSCRIBE_RESPONSE,
+                               response_payload, response_len);
+}
+
+/**
  * Route incoming message to appropriate handler
  */
 static int route_message(const matter_message_t *msg,
@@ -123,8 +150,10 @@ static int route_message(const matter_message_t *msg,
                 case OP_READ_REQUEST:
                     return process_read_request(msg, source_ip, source_port);
                 
-                case OP_WRITE_REQUEST:
                 case OP_SUBSCRIBE_REQUEST:
+                    return process_subscribe_request(msg, source_ip, source_port);
+                
+                case OP_WRITE_REQUEST:
                 case OP_INVOKE_REQUEST:
                     // Not implemented yet
                     return 0;
@@ -152,6 +181,11 @@ int matter_protocol_task(void) {
     uint16_t source_port;
     size_t recv_len;
     int messages_processed = 0;
+    
+    // Check subscription intervals for periodic reporting
+    // Note: In production, this would use actual time from pico SDK
+    // For now, we pass 0 to indicate time checking is not active
+    subscribe_handler_check_intervals(0);
     
     // Process all available messages
     while (udp_transport_recv(buffer, sizeof(buffer), &recv_len,
