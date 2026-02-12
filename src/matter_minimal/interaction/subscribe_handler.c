@@ -397,3 +397,19 @@ size_t subscribe_handler_get_count(void) {
     
     return count;
 }
+
+/**
+ * Clear all subscriptions (for testing/debugging)
+ */
+int subscribe_handler_clear_all(void) {
+    int count = 0;
+    
+    for (int i = 0; i < MAX_SUBSCRIPTIONS; i++) {
+        if (subscriptions[i].active) {
+            subscriptions[i].active = false;
+            count++;
+        }
+    }
+    
+    return count;
+}

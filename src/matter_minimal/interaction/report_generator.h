@@ -8,6 +8,7 @@
 #define REPORT_GENERATOR_H
 
 #include "interaction_model.h"
+#include "read_handler.h"
 #include <stdint.h>
 #include <stddef.h>
 

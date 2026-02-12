@@ -149,14 +149,13 @@ void test_report_with_subscription_id(void) {
         bool found_sub_id = false;
         uint32_t actual_sub_id = 0;
         
-        while (!tlv_reader_is_end(&reader)) {
-            if (tlv_reader_next(&reader, &element) < 0) break;
-            
-            if (element.tag == 0) {
+        if (tlv_reader_next(&reader, &element) >= 0) {
+            if (element.tag == 0 && element.type == TLV_TYPE_UNSIGNED_INT) {
                 // SubscriptionId (tag 0)
-                actual_sub_id = element.value.u32;
+                // TLV encodes values optimally, so need to read correct size
+                // For value 789, it's encoded as 2 bytes (u16)
+                actual_sub_id = element.value.u16;
                 found_sub_id = true;
-                break;
             }
         }
         

@@ -212,9 +212,8 @@ void test_multiple_subscriptions(void) {
 void test_subscription_limit(void) {
     printf("Test: Subscription limit (11 subscriptions)...\n");
     
-    // Clear existing subscriptions
-    subscribe_handler_remove_all_for_session(102);
-    subscribe_handler_remove_all_for_session(103);
+    // Clear ALL subscriptions first
+    subscribe_handler_clear_all();
     
     attribute_path_t path = {
         .endpoint = 1,

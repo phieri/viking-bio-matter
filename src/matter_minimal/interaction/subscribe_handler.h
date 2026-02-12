@@ -8,6 +8,7 @@
 #define SUBSCRIBE_HANDLER_H
 
 #include "interaction_model.h"
+#include "read_handler.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -129,6 +130,14 @@ const subscription_t* subscribe_handler_get_subscription(uint32_t subscription_i
  * @return Number of active subscriptions
  */
 size_t subscribe_handler_get_count(void);
+
+/**
+ * Clear all subscriptions (for testing/debugging)
+ * Removes all subscriptions regardless of session
+ * 
+ * @return Number of subscriptions cleared
+ */
+int subscribe_handler_clear_all(void);
 
 #ifdef __cplusplus
 }
