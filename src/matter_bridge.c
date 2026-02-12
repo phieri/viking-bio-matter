@@ -62,7 +62,7 @@ void matter_bridge_update_flame(bool flame_on) {
         attributes.last_update_time = to_ms_since_boot(get_absolute_time());
         
         printf("Matter: OnOff cluster updated - Flame %s\n", flame_on ? "ON" : "OFF");
-        // In full Matter SDK: call ChipDeviceEvent to trigger attribute report
+        platform_manager_report_onoff_change(1); // Endpoint 1
     }
 }
 
@@ -76,7 +76,7 @@ void matter_bridge_update_fan_speed(uint8_t speed) {
         attributes.last_update_time = to_ms_since_boot(get_absolute_time());
         
         printf("Matter: LevelControl cluster updated - Fan speed %d%%\n", speed);
-        // In full Matter SDK: call ChipDeviceEvent to trigger attribute report
+        platform_manager_report_level_change(1); // Endpoint 1
     }
 }
 
@@ -90,7 +90,7 @@ void matter_bridge_update_temperature(uint16_t temp) {
         attributes.last_update_time = to_ms_since_boot(get_absolute_time());
         
         printf("Matter: TemperatureMeasurement cluster updated - %d°C\n", temp);
-        // In full Matter SDK: call ChipDeviceEvent to trigger attribute report
+        platform_manager_report_temperature_change(1); // Endpoint 1
     }
 }
 

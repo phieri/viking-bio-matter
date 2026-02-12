@@ -243,4 +243,40 @@ void platform_manager_deinit(void) {
     printf("Platform shutdown complete\n");
 }
 
+void platform_manager_report_attribute_change(uint32_t cluster_id, 
+                                              uint32_t attribute_id, 
+                                              uint8_t endpoint) {
+    // Lightweight, non-fatal notification
+    // In a full Matter SDK implementation, this would:
+    // 1. Mark the attribute as dirty in the attribute cache
+    // 2. Schedule a report transmission to subscribed controllers
+    // 3. Handle report throttling and aggregation
+    //
+    // For this stub implementation, we simply log the event
+    // This ensures the API is non-fatal and won't block operation
+    
+    if (!platform_initialized) {
+        return; // Silently ignore if platform not ready
+    }
+    
+    // Log the attribute change for debugging
+    printf("Matter Report: Cluster 0x%04lX, Attribute 0x%04lX, Endpoint %u\n",
+           (unsigned long)cluster_id, (unsigned long)attribute_id, endpoint);
+}
+
+void platform_manager_report_onoff_change(uint8_t endpoint) {
+    // OnOff cluster (0x0006), OnOff attribute (0x0000)
+    platform_manager_report_attribute_change(0x0006, 0x0000, endpoint);
+}
+
+void platform_manager_report_level_change(uint8_t endpoint) {
+    // LevelControl cluster (0x0008), CurrentLevel attribute (0x0000)
+    platform_manager_report_attribute_change(0x0008, 0x0000, endpoint);
+}
+
+void platform_manager_report_temperature_change(uint8_t endpoint) {
+    // TemperatureMeasurement cluster (0x0402), MeasuredValue attribute (0x0000)
+    platform_manager_report_attribute_change(0x0402, 0x0000, endpoint);
+}
+
 } // extern "C"
