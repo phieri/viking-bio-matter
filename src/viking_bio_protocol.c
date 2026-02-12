@@ -65,7 +65,7 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
                 // Parse temperature (16-bit value)
                 uint16_t temp = ((uint16_t)temp_high << 8) | temp_low;
                 // Validate temperature is within reasonable range (binary protocol uses unsigned, so min is 0)
-                if (unlikely(temp > VIKING_BIO_MAX_TEMPERATURE)) {
+                if (temp > VIKING_BIO_MAX_TEMPERATURE) {
                     // Invalid temperature, skip this packet
                     continue;
                 }
@@ -102,7 +102,7 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
                 data->fan_speed = (uint8_t)speed;
             }
             // Validate temperature is within reasonable range (0-500°C for burner)
-            if (unlikely(temp < 0 || temp > VIKING_BIO_MAX_TEMPERATURE)) {
+            if (temp < 0 || temp > VIKING_BIO_MAX_TEMPERATURE) {
                 return false;
             }
             data->temperature = (uint16_t)temp;
