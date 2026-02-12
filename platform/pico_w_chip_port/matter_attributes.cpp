@@ -5,6 +5,7 @@
 
 #include "matter_attributes.h"
 #include <stdio.h>
+#include <inttypes.h>
 #include <string.h>
 #include "pico/stdlib.h"
 #include "hardware/sync.h"
@@ -92,8 +93,8 @@ int matter_attributes_register(uint8_t endpoint, uint32_t cluster_id,
     
     critical_section_exit(&attr_lock);
     
-    printf("Matter: Registered attribute (EP:%u, CL:0x%04lX, AT:0x%04lX)\n",
-           endpoint, (unsigned long)cluster_id, (unsigned long)attribute_id);
+    printf("Matter: Registered attribute (EP:%u, CL:0x%04" PRIx32 ", AT:0x%04" PRIx32 ")\n",
+           endpoint, cluster_id, attribute_id);
     
     return 0;
 }
@@ -135,8 +136,8 @@ int matter_attributes_update(uint8_t endpoint, uint32_t cluster_id,
     matter_attribute_t *attr = find_attribute(endpoint, cluster_id, attribute_id);
     if (!attr) {
         critical_section_exit(&attr_lock);
-        printf("Matter: WARNING - Attribute not found (EP:%u, CL:0x%04lX, AT:0x%04lX)\n",
-               endpoint, (unsigned long)cluster_id, (unsigned long)attribute_id);
+        printf("Matter: WARNING - Attribute not found (EP:%u, CL:0x%04" PRIx32 ", AT:0x%04" PRIx32 ")\n",
+               endpoint, cluster_id, attribute_id);
         return -1;
     }
     
@@ -148,8 +149,8 @@ int matter_attributes_update(uint8_t endpoint, uint32_t cluster_id,
         critical_section_exit(&attr_lock);
         
         // Log the change
-        printf("Matter: Attribute changed (EP:%u, CL:0x%04lX, AT:0x%04lX) = ",
-               endpoint, (unsigned long)cluster_id, (unsigned long)attribute_id);
+        printf("Matter: Attribute changed (EP:%u, CL:0x%04" PRIx32 ", AT:0x%04" PRIx32 ") = ",
+               endpoint, cluster_id, attribute_id);
         
         switch (attr->type) {
             case MATTER_TYPE_BOOL:
@@ -236,17 +237,29 @@ void matter_attributes_process_reports(void) {
         return;
     }
     
-    // First, collect all dirty attributes while holding the lock
+    // Collect dirty attributes and active subscribers while holding the lock
     matter_attribute_t dirty_attrs[MAX_ATTRIBUTES];
     size_t dirty_count = 0;
     
+    // Also copy subscriber state to avoid race conditions
+    matter_subscriber_callback_t active_subscribers[MATTER_MAX_SUBSCRIBERS];
+    int active_count = 0;
+    
     critical_section_enter_blocking(&attr_lock);
     
+    // Collect dirty attributes
     for (size_t i = 0; i < attribute_count; i++) {
         if (attributes[i].dirty) {
             dirty_attrs[dirty_count++] = attributes[i];
             // Clear dirty flag now
             attributes[i].dirty = false;
+        }
+    }
+    
+    // Collect active subscribers
+    for (int s = 0; s < MATTER_MAX_SUBSCRIBERS; s++) {
+        if (subscriber_active[s] && subscribers[s]) {
+            active_subscribers[active_count++] = subscribers[s];
         }
     }
     
@@ -258,11 +271,9 @@ void matter_attributes_process_reports(void) {
     for (size_t i = 0; i < dirty_count; i++) {
         matter_attribute_t *attr = &dirty_attrs[i];
         
-        for (int s = 0; s < MATTER_MAX_SUBSCRIBERS; s++) {
-            if (subscriber_active[s] && subscribers[s]) {
-                subscribers[s](attr->endpoint, attr->cluster_id, 
-                             attr->attribute_id, &attr->value);
-            }
+        for (int s = 0; s < active_count; s++) {
+            active_subscribers[s](attr->endpoint, attr->cluster_id, 
+                                 attr->attribute_id, &attr->value);
         }
     }
 }
