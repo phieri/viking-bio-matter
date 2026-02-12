@@ -3,6 +3,10 @@
 #include "pico/stdlib.h"
 #include "viking_bio_protocol.h"
 
+// Branch prediction hints for better optimization
+#define likely(x)   __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
 // Current Viking Bio data state
 static viking_bio_data_t current_data = {
     .flame_detected = false,
@@ -26,7 +30,7 @@ void viking_bio_init(void) {
 }
 
 bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data_t *data) {
-    if (buffer == NULL || data == NULL || length < VIKING_BIO_MIN_PACKET_SIZE) {
+    if (unlikely(buffer == NULL || data == NULL || length < VIKING_BIO_MIN_PACKET_SIZE)) {
         return false;
     }
     
@@ -38,11 +42,6 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
     // Format: [START_BYTE] [FLAGS] [FAN_SPEED] [TEMP_HIGH] [TEMP_LOW] [END_BYTE]
     // FLAGS bit 0: flame detected
     // FLAGS bit 1-7: error codes
-    
-    // Ensure we don't read past buffer end
-    if (length < VIKING_BIO_MIN_PACKET_SIZE) {
-        return false;
-    }
     
     for (size_t i = 0; i <= length - VIKING_BIO_MIN_PACKET_SIZE; i++) {
         if (buffer[i] == VIKING_BIO_START_BYTE) {

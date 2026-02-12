@@ -10,7 +10,7 @@
 static uint8_t serial_buffer[SERIAL_BUFFER_SIZE];
 static volatile size_t buffer_head = 0;
 static volatile size_t buffer_tail = 0;
-static volatile size_t buffer_count = 0;
+volatile size_t buffer_count = 0;  // Made non-static for inline function in header
 
 // UART RX interrupt handler
 static void on_uart_rx() {
@@ -54,13 +54,7 @@ void serial_handler_task(void) {
     // Currently, all RX handling is done in the interrupt handler
 }
 
-bool serial_handler_data_available(void) {
-    // Read buffer_count atomically to avoid race condition
-    uint32_t interrupts = save_and_disable_interrupts();
-    bool has_data = buffer_count > 0;
-    restore_interrupts(interrupts);
-    return has_data;
-}
+// serial_handler_data_available() is now inline in header file
 
 size_t serial_handler_read(uint8_t *buffer, size_t max_length) {
     if (buffer == NULL || max_length == 0) {
