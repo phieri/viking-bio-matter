@@ -81,8 +81,14 @@ static int derive_w0_w1_from_pin(const uint8_t *pin, size_t pin_len,
     
     // Derive 64 bytes (w0 || w1) using PBKDF2-HMAC-SHA256
     uint8_t derived[64];
+    const mbedtls_md_info_t *md = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+    if (!md) {
+        printf("PASE: Failed to get SHA256 MD info\n");
+        return -1;
+    }
+    
     int ret = mbedtls_pkcs5_pbkdf2_hmac(
-        &(mbedtls_md_info_t){ 0 },  // Will use SHA256
+        md,
         pin, pin_len,
         salt, salt_len,
         iterations,
