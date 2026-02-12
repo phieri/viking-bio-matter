@@ -7,6 +7,7 @@
 #include "../platform/pico_w_chip_port/matter_reporter.h"
 #include "../platform/pico_w_chip_port/matter_network_subscriber.h"
 #include "../platform/pico_w_chip_port/matter_network_transport.h"
+#include "matter_minimal/interaction/subscription_bridge.h"
 
 // Matter attributes storage
 static matter_attributes_t attributes = {
@@ -70,6 +71,13 @@ void matter_bridge_init(void) {
         printf("  2. Call: matter_network_transport_add_controller(\"<IP>\", 5540)\n");
         printf("  3. Attribute changes will be sent as JSON over UDP\n");
         printf("\n");
+    }
+    
+    // Initialize subscription bridge (connects matter_attributes to subscribe_handler)
+    printf("Initializing Matter subscription bridge...\n");
+    if (subscription_bridge_init() != 0) {
+        printf("WARNING: Subscription bridge initialization failed\n");
+        printf("         Subscriptions may not receive attribute updates\n");
     }
     
     initialized = true;
