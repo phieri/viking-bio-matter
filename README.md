@@ -28,27 +28,29 @@ graph LR
         VB_GND[GND]
     end
     
+    LEVEL_SHIFTER[Level Shifter<br/>or<br/>Voltage Divider<br/>5V → 3.3V]
+    
     subgraph PICO[Raspberry Pi Pico W]
         PICO_GP1[GP1 - UART0 RX]
         PICO_GND[GND]
         PICO_USB[USB Port]
     end
     
-    VB_TX -->|TTL 9600 baud| PICO_GP1
+    VB_TX -->|5V TTL| LEVEL_SHIFTER
+    LEVEL_SHIFTER -->|3.3V| PICO_GP1
     VB_GND --> PICO_GND
     PICO_USB -.->|Power & Debug| PICO
     
     style VB fill:#e1f5ff
     style PICO fill:#ffe1f5
+    style LEVEL_SHIFTER fill:#FFB6C1
     style VB_TX fill:#90EE90
     style PICO_GP1 fill:#90EE90
     style VB_GND fill:#FFD700
     style PICO_GND fill:#FFD700
-    
-    style VB fill:#e1f5ff
 
 ```
-**Note**: The Pico W RX pin (GP1) expects 3.3V logic levels. If the Viking Bio 20 outputs 5V TTL, use a level shifter or voltage divider.
+**Note**: The Pico W RX pin (GP1) expects 3.3V logic levels. The Viking Bio 20's TTL output voltage should be verified before connecting directly. If it outputs 5V TTL (which is common), a level shifter (e.g., bi-directional logic level converter) or voltage divider (two resistors: 2kΩ from TX to RX, 1kΩ from RX to GND) is required for safe voltage conversion. The diagram above shows the configuration with level shifting, which is the recommended safe approach.
 
 ## Serial Protocol
 
@@ -229,7 +231,9 @@ viking-bio-matter/
 
 ## License
 
-This project is open source and available under the MIT License.
+This project is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0). This means you can use, modify, and share this project for non-commercial purposes, as long as you provide attribution and share derivatives under the same license.
+
+See the [LICENSE](LICENSE) file for details or visit https://creativecommons.org/licenses/by-nc-sa/4.0/
 
 ## Contributing
 

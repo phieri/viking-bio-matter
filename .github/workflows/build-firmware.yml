@@ -25,7 +25,7 @@ jobs:
     
     - name: Install dependencies
       run: |
-        sudo apt-get update
+        sudo apt-get -qq update
         sudo apt-get install -y cmake gcc-arm-none-eabi libnewlib-arm-none-eabi build-essential
     
     - name: Cache Pico SDK
@@ -35,22 +35,24 @@ jobs:
         path: ${{ github.workspace }}/pico-sdk
         key: pico-sdk-${{ env.PICO_SDK_VERSION }}
     
-    - name: Clone Pico SDK
+    - name: Checkout Pico SDK
       if: steps.cache-pico-sdk.outputs.cache-hit != 'true'
-      run: |
-        git clone --depth 1 --branch ${{ env.PICO_SDK_VERSION }} https://github.com/raspberrypi/pico-sdk.git
-        cd pico-sdk
-        git submodule update --init --recursive
+      uses: actions/checkout@v6
+      with:
+        repository: raspberrypi/pico-sdk
+        ref: ${{ env.PICO_SDK_VERSION }}
+        path: pico-sdk
+        submodules: recursive
     
     - name: Set Pico SDK path
       run: echo "PICO_SDK_PATH=${{ github.workspace }}/pico-sdk" >> $GITHUB_ENV
     
     - name: Checkout connectedhomeip
-      run: |
-        echo "Cloning connectedhomeip (v1.3-branch)..."
-        mkdir -p third_party
-        git clone --depth 1 --branch v1.3-branch https://github.com/project-chip/connectedhomeip.git third_party/connectedhomeip
-        echo "✓ connectedhomeip cloned successfully"
+      uses: actions/checkout@v6
+      with:
+        repository: project-chip/connectedhomeip
+        ref: v1.3-branch
+        path: third_party/connectedhomeip
     
     - name: Verify connectedhomeip submodule
       run: |

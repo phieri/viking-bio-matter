@@ -4,12 +4,16 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "hardware/sync.h"
 
 // UART configuration for TTL serial input from Viking Bio 20
 #define UART_ID uart0
 #define UART_TX_PIN 0
 #define UART_RX_PIN 1
 #define SERIAL_BUFFER_SIZE 256
+
+// External declarations for buffer state (defined in serial_handler.c)
+extern volatile size_t buffer_count;
 
 /**
  * Initialize the serial handler with interrupt-driven RX
@@ -26,9 +30,17 @@ void serial_handler_task(void);
 /**
  * Check if data is available in the circular buffer
  * Thread-safe: disables interrupts during check
+ * Inlined for performance in hot path (zero-overhead main loop polling)
+ * Note: Exposes buffer_count for inline optimization; trades encapsulation for speed
  * @return true if data is available, false otherwise
  */
-bool serial_handler_data_available(void);
+static inline bool serial_handler_data_available(void) {
+    // Read buffer_count atomically to avoid race condition
+    uint32_t interrupts = save_and_disable_interrupts();
+    bool has_data = buffer_count > 0;
+    restore_interrupts(interrupts);
+    return has_data;
+}
 
 /**
  * Read data from the circular buffer
