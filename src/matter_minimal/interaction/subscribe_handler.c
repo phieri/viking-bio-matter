@@ -313,20 +313,14 @@ int subscribe_handler_check_intervals(uint32_t current_time) {
         }
         
         // Check if max_interval has elapsed
-        uint32_t elapsed_sec = (current_time - sub->last_report_time) / 1000;
+        // Handle wraparound by computing difference (works for wraparound up to 2^31 ms)
+        uint32_t time_diff = current_time - sub->last_report_time;
+        uint32_t max_interval_ms = (uint32_t)sub->max_interval * 1000;
         
-        if (elapsed_sec >= sub->max_interval) {
-            // Generate report for this subscription
-            attribute_path_t path = {
-                .endpoint = sub->endpoint,
-                .cluster_id = sub->cluster_id,
-                .attribute_id = sub->attribute_id,
-                .wildcard = false
-            };
-            
-            // Note: report_generator_send_report will read current value
-            // and send the report. For now, we just count it.
-            // Full implementation would call report_generator here.
+        if (time_diff >= max_interval_ms) {
+            // Note: Full report generation would be implemented here
+            // For now, we just track that a report is due
+            // In production, this would call report_generator_send_report()
             
             sub->last_report_time = current_time;
             reports_generated++;
@@ -362,11 +356,14 @@ int subscribe_handler_notify_change(uint8_t endpoint, uint32_t cluster_id,
         }
         
         // Check if min_interval has elapsed
-        uint32_t elapsed_sec = (current_time - sub->last_report_time) / 1000;
+        // Handle wraparound by computing difference (works for wraparound up to 2^31 ms)
+        uint32_t time_diff = current_time - sub->last_report_time;
+        uint32_t min_interval_ms = (uint32_t)sub->min_interval * 1000;
         
-        if (elapsed_sec >= sub->min_interval) {
-            // Generate report for this subscription
-            // Note: Full implementation would call report_generator here
+        if (time_diff >= min_interval_ms) {
+            // Note: Full report generation would be implemented here
+            // For now, we just track that a report is due
+            // In production, this would call report_generator_send_report()
             
             sub->last_report_time = current_time;
             reports_generated++;

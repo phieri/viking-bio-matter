@@ -267,67 +267,107 @@ int report_generator_encode_report(uint32_t subscription_id,
             return -1;
         }
         
-        // Encode AttributeData for success
-        if (tlv_encode_structure_start(&writer, 1) < 0) {
-            return -1;
-        }
-        
-        // DataVersion (tag 0) - optional, use 0
-        if (tlv_encode_uint32(&writer, 0, 0) < 0) {
-            return -1;
-        }
-        
-        // AttributePath (tag 1)
-        if (tlv_encode_structure_start(&writer, 1) < 0) {
-            return -1;
-        }
-        if (tlv_encode_uint8(&writer, 0, report->path.endpoint) < 0) {
-            return -1;
-        }
-        if (tlv_encode_uint32(&writer, 2, report->path.cluster_id) < 0) {
-            return -1;
-        }
-        if (tlv_encode_uint32(&writer, 3, report->path.attribute_id) < 0) {
-            return -1;
-        }
-        if (tlv_encode_container_end(&writer) < 0) {
-            return -1;
-        }
-        
-        // Data (tag 2) - encode attribute value
-        switch (report->type) {
-            case ATTR_TYPE_BOOL:
-                if (tlv_encode_bool(&writer, 2, report->value.bool_val) < 0) {
-                    return -1;
-                }
-                break;
-            case ATTR_TYPE_UINT8:
-                if (tlv_encode_uint8(&writer, 2, report->value.uint8_val) < 0) {
-                    return -1;
-                }
-                break;
-            case ATTR_TYPE_INT16:
-                if (tlv_encode_int16(&writer, 2, report->value.int16_val) < 0) {
-                    return -1;
-                }
-                break;
-            case ATTR_TYPE_UINT16:
-                if (tlv_encode_uint16(&writer, 2, report->value.uint16_val) < 0) {
-                    return -1;
-                }
-                break;
-            case ATTR_TYPE_UINT32:
-                if (tlv_encode_uint32(&writer, 2, report->value.uint32_val) < 0) {
-                    return -1;
-                }
-                break;
-            default:
-                // Unsupported type
+        // Check if this is an error report or success report
+        if (report->status != IM_STATUS_SUCCESS) {
+            // Encode AttributeStatus for errors (tag 0)
+            if (tlv_encode_structure_start(&writer, 0) < 0) {
                 return -1;
-        }
-        
-        if (tlv_encode_container_end(&writer) < 0) {
-            return -1;
+            }
+            
+            // AttributePath (tag 0)
+            if (tlv_encode_structure_start(&writer, 0) < 0) {
+                return -1;
+            }
+            if (tlv_encode_uint8(&writer, 0, report->path.endpoint) < 0) {
+                return -1;
+            }
+            if (tlv_encode_uint32(&writer, 2, report->path.cluster_id) < 0) {
+                return -1;
+            }
+            if (tlv_encode_uint32(&writer, 3, report->path.attribute_id) < 0) {
+                return -1;
+            }
+            if (tlv_encode_container_end(&writer) < 0) {
+                return -1;
+            }
+            
+            // Status (tag 1)
+            if (tlv_encode_structure_start(&writer, 1) < 0) {
+                return -1;
+            }
+            if (tlv_encode_uint8(&writer, 0, (uint8_t)report->status) < 0) {
+                return -1;
+            }
+            if (tlv_encode_container_end(&writer) < 0) {
+                return -1;
+            }
+            
+            if (tlv_encode_container_end(&writer) < 0) {
+                return -1;
+            }
+        } else {
+            // Encode AttributeData for success (tag 1)
+            if (tlv_encode_structure_start(&writer, 1) < 0) {
+                return -1;
+            }
+            
+            // DataVersion (tag 0) - optional, use 0
+            if (tlv_encode_uint32(&writer, 0, 0) < 0) {
+                return -1;
+            }
+            
+            // AttributePath (tag 1)
+            if (tlv_encode_structure_start(&writer, 1) < 0) {
+                return -1;
+            }
+            if (tlv_encode_uint8(&writer, 0, report->path.endpoint) < 0) {
+                return -1;
+            }
+            if (tlv_encode_uint32(&writer, 2, report->path.cluster_id) < 0) {
+                return -1;
+            }
+            if (tlv_encode_uint32(&writer, 3, report->path.attribute_id) < 0) {
+                return -1;
+            }
+            if (tlv_encode_container_end(&writer) < 0) {
+                return -1;
+            }
+            
+            // Data (tag 2) - encode attribute value
+            switch (report->type) {
+                case ATTR_TYPE_BOOL:
+                    if (tlv_encode_bool(&writer, 2, report->value.bool_val) < 0) {
+                        return -1;
+                    }
+                    break;
+                case ATTR_TYPE_UINT8:
+                    if (tlv_encode_uint8(&writer, 2, report->value.uint8_val) < 0) {
+                        return -1;
+                    }
+                    break;
+                case ATTR_TYPE_INT16:
+                    if (tlv_encode_int16(&writer, 2, report->value.int16_val) < 0) {
+                        return -1;
+                    }
+                    break;
+                case ATTR_TYPE_UINT16:
+                    if (tlv_encode_uint16(&writer, 2, report->value.uint16_val) < 0) {
+                        return -1;
+                    }
+                    break;
+                case ATTR_TYPE_UINT32:
+                    if (tlv_encode_uint32(&writer, 2, report->value.uint32_val) < 0) {
+                        return -1;
+                    }
+                    break;
+                default:
+                    // Unsupported type
+                    return -1;
+            }
+            
+            if (tlv_encode_container_end(&writer) < 0) {
+                return -1;
+            }
         }
         
         // End AttributeReport structure

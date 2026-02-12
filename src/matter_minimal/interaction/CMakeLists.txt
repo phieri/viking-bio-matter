@@ -19,5 +19,12 @@ target_link_libraries(matter_interaction
     matter_tlv
 )
 
+# For Pico builds, link pico_stdlib (needed by subscription_bridge.cpp)
+if(PICO_PLATFORM)
+    target_link_libraries(matter_interaction
+        pico_stdlib
+    )
+endif()
+
 # Set C standard
 set_property(TARGET matter_interaction PROPERTY C_STANDARD 11)
