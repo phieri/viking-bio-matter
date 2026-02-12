@@ -2,34 +2,48 @@
 #include <string.h>
 
 /**
- * TLV Control Byte Encoding (Matter Core Specification Section 4.14)
+ * TLV Control Byte Encoding - Simplified Minimal Implementation
  * 
- * Bits 7-5: Element Type (3 bits)
- * Bits 4-3: Tag Control (2 bits) 
- * Bits 2-0: Length/Value (3 bits)
+ * NOTE: This is a simplified encoding for learning/testing purposes.
+ * It does NOT match the Matter Core Specification Section 4.14 exactly.
+ * 
+ * For production use, refer to the full Matter spec encoding which uses:
+ * - 3-bit element type field in bits 7-5
+ * - 2-bit tag control in bits 4-3
+ * - 3-bit length field in bits 2-0
+ * 
+ * This minimal implementation uses:
+ * - Full byte for control (type + tag control)
+ * - Separate tag byte for context-specific tags
+ * - Separate length byte(s) for variable-length types
  */
 
 // Control byte field masks
-#define TLV_TYPE_SHIFT 5
-#define TLV_TAG_SHIFT 3
-#define TLV_LENGTH_MASK 0x07
+#define TLV_TYPE_MASK 0xF0
+#define TLV_TAG_MASK 0x0F
 
-// Element type encoding in control byte
-#define TLV_ELEMENT_TYPE_INT (0 << TLV_TYPE_SHIFT)
-#define TLV_ELEMENT_TYPE_UINT (1 << TLV_TYPE_SHIFT)
-#define TLV_ELEMENT_TYPE_BOOL (2 << TLV_TYPE_SHIFT)
-#define TLV_ELEMENT_TYPE_FLOAT (3 << TLV_TYPE_SHIFT)
-#define TLV_ELEMENT_TYPE_UTF8_STRING (4 << TLV_TYPE_SHIFT)
-#define TLV_ELEMENT_TYPE_BYTE_STRING (5 << TLV_TYPE_SHIFT)
-#define TLV_ELEMENT_TYPE_NULL (6 << TLV_TYPE_SHIFT)
-#define TLV_ELEMENT_TYPE_STRUCTURE (7 << TLV_TYPE_SHIFT)
-#define TLV_ELEMENT_TYPE_ARRAY (8 << TLV_TYPE_SHIFT)
-#define TLV_ELEMENT_TYPE_LIST (9 << TLV_TYPE_SHIFT)
-#define TLV_ELEMENT_TYPE_END (10 << TLV_TYPE_SHIFT)
+// Element type encoding (high nibble)
+#define TLV_ELEMENT_TYPE_INT 0x00
+#define TLV_ELEMENT_TYPE_UINT 0x10
+#define TLV_ELEMENT_TYPE_BOOL 0x20
+#define TLV_ELEMENT_TYPE_FLOAT 0x30
+#define TLV_ELEMENT_TYPE_UTF8_STRING 0x40
+#define TLV_ELEMENT_TYPE_BYTE_STRING 0x50
+#define TLV_ELEMENT_TYPE_NULL 0x60
+#define TLV_ELEMENT_TYPE_STRUCTURE 0x70
+#define TLV_ELEMENT_TYPE_ARRAY 0x80
+#define TLV_ELEMENT_TYPE_LIST 0x90
+#define TLV_ELEMENT_TYPE_END 0xA0
 
-// Tag control encoding
-#define TLV_TAG_CONTROL_ANONYMOUS (0 << TLV_TAG_SHIFT)
-#define TLV_TAG_CONTROL_CONTEXT (1 << TLV_TAG_SHIFT)
+// Tag control encoding (low nibble)
+#define TLV_TAG_CONTROL_ANONYMOUS 0x00
+#define TLV_TAG_CONTROL_CONTEXT 0x01
+
+// Length encoding for integers and var-length types
+#define TLV_LENGTH_1_BYTE 0
+#define TLV_LENGTH_2_BYTE 1
+#define TLV_LENGTH_4_BYTE 2
+#define TLV_LENGTH_8_BYTE 3
 
 // Length encoding for integers
 #define TLV_LENGTH_1_BYTE 0
@@ -45,8 +59,8 @@ static int write_control_and_tag(tlv_writer_t *writer, uint8_t type, uint8_t len
         return -1;
     }
     
-    // Build control byte: type (bits 7-5) | tag control (bits 4-3) | length (bits 2-0)
-    uint8_t control = type | TLV_TAG_CONTROL_CONTEXT | length;
+    // Build control byte: type (high nibble) | tag control (low nibble)
+    uint8_t control = type | TLV_TAG_CONTROL_CONTEXT;
     writer->buffer[writer->offset++] = control;
     
     // Write tag byte for context-specific tags
@@ -54,6 +68,14 @@ static int write_control_and_tag(tlv_writer_t *writer, uint8_t type, uint8_t len
         return -1;
     }
     writer->buffer[writer->offset++] = tag;
+    
+    // Write length byte for integers (optimization info)
+    if (type == TLV_ELEMENT_TYPE_INT || type == TLV_ELEMENT_TYPE_UINT) {
+        if (writer->offset >= writer->buffer_size) {
+            return -1;
+        }
+        writer->buffer[writer->offset++] = length;
+    }
     
     return 0;
 }
@@ -275,9 +297,14 @@ int tlv_encode_bool(tlv_writer_t *writer, uint8_t tag, bool value) {
         return -1;
     }
     
-    // Boolean encoding: control byte with length bit indicating true (1) or false (0)
-    uint8_t length = value ? 1 : 0;
-    return write_control_and_tag(writer, TLV_ELEMENT_TYPE_BOOL, length, tag);
+    // Write control byte and tag
+    if (write_control_and_tag(writer, TLV_ELEMENT_TYPE_BOOL, 0, tag) < 0) {
+        return -1;
+    }
+    
+    // Write boolean value as a byte
+    uint8_t bool_val = value ? 1 : 0;
+    return write_bytes(writer, &bool_val, 1);
 }
 
 int tlv_encode_null(tlv_writer_t *writer, uint8_t tag) {
@@ -309,6 +336,11 @@ int tlv_encode_string(tlv_writer_t *writer, uint8_t tag, const char *str) {
         return -1;
     }
     
+    // Write length encoding byte
+    if (write_bytes(writer, &length_encoding, 1) < 0) {
+        return -1;
+    }
+    
     if (write_length_prefix(writer, length) < 0) {
         return -1;
     }
@@ -332,6 +364,11 @@ int tlv_encode_bytes(tlv_writer_t *writer, uint8_t tag, const uint8_t *data, siz
     }
     
     if (write_control_and_tag(writer, TLV_ELEMENT_TYPE_BYTE_STRING, length_encoding, tag) < 0) {
+        return -1;
+    }
+    
+    // Write length encoding byte
+    if (write_bytes(writer, &length_encoding, 1) < 0) {
         return -1;
     }
     
@@ -456,32 +493,31 @@ int tlv_reader_next(tlv_reader_t *reader, tlv_element_t *element) {
     uint8_t control = reader->buffer[reader->offset++];
     
     // Extract fields from control byte
-    uint8_t type_field = (control >> TLV_TYPE_SHIFT) & 0x1F;
-    uint8_t tag_control = (control >> TLV_TAG_SHIFT) & 0x03;
-    uint8_t length_field = control & TLV_LENGTH_MASK;
+    uint8_t type_field = (control & TLV_TYPE_MASK);
+    uint8_t tag_control = (control & TLV_TAG_MASK);
     
     // Parse element type
     switch (type_field) {
-        case 0: element->type = TLV_TYPE_SIGNED_INT; break;
-        case 1: element->type = TLV_TYPE_UNSIGNED_INT; break;
-        case 2: element->type = TLV_TYPE_BOOL; break;
-        case 3: element->type = TLV_TYPE_FLOAT; break;
-        case 4: element->type = TLV_TYPE_UTF8_STRING; break;
-        case 5: element->type = TLV_TYPE_BYTE_STRING; break;
-        case 6: element->type = TLV_TYPE_NULL; break;
-        case 7: element->type = TLV_TYPE_STRUCTURE; break;
-        case 8: element->type = TLV_TYPE_ARRAY; break;
-        case 9: element->type = TLV_TYPE_LIST; break;
-        case 10: element->type = TLV_TYPE_END_OF_CONTAINER; break;
+        case TLV_ELEMENT_TYPE_INT: element->type = TLV_TYPE_SIGNED_INT; break;
+        case TLV_ELEMENT_TYPE_UINT: element->type = TLV_TYPE_UNSIGNED_INT; break;
+        case TLV_ELEMENT_TYPE_BOOL: element->type = TLV_TYPE_BOOL; break;
+        case TLV_ELEMENT_TYPE_FLOAT: element->type = TLV_TYPE_FLOAT; break;
+        case TLV_ELEMENT_TYPE_UTF8_STRING: element->type = TLV_TYPE_UTF8_STRING; break;
+        case TLV_ELEMENT_TYPE_BYTE_STRING: element->type = TLV_TYPE_BYTE_STRING; break;
+        case TLV_ELEMENT_TYPE_NULL: element->type = TLV_TYPE_NULL; break;
+        case TLV_ELEMENT_TYPE_STRUCTURE: element->type = TLV_TYPE_STRUCTURE; break;
+        case TLV_ELEMENT_TYPE_ARRAY: element->type = TLV_TYPE_ARRAY; break;
+        case TLV_ELEMENT_TYPE_LIST: element->type = TLV_TYPE_LIST; break;
+        case TLV_ELEMENT_TYPE_END: element->type = TLV_TYPE_END_OF_CONTAINER; break;
         default: return -1;
     }
     
     // Parse tag
-    if (tag_control == 0) {
+    if (tag_control == TLV_TAG_CONTROL_ANONYMOUS) {
         // Anonymous tag
         element->tag_type = TLV_TAG_ANONYMOUS;
         element->tag = 0;
-    } else if (tag_control == 1) {
+    } else if (tag_control == TLV_TAG_CONTROL_CONTEXT) {
         // Context-specific tag
         element->tag_type = TLV_TAG_CONTEXT_SPECIFIC;
         if (read_bytes(reader, &element->tag, 1) < 0) {
@@ -490,6 +526,14 @@ int tlv_reader_next(tlv_reader_t *reader, tlv_element_t *element) {
     } else {
         // Other tag types not supported in minimal version
         return -1;
+    }
+    
+    // For integers, read length byte
+    uint8_t length_field = 0;
+    if (element->type == TLV_TYPE_SIGNED_INT || element->type == TLV_TYPE_UNSIGNED_INT) {
+        if (read_bytes(reader, &length_field, 1) < 0) {
+            return -1;
+        }
     }
     
     // Parse value based on type
@@ -535,12 +579,17 @@ int tlv_reader_next(tlv_reader_t *reader, tlv_element_t *element) {
         }
         
         case TLV_TYPE_BOOL:
-            element->value.boolean = (length_field != 0);
+            // Boolean value is encoded in tag control field (0=false, non-zero=true)
+            // For simplicity, we'll read it from the next byte
+            if (read_bytes(reader, &element->value.boolean, 1) < 0) return -1;
             break;
         
         case TLV_TYPE_UTF8_STRING: {
+            uint8_t length_encoding;
+            if (read_bytes(reader, &length_encoding, 1) < 0) return -1;
+            
             size_t length;
-            if (read_length_prefix(reader, length_field, &length) < 0) {
+            if (read_length_prefix(reader, length_encoding, &length) < 0) {
                 return -1;
             }
             element->value.string.data = (const char *)&reader->buffer[reader->offset];
@@ -550,8 +599,11 @@ int tlv_reader_next(tlv_reader_t *reader, tlv_element_t *element) {
         }
         
         case TLV_TYPE_BYTE_STRING: {
+            uint8_t length_encoding;
+            if (read_bytes(reader, &length_encoding, 1) < 0) return -1;
+            
             size_t length;
-            if (read_length_prefix(reader, length_field, &length) < 0) {
+            if (read_length_prefix(reader, length_encoding, &length) < 0) {
                 return -1;
             }
             element->value.bytes.data = &reader->buffer[reader->offset];
