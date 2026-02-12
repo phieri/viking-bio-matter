@@ -100,6 +100,8 @@ target_include_directories(viking_bio_matter PRIVATE
     src/matter_minimal/codec
     src/matter_minimal/transport
     src/matter_minimal/security
+    src/matter_minimal/interaction
+    src/matter_minimal/clusters
 )
 
 # Pull in all dependencies
@@ -115,6 +117,8 @@ target_link_libraries(viking_bio_matter
     matter_tlv
     matter_transport
     matter_security
+    matter_interaction
+    matter_clusters
 )
 
 # Enable USB output, disable UART output
@@ -132,11 +136,15 @@ target_include_directories(viking_bio_matter PRIVATE
 add_subdirectory(tests/codec)
 add_subdirectory(tests/transport)
 add_subdirectory(tests/security)
+add_subdirectory(tests/interaction)
+add_subdirectory(tests/clusters)
 
 # Add matter_minimal subdirectories for Pico build
 if(PICO_PLATFORM)
     add_subdirectory(src/matter_minimal/codec)
     add_subdirectory(src/matter_minimal/transport)
     add_subdirectory(src/matter_minimal/security)
+    add_subdirectory(src/matter_minimal/interaction)
+    add_subdirectory(src/matter_minimal/clusters)
 endif()
 
