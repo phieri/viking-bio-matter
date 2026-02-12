@@ -42,9 +42,7 @@ static int parse_attribute_path(tlv_reader_t *reader, attribute_path_t *path) {
         }
         
         // Check if we've hit a container end
-        if (element.type == TLV_TYPE_STRUCTURE_END ||
-            element.type == TLV_TYPE_ARRAY_END ||
-            element.type == TLV_TYPE_LIST_END) {
+        if (element.type == TLV_TYPE_END_OF_CONTAINER) {
             break;
         }
         
@@ -57,10 +55,10 @@ static int parse_attribute_path(tlv_reader_t *reader, attribute_path_t *path) {
                 path->endpoint = tlv_read_uint8(&element);
                 break;
             case 2: // Cluster ID
-                path->cluster_id = element.value.uint32_val;
+                path->cluster_id = element.value.u32;
                 break;
             case 3: // Attribute ID
-                path->attribute_id = element.value.uint32_val;
+                path->attribute_id = element.value.u32;
                 break;
             default:
                 // Ignore unknown tags
@@ -153,8 +151,7 @@ int read_handler_process_request(const uint8_t *request_tlv, size_t request_len,
                     break;
                 }
                 
-                if (element.type == TLV_TYPE_LIST_END ||
-                    element.type == TLV_TYPE_ARRAY_END) {
+                if (element.type == TLV_TYPE_END_OF_CONTAINER) {
                     tlv_reader_skip(&reader);
                     break;
                 }
@@ -182,8 +179,7 @@ int read_handler_process_request(const uint8_t *request_tlv, size_t request_len,
                     // Skip to end of structure
                     while (!tlv_reader_is_end(&reader)) {
                         if (tlv_reader_peek(&reader, &element) < 0) break;
-                        if (element.type == TLV_TYPE_STRUCTURE_END ||
-                            element.type == TLV_TYPE_LIST_END) {
+                        if (element.type == TLV_TYPE_END_OF_CONTAINER) {
                             tlv_reader_skip(&reader);
                             break;
                         }
