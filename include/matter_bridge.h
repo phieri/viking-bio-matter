@@ -5,6 +5,10 @@
 #include <stdbool.h>
 #include "viking_bio_protocol.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Matter cluster attribute definitions
 typedef struct {
     bool flame_state;           // OnOff cluster: flame detected state
@@ -61,5 +65,17 @@ void matter_bridge_update_fan_speed(uint8_t speed);
  * @param temp Temperature in degrees Celsius
  */
 void matter_bridge_update_temperature(uint16_t temp);
+
+/**
+ * Add a Matter controller to receive attribute reports over WiFi
+ * @param ip_address Controller IP address (e.g., "192.168.1.100")
+ * @param port UDP port (typically 5540 for Matter)
+ * @return Controller ID on success, -1 on failure
+ */
+int matter_bridge_add_controller(const char *ip_address, uint16_t port);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // MATTER_BRIDGE_H

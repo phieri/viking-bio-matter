@@ -68,6 +68,42 @@ void platform_manager_task(void);
  */
 void platform_manager_deinit(void);
 
+/**
+ * Notify platform of Matter attribute change
+ * Lightweight, non-fatal call to trigger attribute reports
+ * 
+ * @param cluster_id Matter cluster ID (e.g., 0x0006 for OnOff)
+ * @param attribute_id Matter attribute ID
+ * @param endpoint Endpoint number (typically 1)
+ */
+void platform_manager_report_attribute_change(uint32_t cluster_id, 
+                                              uint32_t attribute_id, 
+                                              uint8_t endpoint);
+
+/**
+ * Report OnOff cluster attribute change (cluster 0x0006, attribute 0x0000)
+ * Convenience wrapper for flame state changes
+ * 
+ * @param endpoint Endpoint number (typically 1)
+ */
+void platform_manager_report_onoff_change(uint8_t endpoint);
+
+/**
+ * Report LevelControl cluster attribute change (cluster 0x0008, attribute 0x0000)
+ * Convenience wrapper for fan speed changes
+ * 
+ * @param endpoint Endpoint number (typically 1)
+ */
+void platform_manager_report_level_change(uint8_t endpoint);
+
+/**
+ * Report TemperatureMeasurement cluster attribute change (cluster 0x0402, attribute 0x0000)
+ * Convenience wrapper for temperature changes
+ * 
+ * @param endpoint Endpoint number (typically 1)
+ */
+void platform_manager_report_temperature_change(uint8_t endpoint);
+
 #ifdef __cplusplus
 }
 #endif

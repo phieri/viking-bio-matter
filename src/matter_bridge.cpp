@@ -3,6 +3,10 @@
 #include "pico/stdlib.h"
 #include "matter_bridge.h"
 #include "../platform/pico_w_chip_port/platform_manager.h"
+#include "../platform/pico_w_chip_port/matter_attributes.h"
+#include "../platform/pico_w_chip_port/matter_reporter.h"
+#include "../platform/pico_w_chip_port/matter_network_subscriber.h"
+#include "../platform/pico_w_chip_port/matter_network_transport.h"
 
 // Matter attributes storage
 static matter_attributes_t attributes = {
@@ -14,6 +18,8 @@ static matter_attributes_t attributes = {
 
 // Matter bridge state
 static bool initialized = false;
+
+extern "C" {
 
 void matter_bridge_init(void) {
     printf("\n");
@@ -43,8 +49,29 @@ void matter_bridge_init(void) {
     // Print commissioning information
     platform_manager_print_commissioning_info();
     
-    // Initialize attribute storage
-    memset(&attributes, 0, sizeof(attributes));
+    // Initialize Matter reporter (demonstrates attribute subscription)
+    printf("Initializing Matter attribute reporter...\n");
+    if (matter_reporter_init() != 0) {
+        printf("WARNING: Matter reporter initialization failed\n");
+    }
+    
+    // Initialize Matter network subscriber (sends reports over WiFi)
+    printf("Initializing Matter network subscriber...\n");
+    if (matter_network_subscriber_init() != 0) {
+        printf("WARNING: Matter network subscriber initialization failed\n");
+        printf("         Attribute reports will not be sent over WiFi\n");
+    } else {
+        // Add example controller (user should update this to their controller's IP)
+        // For testing, you can add your Matter controller's IP address here
+        // Example: matter_network_transport_add_controller("192.168.1.100", 5540);
+        printf("\n");
+        printf("To receive Matter attribute reports over WiFi:\n");
+        printf("  1. Note your Matter controller's IP address\n");
+        printf("  2. Call: matter_network_transport_add_controller(\"<IP>\", 5540)\n");
+        printf("  3. Attribute changes will be sent as JSON over UDP\n");
+        printf("\n");
+    }
+    
     initialized = true;
     
     printf("✓ Matter Bridge fully initialized\n");
@@ -62,7 +89,11 @@ void matter_bridge_update_flame(bool flame_on) {
         attributes.last_update_time = to_ms_since_boot(get_absolute_time());
         
         printf("Matter: OnOff cluster updated - Flame %s\n", flame_on ? "ON" : "OFF");
-        // In full Matter SDK: call ChipDeviceEvent to trigger attribute report
+        
+        // Update Matter attribute
+        matter_attr_value_t value;
+        value.bool_val = flame_on;
+        matter_attributes_update(1, MATTER_CLUSTER_ON_OFF, MATTER_ATTR_ON_OFF, &value);
     }
 }
 
@@ -76,7 +107,11 @@ void matter_bridge_update_fan_speed(uint8_t speed) {
         attributes.last_update_time = to_ms_since_boot(get_absolute_time());
         
         printf("Matter: LevelControl cluster updated - Fan speed %d%%\n", speed);
-        // In full Matter SDK: call ChipDeviceEvent to trigger attribute report
+        
+        // Update Matter attribute
+        matter_attr_value_t value;
+        value.uint8_val = speed;
+        matter_attributes_update(1, MATTER_CLUSTER_LEVEL_CONTROL, MATTER_ATTR_CURRENT_LEVEL, &value);
     }
 }
 
@@ -90,7 +125,11 @@ void matter_bridge_update_temperature(uint16_t temp) {
         attributes.last_update_time = to_ms_since_boot(get_absolute_time());
         
         printf("Matter: TemperatureMeasurement cluster updated - %d°C\n", temp);
-        // In full Matter SDK: call ChipDeviceEvent to trigger attribute report
+        
+        // Update Matter attribute (convert to centidegrees for Matter spec)
+        matter_attr_value_t value;
+        value.int16_val = (int16_t)(temp * 100); // Convert to centidegrees
+        matter_attributes_update(1, MATTER_CLUSTER_TEMPERATURE_MEASUREMENT, MATTER_ATTR_MEASURED_VALUE, &value);
     }
 }
 
@@ -110,11 +149,8 @@ void matter_bridge_task(void) {
         return;
     }
     
-    // Process Matter platform tasks
+    // Process Matter platform tasks (includes attribute reporting)
     platform_manager_task();
-    
-    // Periodic Matter stack processing would happen here
-    // In full SDK: ChipDeviceEvent processing, network polling, etc.
 }
 
 void matter_bridge_get_attributes(matter_attributes_t *attrs) {
@@ -122,3 +158,14 @@ void matter_bridge_get_attributes(matter_attributes_t *attrs) {
         memcpy(attrs, &attributes, sizeof(matter_attributes_t));
     }
 }
+
+int matter_bridge_add_controller(const char *ip_address, uint16_t port) {
+    if (!initialized) {
+        printf("Matter: ERROR - Bridge not initialized\n");
+        return -1;
+    }
+    
+    return matter_network_transport_add_controller(ip_address, port);
+}
+
+} // extern "C"

@@ -40,12 +40,16 @@ add_compile_options(
 set(SOURCES
     src/main.c
     src/serial_handler.c
-    src/matter_bridge.c
+    src/matter_bridge.cpp
     src/viking_bio_protocol.c
     platform/pico_w_chip_port/network_adapter.cpp
     platform/pico_w_chip_port/storage_adapter.cpp
     platform/pico_w_chip_port/crypto_adapter.cpp
     platform/pico_w_chip_port/platform_manager.cpp
+    platform/pico_w_chip_port/matter_attributes.cpp
+    platform/pico_w_chip_port/matter_reporter.cpp
+    platform/pico_w_chip_port/matter_network_transport.cpp
+    platform/pico_w_chip_port/matter_network_subscriber.cpp
 )
 
 # Matter is always enabled

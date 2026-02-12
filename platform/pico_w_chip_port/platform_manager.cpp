@@ -4,9 +4,11 @@
  */
 
 #include <stdio.h>
+#include <inttypes.h>
 #include <string.h>
 #include "pico/stdlib.h"
 #include "mbedtls/sha256.h"
+#include "matter_attributes.h"
 
 // Forward declarations of adapter functions (internal C++ functions)
 int network_adapter_init(void);
@@ -115,28 +117,54 @@ int platform_manager_init(void) {
     printf("===================================\n\n");
 
     // Initialize crypto first (needed for other components)
-    printf("Step 1/3: Initializing cryptography...\n");
+    printf("Step 1/4: Initializing cryptography...\n");
     if (crypto_adapter_init() != 0) {
         printf("ERROR: Failed to initialize crypto adapter\n");
         return -1;
     }
 
     // Initialize storage
-    printf("\nStep 2/3: Initializing storage...\n");
+    printf("\nStep 2/4: Initializing storage...\n");
     if (storage_adapter_init() != 0) {
         printf("ERROR: Failed to initialize storage adapter\n");
         return -1;
     }
 
     // Initialize network
-    printf("\nStep 3/3: Initializing network...\n");
+    printf("\nStep 3/4: Initializing network...\n");
     if (network_adapter_init() != 0) {
         printf("ERROR: Failed to initialize network adapter\n");
         return -1;
     }
 
+    // Initialize Matter attribute system
+    printf("\nStep 4/4: Initializing Matter attributes...\n");
+    if (matter_attributes_init() != 0) {
+        printf("ERROR: Failed to initialize Matter attributes\n");
+        return -1;
+    }
+    
+    // Register Matter clusters/attributes for Viking Bio bridge
+    matter_attr_value_t initial_value;
+    
+    // OnOff cluster (flame state)
+    initial_value.bool_val = false;
+    matter_attributes_register(1, MATTER_CLUSTER_ON_OFF, MATTER_ATTR_ON_OFF, 
+                              MATTER_TYPE_BOOL, &initial_value);
+    
+    // LevelControl cluster (fan speed)
+    initial_value.uint8_val = 0;
+    matter_attributes_register(1, MATTER_CLUSTER_LEVEL_CONTROL, MATTER_ATTR_CURRENT_LEVEL,
+                              MATTER_TYPE_UINT8, &initial_value);
+    
+    // TemperatureMeasurement cluster (temperature in centidegrees)
+    initial_value.int16_val = 0;
+    matter_attributes_register(1, MATTER_CLUSTER_TEMPERATURE_MEASUREMENT, MATTER_ATTR_MEASURED_VALUE,
+                              MATTER_TYPE_INT16, &initial_value);
+
     platform_initialized = true;
-    printf("\n✓ Platform initialization complete\n\n");
+    printf("\n✓ Platform initialization complete\n");
+    printf("✓ %zu Matter attributes registered\n\n", matter_attributes_count());
     return 0;
 }
 
@@ -222,6 +250,9 @@ void platform_manager_task(void) {
         return;
     }
 
+    // Process Matter attribute reports
+    matter_attributes_process_reports();
+    
     // Periodic platform maintenance tasks
     // In a full implementation, this would:
     // - Process network events
@@ -241,6 +272,39 @@ void platform_manager_deinit(void) {
     
     platform_initialized = false;
     printf("Platform shutdown complete\n");
+}
+
+void platform_manager_report_attribute_change(uint32_t cluster_id, 
+                                              uint32_t attribute_id, 
+                                              uint8_t endpoint) {
+    // This function is now a no-op since matter_attributes_update()
+    // automatically handles the reporting through the subscription system.
+    // Kept for API compatibility.
+    
+    if (!platform_initialized) {
+        return;
+    }
+    
+    // The actual reporting happens in matter_attributes_process_reports()
+    // which is called from platform_manager_task()
+}
+
+void platform_manager_report_onoff_change(uint8_t endpoint) {
+    // OnOff cluster (0x0006), OnOff attribute (0x0000)
+    // Note: Actual update happens in matter_bridge via matter_attributes_update()
+    platform_manager_report_attribute_change(MATTER_CLUSTER_ON_OFF, MATTER_ATTR_ON_OFF, endpoint);
+}
+
+void platform_manager_report_level_change(uint8_t endpoint) {
+    // LevelControl cluster (0x0008), CurrentLevel attribute (0x0000)
+    // Note: Actual update happens in matter_bridge via matter_attributes_update()
+    platform_manager_report_attribute_change(MATTER_CLUSTER_LEVEL_CONTROL, MATTER_ATTR_CURRENT_LEVEL, endpoint);
+}
+
+void platform_manager_report_temperature_change(uint8_t endpoint) {
+    // TemperatureMeasurement cluster (0x0402), MeasuredValue attribute (0x0000)
+    // Note: Actual update happens in matter_bridge via matter_attributes_update()
+    platform_manager_report_attribute_change(MATTER_CLUSTER_TEMPERATURE_MEASUREMENT, MATTER_ATTR_MEASURED_VALUE, endpoint);
 }
 
 } // extern "C"
