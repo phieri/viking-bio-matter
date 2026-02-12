@@ -121,3 +121,6 @@ pico_add_extra_outputs(viking_bio_matter)
 target_include_directories(viking_bio_matter PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+# Add tests directory (only built for host, not Pico)
+add_subdirectory(tests/codec)
