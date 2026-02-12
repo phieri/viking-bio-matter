@@ -21,6 +21,14 @@ static session_t sessions[MAX_SESSIONS];
 static bool session_mgr_initialized = false;
 
 /**
+ * Helper function to get current time in seconds
+ * Inline to avoid function call overhead
+ */
+static inline uint32_t get_current_time_sec(void) {
+    return time_us_32() / 1000000;  // Convert microseconds to seconds
+}
+
+/**
  * Find session by ID
  */
 static session_t* find_session(uint16_t session_id) {
@@ -99,7 +107,7 @@ int session_create(uint16_t session_id, const uint8_t *key, size_t key_len) {
                session_id);
         memcpy(existing->encryption_key, key, SESSION_KEY_LENGTH);
         existing->message_counter = 0;
-        existing->last_used_time = time_us_32() / 1000000;  // Convert to seconds
+        existing->last_used_time = get_current_time_sec();
         return 0;
     }
     
@@ -114,7 +122,7 @@ int session_create(uint16_t session_id, const uint8_t *key, size_t key_len) {
     slot->session_id = session_id;
     memcpy(slot->encryption_key, key, SESSION_KEY_LENGTH);
     slot->message_counter = 0;
-    slot->last_used_time = time_us_32() / 1000000;  // Convert to seconds
+    slot->last_used_time = get_current_time_sec();
     slot->active = true;
     
     printf("Session Manager: Created session %u\n", session_id);
@@ -187,7 +195,7 @@ int session_encrypt(uint16_t session_id,
     
     // Increment message counter
     session->message_counter++;
-    session->last_used_time = time_us_32() / 1000000;
+    session->last_used_time = get_current_time_sec();
     
     return 0;
 }
@@ -260,7 +268,7 @@ int session_decrypt(uint16_t session_id,
     *actual_plaintext_len = encrypted_len;
     
     // Update last used time
-    session->last_used_time = time_us_32() / 1000000;
+    session->last_used_time = get_current_time_sec();
     
     return 0;
 }

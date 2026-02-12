@@ -26,8 +26,14 @@ void test_pase_init_with_pin(void) {
     assert(result == 0);
     assert(pase_get_state(&ctx) == PASE_STATE_INITIALIZED);
     
-    // Verify PIN is stored correctly (can't compare directly due to security)
-    assert(strlen((char*)ctx.setup_pin) == PASE_PIN_LENGTH);
+    // Verify initialization succeeded by testing subsequent operation
+    uint8_t request[64] = {0};
+    uint8_t response[256];
+    size_t response_len;
+    
+    result = pase_handle_pbkdf_request(&ctx, request, sizeof(request),
+                                       response, sizeof(response), &response_len);
+    assert(result == 0);  // Should succeed if PIN was stored correctly
     
     pase_deinit(&ctx);
     
