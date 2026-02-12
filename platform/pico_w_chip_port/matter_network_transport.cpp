@@ -180,15 +180,15 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
         ip_addr_t dest_addr;
         ip_addr_set_ip4_u32(&dest_addr, controllers[i].ip_address);
         
-        // Allocate buffer for UDP packet
-        struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, strlen(message), PBUF_RAM);
+        // Allocate buffer for UDP packet (use msg_len for efficiency)
+        struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, msg_len, PBUF_RAM);
         if (!p) {
             printf("Matter Transport: ERROR - Failed to allocate pbuf\n");
             continue;
         }
         
-        // Copy message to buffer
-        memcpy(p->payload, message, strlen(message));
+        // Copy message to buffer (use msg_len to avoid redundant strlen)
+        memcpy(p->payload, message, msg_len);
         
         // Send UDP packet
         err_t err = udp_sendto(udp_pcb, p, &dest_addr, controllers[i].port);
