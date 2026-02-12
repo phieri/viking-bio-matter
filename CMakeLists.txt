@@ -48,6 +48,8 @@ set(SOURCES
     platform/pico_w_chip_port/platform_manager.cpp
     platform/pico_w_chip_port/matter_attributes.cpp
     platform/pico_w_chip_port/matter_reporter.cpp
+    platform/pico_w_chip_port/matter_network_transport.cpp
+    platform/pico_w_chip_port/matter_network_subscriber.cpp
 )
 
 # Matter is always enabled

@@ -5,6 +5,8 @@
 #include "../platform/pico_w_chip_port/platform_manager.h"
 #include "../platform/pico_w_chip_port/matter_attributes.h"
 #include "../platform/pico_w_chip_port/matter_reporter.h"
+#include "../platform/pico_w_chip_port/matter_network_subscriber.h"
+#include "../platform/pico_w_chip_port/matter_network_transport.h"
 
 // Matter attributes storage
 static matter_attributes_t attributes = {
@@ -51,6 +53,23 @@ void matter_bridge_init(void) {
     printf("Initializing Matter attribute reporter...\n");
     if (matter_reporter_init() != 0) {
         printf("WARNING: Matter reporter initialization failed\n");
+    }
+    
+    // Initialize Matter network subscriber (sends reports over WiFi)
+    printf("Initializing Matter network subscriber...\n");
+    if (matter_network_subscriber_init() != 0) {
+        printf("WARNING: Matter network subscriber initialization failed\n");
+        printf("         Attribute reports will not be sent over WiFi\n");
+    } else {
+        // Add example controller (user should update this to their controller's IP)
+        // For testing, you can add your Matter controller's IP address here
+        // Example: matter_network_transport_add_controller("192.168.1.100", 5540);
+        printf("\n");
+        printf("To receive Matter attribute reports over WiFi:\n");
+        printf("  1. Note your Matter controller's IP address\n");
+        printf("  2. Call: matter_network_transport_add_controller(\"<IP>\", 5540)\n");
+        printf("  3. Attribute changes will be sent as JSON over UDP\n");
+        printf("\n");
     }
     
     initialized = true;
@@ -138,6 +157,15 @@ void matter_bridge_get_attributes(matter_attributes_t *attrs) {
     if (attrs != NULL && initialized) {
         memcpy(attrs, &attributes, sizeof(matter_attributes_t));
     }
+}
+
+int matter_bridge_add_controller(const char *ip_address, uint16_t port) {
+    if (!initialized) {
+        printf("Matter: ERROR - Bridge not initialized\n");
+        return -1;
+    }
+    
+    return matter_network_transport_add_controller(ip_address, port);
 }
 
 } // extern "C"
