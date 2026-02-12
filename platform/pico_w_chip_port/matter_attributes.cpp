@@ -8,7 +8,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include "pico/stdlib.h"
-#include "hardware/sync.h"
+#include "pico/critical_section.h"
 
 // Maximum number of attributes we can track
 #define MAX_ATTRIBUTES 16
