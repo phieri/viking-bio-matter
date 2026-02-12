@@ -185,12 +185,11 @@ void network_reporter(uint8_t endpoint, uint32_t cluster_id,
 }
 ```
 
-### Full Matter SDK Integration
-Replace the attribute system with the full connectedhomeip SDK:
-- Link Matter SDK libraries
-- Implement DeviceLayer platform interface
-- Use Matter's built-in attribute management
-- Add full protocol support (BLE, Thread, etc.)
+### Future Enhancements
+- Add more standard Matter clusters
+- Implement persistent storage for attributes
+- Enhance Matter protocol features
+- Support additional device types
 
 ### Persistent Storage
 Store attribute values in flash:
@@ -211,11 +210,11 @@ Monitor the console output to see attribute updates and reports being generated 
 
 ## Integration with Matter Controllers
 
-While this implementation provides functional attribute management, it doesn't include network transport. To integrate with actual Matter controllers:
+While this implementation provides functional attribute management with network transport via UDP/JSON, future enhancements could include:
 
-1. **Option A**: Add a network subscriber that sends reports via UDP/TCP
-2. **Option B**: Integrate with the full connectedhomeip SDK
-3. **Option C**: Use the attribute system as a bridge to a separate Matter stack
+1. **Add more clusters**: Support additional standard Matter device types
+2. **Enhanced transport**: Use full Matter protocol encoding
+3. **Command handling**: Implement bidirectional control
 
 ## Comparison: Stub vs Functional Implementation
 
