@@ -3,6 +3,10 @@
 #include "pico/stdlib.h"
 #include "viking_bio_protocol.h"
 
+// Branch prediction hints for better optimization
+#define likely(x)   __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
 // Current Viking Bio data state
 static viking_bio_data_t current_data = {
     .flame_detected = false,
@@ -26,7 +30,7 @@ void viking_bio_init(void) {
 }
 
 bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data_t *data) {
-    if (buffer == NULL || data == NULL || length < VIKING_BIO_MIN_PACKET_SIZE) {
+    if (unlikely(buffer == NULL || data == NULL || length < VIKING_BIO_MIN_PACKET_SIZE)) {
         return false;
     }
     
@@ -40,14 +44,14 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
     // FLAGS bit 1-7: error codes
     
     // Ensure we don't read past buffer end
-    if (length < VIKING_BIO_MIN_PACKET_SIZE) {
+    if (unlikely(length < VIKING_BIO_MIN_PACKET_SIZE)) {
         return false;
     }
     
     for (size_t i = 0; i <= length - VIKING_BIO_MIN_PACKET_SIZE; i++) {
-        if (buffer[i] == VIKING_BIO_START_BYTE) {
+        if (likely(buffer[i] == VIKING_BIO_START_BYTE)) {
             // Check for valid end byte
-            if (buffer[i + 5] == VIKING_BIO_END_BYTE) {
+            if (likely(buffer[i + 5] == VIKING_BIO_END_BYTE)) {
                 uint8_t flags = buffer[i + 1];
                 uint8_t fan_speed = buffer[i + 2];
                 uint8_t temp_high = buffer[i + 3];
@@ -61,7 +65,7 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
                 // Parse temperature (16-bit value)
                 uint16_t temp = ((uint16_t)temp_high << 8) | temp_low;
                 // Validate temperature is within reasonable range (binary protocol uses unsigned, so min is 0)
-                if (temp > VIKING_BIO_MAX_TEMPERATURE) {
+                if (unlikely(temp > VIKING_BIO_MAX_TEMPERATURE)) {
                     // Invalid temperature, skip this packet
                     continue;
                 }
@@ -79,7 +83,7 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
     
     // If no valid packet found, try simple text protocol fallback
     // Format: "F:1,S:50,T:75\n" (Flame:bool, Speed:%, Temp:°C)
-    if (length > 10 && length < VIKING_BIO_MAX_TEXT_LENGTH) {  // Sanity check on input length
+    if (unlikely(length > 10 && length < VIKING_BIO_MAX_TEXT_LENGTH)) {  // Sanity check on input length
         char str_buffer[VIKING_BIO_MAX_TEXT_LENGTH];
         size_t copy_len = length < sizeof(str_buffer) - 1 ? length : sizeof(str_buffer) - 1;
         memcpy(str_buffer, buffer, copy_len);
@@ -98,7 +102,7 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
                 data->fan_speed = (uint8_t)speed;
             }
             // Validate temperature is within reasonable range (0-500°C for burner)
-            if (temp < 0 || temp > VIKING_BIO_MAX_TEMPERATURE) {
+            if (unlikely(temp < 0 || temp > VIKING_BIO_MAX_TEMPERATURE)) {
                 return false;
             }
             data->temperature = (uint16_t)temp;

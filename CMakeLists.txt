@@ -19,6 +19,23 @@ set(CMAKE_CXX_STANDARD 17)
 # Initialize the Pico SDK
 pico_sdk_init()
 
+# Compiler optimizations - prioritize speed over size
+# -O3: Aggressive optimization for speed
+# -ffast-math: Fast floating point math (safe for this application)
+# -fno-signed-zeros: Allow optimizations assuming no signed zeros
+# -fno-trapping-math: Allow optimizations assuming no FP exceptions
+# -funroll-loops: Unroll loops for speed
+add_compile_options(
+    -O3
+    -ffast-math
+    -fno-signed-zeros
+    -fno-trapping-math
+    -funroll-loops
+)
+
+# Note: LTO disabled due to Pico SDK compatibility issues with wrapped functions
+# set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+
 # Define source files (Matter platform included)
 set(SOURCES
     src/main.c

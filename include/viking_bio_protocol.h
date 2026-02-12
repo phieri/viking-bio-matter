@@ -35,7 +35,7 @@ void viking_bio_init(void);
  * @param data Output structure to receive parsed data (must not be NULL)
  * @return true if valid data was parsed, false otherwise
  */
-bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data_t *data);
+bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data_t *data) __attribute__((hot));
 
 /**
  * Get the current cached Viking Bio data
