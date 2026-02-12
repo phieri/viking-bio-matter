@@ -288,6 +288,165 @@ The firmware exposes three standard Matter clusters:
    - crypto_adapter.cpp: DRBG and RNG are stubbed (Pico SDK 1.5.1 mbedTLS has bugs)
    - SHA256 and AES functions work correctly
 
+## Architecture Details
+
+### Components
+
+#### 1. Serial Handler (`serial_handler.c`)
+
+Manages UART communication with the Viking Bio 20 burner:
+- Configures UART0 (GP0/GP1) at 9600 baud, 8N1
+- Uses interrupt-driven reception with circular buffer
+- Non-blocking read API for main loop integration
+
+#### 2. Viking Bio Protocol Parser (`viking_bio_protocol.c`)
+
+Parses incoming serial data from the burner:
+
+**Binary Protocol** (6 bytes):
+```
+Byte 0: 0xAA (Start marker)
+Byte 1: Flags (bit 0: flame, bits 1-7: errors)
+Byte 2: Fan speed (0-100%)
+Byte 3: Temperature high byte
+Byte 4: Temperature low byte  
+Byte 5: 0x55 (End marker)
+```
+
+**Text Protocol** (Fallback):
+```
+F:1,S:50,T:75\n
+```
+- F: Flame (0/1)
+- S: Speed (0-100)
+- T: Temperature (°C)
+
+#### 3. Matter Bridge (`matter_bridge.c`)
+
+Exposes burner data via Matter protocol over WiFi:
+
+- Complete Matter/CHIP stack integration
+- WiFi connectivity via CYW43439 chip (Pico W)
+- Matter commissioning with QR code
+- Persistent fabric storage in flash
+- Exposes three standard Matter clusters:
+
+**Matter Clusters:**
+
+1. **OnOff Cluster (0x0006, Endpoint 1)**
+   - Attribute: OnOff (bool) - Flame detected state
+   - Updates when flame state changes
+
+2. **LevelControl Cluster (0x0008, Endpoint 1)**
+   - Attribute: CurrentLevel (uint8, 0-100) - Fan speed percentage
+   - Updates when fan speed changes
+
+3. **TemperatureMeasurement Cluster (0x0402, Endpoint 1)**
+   - Attribute: MeasuredValue (int16, centidegrees) - Burner temperature
+   - Updates when temperature changes
+
+**Matter Platform Port (platform/pico_w_chip_port/):**
+- **Network Adapter**: CYW43439 WiFi integration with lwIP
+- **Storage Adapter**: Flash-based key-value store for fabric data
+- **Crypto Adapter**: mbedTLS integration for security
+- **Platform Manager**: Coordinates initialization and commissioning
+
+#### 4. Main Application (`main.c`)
+
+Coordinates all components:
+1. Initializes peripherals and subsystems
+2. Reads serial data in main loop
+3. Parses Viking Bio protocol
+4. Updates Matter attributes
+5. Provides status LED feedback
+
+### Data Flow
+
+```
+Viking Bio 20
+    ↓ (TTL Serial 9600 baud)
+Serial Handler (UART0)
+    ↓ (Circular Buffer)
+Protocol Parser
+    ↓ (viking_bio_data_t)
+Matter Bridge
+    ↓ (Matter Attributes)
+Platform Manager
+    ├─→ Network (WiFi/lwIP)
+    ├─→ Storage (Flash NVM)
+    └─→ Crypto (mbedTLS)
+    ↓
+Matter Stack (connectedhomeip)
+    ↓ (Matter protocol over WiFi)
+Matter Controller (chip-tool, etc.)
+```
+
+### Matter Device Type
+
+The bridge implements a **Temperature Sensor** device type with additional custom attributes:
+
+- **Device Type ID**: 0x0302 (Temperature Sensor)
+- **Vendor ID**: TBD
+- **Product ID**: TBD
+
+### Performance Optimizations
+
+The firmware is built with aggressive compiler optimizations to prioritize execution speed over binary size:
+
+#### Compiler Optimizations
+
+The following GCC flags are enabled in `CMakeLists.txt`:
+
+- **`-O3`**: Maximum optimization for speed
+  - Aggressive function inlining
+  - Loop optimizations and vectorization
+  - Instruction scheduling for target CPU
+
+- **`-ffast-math`**: Fast floating-point math
+  - Assumes IEEE compliance is not critical
+  - Safe for this application (no sensitive FP calculations)
+
+- **`-fno-signed-zeros`**: Treat +0.0 and -0.0 as equivalent
+  - Enables additional optimizations
+
+- **`-fno-trapping-math`**: Assume no FP exceptions
+  - Safe for embedded systems without FP exception handlers
+
+- **`-funroll-loops`**: Unroll loops for speed
+  - Reduces loop overhead at the cost of code size
+
+**Note**: Link Time Optimization (LTO) is intentionally disabled due to compatibility issues with Pico SDK's wrapped functions (`__wrap_printf`, etc.).
+
+#### Code-Level Optimizations
+
+1. **Inline Hot Path Functions**
+   - `serial_handler_data_available()`: Inlined for zero-overhead checks in main loop
+   - Declared as `static inline` in header for cross-module optimization
+   - Trade-off: Exposes internal state for inlining; prioritizes speed over encapsulation
+
+2. **Function Attributes**
+   - `__attribute__((hot))`: Applied to `viking_bio_parse_data()` to prioritize optimization
+   - Hints to compiler that this is a frequently-called function
+
+3. **Branch Prediction**
+   - `unlikely()` macro used conservatively for truly exceptional cases
+   - Applied to null pointer checks and invalid temperature ranges
+   - Not used in protocol parsing hot path (packet arrival patterns vary)
+
+#### Memory Usage
+
+With optimizations enabled:
+- **Text (code)**: 379 KB
+- **BSS (uninitialized data)**: 49 KB
+- **Data (initialized data)**: 0 KB
+- **Total UF2 image**: 742 KB
+
+#### Trade-offs
+
+- **Speed over size**: `-O3` produces larger binaries than `-Os`, but significantly faster execution
+- **No LTO**: Would reduce size further but causes linker errors with SDK wrappers
+- **Fast math**: Safe for sensor data processing but may not be suitable for all applications
+
 ## Common Code Change Scenarios
 
 ### Modifying Serial Protocol
@@ -326,6 +485,79 @@ Then rebuild firmware. ⚠️ Never commit credentials to version control.
    - Build steps → Update README.md and this file
    - APIs → Update ARCHITECTURE.md and code comments
    - Matter configuration → Update platform/pico_w_chip_port/README.md
+
+## Matter Platform Port Implementation
+
+### Overview
+
+The Matter platform port at `platform/pico_w_chip_port/` provides a complete platform abstraction layer for the connectedhomeip SDK on Raspberry Pi Pico W:
+
+1. **Network Adapter** (`network_adapter.cpp`): Integrates CYW43439 WiFi chip with lwIP stack
+2. **Storage Adapter** (`storage_adapter.cpp`): Flash-based persistent storage for fabric commissioning data
+3. **Crypto Adapter** (`crypto_adapter.cpp`): mbedTLS integration for cryptographic operations
+4. **Platform Manager** (`platform_manager.cpp`): Coordinates initialization and provides unified API
+
+### Implementation File Structure
+
+```
+viking-bio-matter/
+├── platform/pico_w_chip_port/      # Matter platform port
+│   ├── CHIPDevicePlatformConfig.h
+│   ├── network_adapter.cpp
+│   ├── storage_adapter.cpp
+│   ├── crypto_adapter.cpp
+│   ├── platform_manager.cpp
+│   ├── platform_manager.h
+│   ├── CMakeLists.txt
+│   ├── config/
+│   │   ├── lwipopts.h             # lwIP configuration
+│   │   └── mbedtls_config.h       # mbedTLS configuration
+│   └── README.md
+├── src/matter_bridge.c             # Matter integration
+├── third_party/connectedhomeip/    # Matter SDK (manual clone)
+└── .github/workflows/
+    └── build-firmware.yml          # CI build pipeline
+```
+
+### Known Limitations
+
+1. **No OTA support**: Firmware updates require physical USB access
+2. **Single WiFi only**: No Thread or Ethernet support
+3. **Simple storage**: Basic key-value store without wear leveling
+4. **Limited fabrics**: Maximum 5 fabrics due to memory constraints (264KB RAM)
+5. **Test credentials**: Ships with discriminator 3840 (testing only)
+6. **Crypto limitations**: DRBG and RNG are stubbed due to Pico SDK 1.5.1 mbedTLS bugs
+
+### Future Enhancements
+
+1. **Full Matter SDK Integration**
+   - ✅ Commissioning flow
+   - ✅ Attribute subscriptions
+   - ✅ WiFi support (Pico W)
+   - ⏳ Command handling (future)
+   - ⏳ OTA firmware updates (future)
+
+2. **Network Connectivity**
+   - ✅ WiFi support (Pico W)
+   - ⏳ Thread support (with external radio)
+   - ⏳ Ethernet support (with W5500 module)
+
+3. **Advanced Features**
+   - ⏳ OTA firmware updates over Matter
+   - ⏳ Enhanced error reporting via Matter events
+   - ⏳ Historical data logging
+   - ⏳ Alarm notifications
+
+4. **Protocol Extensions**
+   - ⏳ Support for multiple Viking Bio devices
+   - ⏳ Bidirectional communication (control burner)
+   - ⏳ Enhanced diagnostics
+
+5. **Production Readiness**
+   - ⏳ Per-device unique commissioning credentials
+   - ⏳ Secure boot and attestation
+   - ⏳ Flash wear leveling for storage
+   - ⏳ Watchdog and fault recovery
 
 ## Trust These Instructions
 
