@@ -30,7 +30,8 @@ void serial_handler_task(void);
 /**
  * Check if data is available in the circular buffer
  * Thread-safe: disables interrupts during check
- * Inlined for performance in hot path
+ * Inlined for performance in hot path (zero-overhead main loop polling)
+ * Note: Exposes buffer_count for inline optimization; trades encapsulation for speed
  * @return true if data is available, false otherwise
  */
 static inline bool serial_handler_data_available(void) {

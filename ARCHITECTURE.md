@@ -340,15 +340,16 @@ The following GCC flags are enabled in `CMakeLists.txt`:
 1. **Inline Hot Path Functions**
    - `serial_handler_data_available()`: Inlined for zero-overhead checks in main loop
    - Declared as `static inline` in header for cross-module optimization
+   - Trade-off: Exposes internal state for inlining; prioritizes speed over encapsulation
 
 2. **Function Attributes**
    - `__attribute__((hot))`: Applied to `viking_bio_parse_data()` to prioritize optimization
    - Hints to compiler that this is a frequently-called function
 
 3. **Branch Prediction**
-   - `likely()` / `unlikely()` macros for expected paths in protocol parser
-   - Helps CPU branch predictor and compiler optimization
-   - Used in packet validation and format detection
+   - `unlikely()` macro used conservatively for truly exceptional cases
+   - Applied to null pointer checks and invalid temperature ranges
+   - Not used in protocol parsing hot path (packet arrival patterns vary)
 
 ### Memory Usage
 

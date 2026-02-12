@@ -49,9 +49,9 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
     }
     
     for (size_t i = 0; i <= length - VIKING_BIO_MIN_PACKET_SIZE; i++) {
-        if (unlikely(buffer[i] == VIKING_BIO_START_BYTE)) {
+        if (buffer[i] == VIKING_BIO_START_BYTE) {
             // Check for valid end byte
-            if (unlikely(buffer[i + 5] == VIKING_BIO_END_BYTE)) {
+            if (buffer[i + 5] == VIKING_BIO_END_BYTE) {
                 uint8_t flags = buffer[i + 1];
                 uint8_t fan_speed = buffer[i + 2];
                 uint8_t temp_high = buffer[i + 3];
