@@ -45,11 +45,6 @@
 #define TLV_LENGTH_4_BYTE 2
 #define TLV_LENGTH_8_BYTE 3
 
-// Length encoding for integers
-#define TLV_LENGTH_1_BYTE 0
-#define TLV_LENGTH_2_BYTE 1
-#define TLV_LENGTH_4_BYTE 2
-#define TLV_LENGTH_8_BYTE 3
 
 /**
  * Helper function to write a control byte and optional tag

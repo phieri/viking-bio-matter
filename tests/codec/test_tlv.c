@@ -294,14 +294,15 @@ void test_buffer_overflow_handling(void) {
     
     // Try to encode more data than buffer can hold
     int result = tlv_encode_uint8(&writer, 1, 10);
-    assert(result == 0); // Should succeed
+    assert(result == 0); // Should succeed (4 bytes used)
     
+    // After first encode, we have 6 bytes left, which is enough for another uint8
     result = tlv_encode_uint8(&writer, 2, 20);
-    // May succeed or fail depending on how much space is left
+    assert(result == 0); // Should succeed (8 bytes used total)
     
     // Try to encode a large string that won't fit
     result = tlv_encode_string(&writer, 3, "This is a very long string");
-    assert(result == -1); // Should fail due to buffer overflow
+    assert(result == -1); // Should fail - string requires 31+ bytes (control + tag + length_enc + length + data)
     
     PASS();
 }
