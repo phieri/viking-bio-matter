@@ -1,3 +1,18 @@
+/*
+ * message_codec.h
+ * Matter message encoding/decoding per Matter Core Specification Section 4.7
+ * 
+ * Phase 2 Implementation Note:
+ * This is a simplified implementation for unsecured messages. Protocol metadata
+ * (protocol_id, opcode, exchange_id) is stored in the message structure but NOT
+ * encoded in the wire format. In a full Matter implementation, this data would be
+ * part of the secured payload. For Phase 2, we encode only:
+ *   - Message header (flags, session_id, security_flags, message_counter, node IDs)
+ *   - Application payload (TLV-encoded)
+ * 
+ * Phase 3 will add security (PASE/CASE) and proper protocol header encoding.
+ */
+
 #ifndef MESSAGE_CODEC_H
 #define MESSAGE_CODEC_H
 
