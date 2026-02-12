@@ -5,6 +5,10 @@
 #include <stdbool.h>
 #include "viking_bio_protocol.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Matter cluster attribute definitions
 typedef struct {
     bool flame_state;           // OnOff cluster: flame detected state
@@ -61,5 +65,9 @@ void matter_bridge_update_fan_speed(uint8_t speed);
  * @param temp Temperature in degrees Celsius
  */
 void matter_bridge_update_temperature(uint16_t temp);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // MATTER_BRIDGE_H
