@@ -137,20 +137,21 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
     // Build Matter attribute report message (simplified JSON format)
     // Buffer size calculated to handle maximum possible message:
     // - Fixed text: ~100 bytes
-    // - Cluster ID (8 hex digits): 8 bytes
-    // - Attribute ID (8 hex digits): 8 bytes
-    // - Value string (max): 32 bytes
+    // - Cluster ID (4 hex digits with 0x prefix): 6 bytes
+    // - Attribute ID (4 hex digits with 0x prefix): 6 bytes
+    // - Value string (max): 64 bytes (generous for numeric values)
     // - Timestamp (10 digits): 10 bytes
-    // - Overhead: 20 bytes
-    // Total: ~178 bytes, use 512 for safety
+    // - Overhead/formatting: 20 bytes
+    // Total: ~206 bytes, use 512 for safety margin
     char message[512];
-    char value_str[64];
+    char value_str[64];  // Generous size for any numeric value
     matter_attr_type_t type = get_attribute_type(cluster_id, attribute_id);
     format_attribute_value(value, type, value_str, sizeof(value_str));
     
     // Construct JSON message with proper formatting
     // Note: All values are either JSON keywords (true/false/null) or numeric,
-    // so no string escaping is needed
+    // so no string escaping is needed. Using %04 for 4-digit hex formatting
+    // (sufficient for current cluster/attribute IDs, which are 16-bit values)
     int msg_len = snprintf(message, sizeof(message),
                           "{\"type\":\"attribute-report\",\"endpoint\":%u,\"cluster\":\"0x%04" PRIx32 "\","
                           "\"attribute\":\"0x%04" PRIx32 "\",\"value\":%s,\"timestamp\":%" PRIu32 "}\n",
