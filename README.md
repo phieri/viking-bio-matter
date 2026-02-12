@@ -50,7 +50,7 @@ graph LR
     style PICO_GND fill:#FFD700
 
 ```
-**Note**: The Pico W RX pin (GP1) expects 3.3V logic levels. If the Viking Bio 20 outputs 5V TTL, a level shifter (e.g., bi-directional logic level converter) or voltage divider (two resistors: 2kΩ from TX to RX, 1kΩ from RX to GND) is required for voltage conversion.
+**Note**: The Pico W RX pin (GP1) expects 3.3V logic levels. The Viking Bio 20's TTL output voltage should be verified before connecting directly. If it outputs 5V TTL (which is common), a level shifter (e.g., bi-directional logic level converter) or voltage divider (two resistors: 2kΩ from TX to RX, 1kΩ from RX to GND) is required for safe voltage conversion. The diagram above shows the configuration with level shifting, which is the recommended safe approach.
 
 ## Serial Protocol
 
