@@ -7,7 +7,7 @@
 **Size**: Small (~484KB core files, 17 source files excluding dependencies)  
 **Languages**: C (firmware), C++ (Matter platform port), Python (simulator/tools)  
 **Target**: ARM Cortex-M0+ (RP2040 microcontroller) on Raspberry Pi Pico W  
-**Key Frameworks**: Pico SDK 1.5.1, connectedhomeip (Matter SDK v1.3-branch)
+**Key Frameworks**: Pico SDK 1.5.1, Minimal Matter Protocol Implementation
 
 ## Build System & Commands
 
@@ -30,34 +30,27 @@ export PICO_SDK_PATH=$(pwd)/pico-sdk
 
 ### Build Instructions (Matter Always Enabled)
 
-**IMPORTANT**: Matter support is **always enabled** in this firmware. There is no ENABLE_MATTER flag. The firmware **requires Pico W** (not standard Pico) and the connectedhomeip SDK.
+**IMPORTANT**: Matter support is **always enabled** in this firmware using a minimal Matter protocol implementation. There is no ENABLE_MATTER flag. The firmware **requires Pico W** (not standard Pico).
 
 ```bash
-# Step 1: Clone connectedhomeip (one-time, REQUIRED)
-# NOTE: .gitmodules is not configured in this repo, must clone manually
-mkdir -p third_party
-cd third_party
-git clone --depth 1 --branch v1.3-branch https://github.com/project-chip/connectedhomeip.git
-cd ..
-
-# Step 2: Create build directory and configure
+# Step 1: Create build directory and configure
 mkdir build && cd build
 export PICO_SDK_PATH=/path/to/pico-sdk  # REQUIRED - must be absolute path
 
-# Step 3: Configure with CMake
+# Step 2: Configure with CMake
 cmake ..
 
-# Step 4: Build firmware
+# Step 3: Build firmware
 make -j$(nproc)
 ```
 
-**Output**: `viking_bio_matter.uf2` (~717KB) - Pico W only, includes full Matter stack  
+**Output**: `viking_bio_matter.uf2` (~837KB) - Pico W only, includes minimal Matter stack  
 **Build Time**: 
 - First build: ~12 seconds (parallel build on 8 cores)
 - Clean builds: ~12 seconds
 - Incremental builds: ~3-5 seconds
 
-**Status**: ✅ Always succeeds if PICO_SDK_PATH is set and connectedhomeip is cloned
+**Status**: ✅ Always succeeds if PICO_SDK_PATH is set
 
 ### Common Build Issues & Workarounds
 
@@ -68,20 +61,13 @@ make -j$(nproc)
 2. **"arm-none-eabi-gcc not found"**  
    → Install ARM toolchain: `sudo apt-get install gcc-arm-none-eabi libnewlib-arm-none-eabi`
 
-3. **"ERROR: Matter SDK (connectedhomeip) not found"**  
-   → The repository does NOT have .gitmodules configured  
-   → Cannot use `git submodule update --init`  
-   → Must manually clone: `git clone --depth 1 --branch v1.3-branch https://github.com/project-chip/connectedhomeip.git third_party/connectedhomeip`  
-   → Takes 2-3 minutes to clone (~16K files)
-
-4. **"This firmware requires PICO_BOARD=pico_w"**  
+3. **"This firmware requires PICO_BOARD=pico_w"**  
    → CMakeLists.txt automatically sets PICO_BOARD=pico_w  
    → Standard Pico (without WiFi) is NOT supported  
    → Only Pico W works
 
-5. **Clean build recommended after**:
+4. **Clean build recommended after**:
    - Changing WiFi credentials in platform/pico_w_chip_port/network_adapter.cpp
-   - Updating connectedhomeip version
    - Modifying platform port files
 
 ### WiFi Configuration
@@ -161,7 +147,13 @@ src/
 ├── main.c                      # Entry point, main loop
 ├── serial_handler.c            # UART interrupt-driven RX (GP1)
 ├── viking_bio_protocol.c       # Protocol parser (binary/text formats)
-└── matter_bridge.c             # Matter integration (always enabled)
+├── matter_bridge.cpp           # Matter integration (always enabled)
+└── matter_minimal/             # Minimal Matter protocol implementation
+    ├── codec/                  # TLV and message encoding
+    ├── transport/              # UDP transport layer
+    ├── security/               # PASE and session management
+    ├── interaction/            # Interaction model (read/subscribe)
+    └── clusters/               # Standard Matter clusters
 
 include/
 ├── serial_handler.h
@@ -180,9 +172,6 @@ platform/pico_w_chip_port/      # Matter platform port (Pico W only)
 examples/
 ├── viking_bio_simulator.py     # Serial data simulator for testing
 └── README.md
-
-third_party/
-└── connectedhomeip/            # Matter SDK (must be cloned manually, not a git submodule)
 ```
 
 ### Configuration Files
@@ -233,7 +222,6 @@ The firmware exposes three standard Matter clusters:
 **Jobs**:
 1. `build-matter`: Builds Matter-enabled firmware for Pico W
    - Clones Pico SDK 1.5.1 (cached between runs)
-   - Clones connectedhomeip (v1.3-branch, ~2-3 minutes)
    - Builds with cmake and make (~12 seconds)
    - Uploads artifacts: *.uf2, *.elf, *.bin, *.hex
 
@@ -245,7 +233,6 @@ The firmware exposes three standard Matter clusters:
 **Dependencies**:
 - Pico SDK 1.5.1 (cached, ~60 seconds to initialize submodules if not cached)
 - ARM toolchain (gcc-arm-none-eabi, libnewlib-arm-none-eabi)
-- connectedhomeip SDK (cloned fresh each time, not cached due to size)
 
 **Build artifacts location**: Actions tab → Select workflow run → Artifacts section
 
@@ -255,11 +242,12 @@ The firmware exposes three standard Matter clusters:
    - No ENABLE_MATTER flag - Matter support is mandatory
    - Firmware only works on Pico W (WiFi required)
    - Standard Pico (without WiFi) is NOT supported
+   - Uses minimal Matter protocol implementation (src/matter_minimal/)
 
-2. **No .gitmodules configuration**: 
-   - Repository lacks .gitmodules file for connectedhomeip
-   - Cannot use `git submodule update --init`
-   - Must manually clone connectedhomeip to third_party/
+2. **Minimal Matter Implementation**: 
+   - Custom lightweight Matter stack in src/matter_minimal/
+   - No external Matter SDK dependencies
+   - Includes TLV codec, UDP transport, security (PASE), interaction model, and clusters
 
 3. **Interrupt-driven serial**: 
    - Uses Pico SDK `hardware_sync` library for interrupt safety
@@ -372,12 +360,7 @@ Protocol Parser
     ↓ (viking_bio_data_t)
 Matter Bridge
     ↓ (Matter Attributes)
-Platform Manager
-    ├─→ Network (WiFi/lwIP)
-    ├─→ Storage (Flash NVM)
-    └─→ Crypto (mbedTLS)
-    ↓
-Matter Stack (connectedhomeip)
+Minimal Matter Stack (src/matter_minimal/)
     ↓ (Matter protocol over WiFi)
 Matter Controller (chip-tool, etc.)
 ```
@@ -479,10 +462,9 @@ Then rebuild firmware. ⚠️ Never commit credentials to version control.
 1. ✅ **Build firmware**: `cmake .. && make` (must succeed, ~12 seconds)
 2. ✅ **Check build artifacts exist**: `ls *.uf2 *.elf *.bin *.hex`
 3. ✅ **Verify PICO_SDK_PATH is set**: `echo $PICO_SDK_PATH` (must be non-empty)
-4. ✅ **Verify connectedhomeip exists**: `ls third_party/connectedhomeip/src` (must exist)
-5. ✅ **Check for credential leaks**: `git diff | grep -i password` (must be empty)
-6. ✅ **Verify no new TODOs/HACKs**: `git diff | grep -E "TODO|HACK|FIXME"` (without good reason)
-7. ✅ **Update documentation if changing**:
+4. ✅ **Check for credential leaks**: `git diff | grep -i password` (must be empty)
+5. ✅ **Verify no new TODOs/HACKs**: `git diff | grep -E "TODO|HACK|FIXME"` (without good reason)
+6. ✅ **Update documentation if changing**:
    - Build steps → Update README.md and this file
    - APIs → Update code comments and this file
    - Matter configuration → Update platform/pico_w_chip_port/README.md
@@ -491,7 +473,7 @@ Then rebuild firmware. ⚠️ Never commit credentials to version control.
 
 ### Overview
 
-The Matter platform port at `platform/pico_w_chip_port/` provides a complete platform abstraction layer for the connectedhomeip SDK on Raspberry Pi Pico W:
+The Matter platform port at `platform/pico_w_chip_port/` provides a complete platform abstraction layer for the minimal Matter implementation on Raspberry Pi Pico W:
 
 1. **Network Adapter** (`network_adapter.cpp`): Integrates CYW43439 WiFi chip with lwIP stack
 2. **Storage Adapter** (`storage_adapter.cpp`): Flash-based persistent storage for fabric commissioning data
@@ -514,8 +496,8 @@ viking-bio-matter/
 │   │   ├── lwipopts.h             # lwIP configuration
 │   │   └── mbedtls_config.h       # mbedTLS configuration
 │   └── README.md
-├── src/matter_bridge.c             # Matter integration
-├── third_party/connectedhomeip/    # Matter SDK (manual clone)
+├── src/matter_bridge.cpp            # Matter integration
+├── src/matter_minimal/              # Minimal Matter implementation
 └── .github/workflows/
     └── build-firmware.yml          # CI build pipeline
 ```

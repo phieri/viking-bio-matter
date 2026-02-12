@@ -95,18 +95,13 @@ F:1,S:50,T:75\n
 
 ### Build Steps
 
-1. **Initialize the connectedhomeip submodule:**
-   ```bash
-   git submodule update --init --recursive third_party/connectedhomeip
-   ```
-
-2. **Configure WiFi credentials** in `platform/pico_w_chip_port/network_adapter.cpp`:
+1. **Configure WiFi credentials** in `platform/pico_w_chip_port/network_adapter.cpp`:
    ```cpp
    #define WIFI_SSID "YourNetworkName"
    #define WIFI_PASSWORD "YourPassword"
    ```
 
-3. **Build the firmware:**
+2. **Build the firmware:**
    ```bash
    mkdir build
    cd build
@@ -219,8 +214,17 @@ viking-bio-matter/
 │       ├── crypto_adapter.cpp     # mbedTLS crypto
 │       ├── platform_manager.cpp   # Platform coordination
 │       └── README.md              # Detailed Matter documentation
-├── third_party/
-│   └── connectedhomeip/       # Matter SDK submodule (when initialized)
+├── src/
+│   ├── matter_minimal/          # Minimal Matter protocol implementation
+│   │   ├── codec/               # TLV and message encoding
+│   │   ├── transport/           # UDP transport layer
+│   │   ├── security/            # PASE and session management
+│   │   ├── interaction/         # Interaction model (read/subscribe)
+│   │   └── clusters/            # Standard Matter clusters
+│   ├── main.c                   # Entry point
+│   ├── serial_handler.c         # UART RX handler
+│   ├── matter_bridge.cpp        # Matter integration
+│   └── viking_bio_protocol.c    # Protocol parser
 ├── examples/
 │   └── viking_bio_simulator.py # Serial data simulator for testing
 ├── CMakeLists.txt             # Build configuration
@@ -303,14 +307,13 @@ Matter: LevelControl cluster updated - Fan speed 80%
    
    Look for the commissioning information displayed on boot.
 
-3. **Commission with chip-tool:**
-   ```bash
-   # Build chip-tool from Matter SDK (one-time setup)
-   cd third_party/connectedhomeip
-   ./scripts/examples/gn_build_example.sh examples/chip-tool out/host
+3. **Commission with a Matter controller:**
    
+   The device can be commissioned using any Matter-compatible controller. For testing with chip-tool:
+   
+   ```bash
    # Commission device using the PIN from your device's serial output
-   ./out/host/chip-tool pairing code 1 <PIN>
+   chip-tool pairing code 1 <PIN>
    ```
 
 4. **Test attribute reads:**
@@ -360,7 +363,7 @@ Matter: LevelControl cluster updated - Fan speed 80%
 
 ## Future Enhancements
 
-1. **Full Matter SDK Integration**
+1. **Enhanced Matter Integration**
    - ✅ Commissioning flow
    - ✅ Attribute subscriptions
    - ✅ WiFi support (Pico W)
@@ -393,7 +396,6 @@ Matter: LevelControl cluster updated - Fan speed 80%
 
 - [Matter Specification](https://csa-iot.org/all-solutions/matter/)
 - [Raspberry Pi Pico SDK](https://github.com/raspberrypi/pico-sdk)
-- [Project CHIP (connectedhomeip)](https://github.com/project-chip/connectedhomeip)
 - [Viking Bio 20 Documentation](https://www.vikingbio.se/)
 - [Platform Port README](platform/pico_w_chip_port/README.md) - Detailed Matter configuration
 

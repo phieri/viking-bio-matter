@@ -1,6 +1,6 @@
 # Pico W Matter (CHIP) Platform Port
 
-This directory contains the Matter (Project CHIP / connectedhomeip) platform port for Raspberry Pi Pico W.
+This directory contains the Matter platform port for Raspberry Pi Pico W. It provides platform-specific implementations for networking, storage, and cryptography to support the minimal Matter protocol implementation.
 
 ## Overview
 
@@ -43,20 +43,7 @@ The port consists of several adapter layers:
    export PICO_SDK_PATH=/path/to/pico-sdk
    ```
 
-2. **connectedhomeip submodule**
-   ```bash
-   cd /home/runner/work/viking-bio-matter/viking-bio-matter
-   git submodule update --init --recursive third_party/connectedhomeip
-   ```
-
-   Or manually clone:
-   ```bash
-   git clone --recurse-submodules --branch v1.3-branch \
-       https://github.com/project-chip/connectedhomeip.git \
-       third_party/connectedhomeip
-   ```
-
-3. **ARM GCC Toolchain**
+2. **ARM GCC Toolchain**
    ```bash
    # Ubuntu/Debian
    sudo apt-get install gcc-arm-none-eabi libnewlib-arm-none-eabi
@@ -155,10 +142,15 @@ print(f"PIN: {pin}")
 
 ### 2. Commission with chip-tool
 
-Install chip-tool from the Matter SDK:
+Install chip-tool from the Matter SDK or use your Matter controller:
 
 ```bash
-cd third_party/connectedhomeip
+# Option A: Install from package manager (if available)
+sudo apt-get install chip-tool
+
+# Option B: Build from source
+git clone --depth 1 --branch v1.3-branch https://github.com/project-chip/connectedhomeip.git
+cd connectedhomeip
 ./scripts/examples/gn_build_example.sh examples/chip-tool out/host
 ```
 
@@ -312,13 +304,11 @@ ERROR: Storage area exceeds flash size
 
 ### Build Errors
 
-```
-connectedhomeip submodule not found
-```
+**PICO_SDK_PATH not set**
 
-**Solutions:**
+Solution: Export the PICO_SDK_PATH environment variable:
 ```bash
-git submodule update --init --recursive third_party/connectedhomeip
+export PICO_SDK_PATH=/path/to/pico-sdk
 ```
 
 ## Development
@@ -344,7 +334,6 @@ Enable verbose logging:
 ## References
 
 - [Matter Specification](https://csa-iot.org/all-solutions/matter/)
-- [connectedhomeip GitHub](https://github.com/project-chip/connectedhomeip)
 - [Pico W Documentation](https://www.raspberrypi.com/documentation/microcontrollers/raspberry-pi-pico.html)
 - [CYW43439 WiFi Chip](https://www.infineon.com/cms/en/product/wireless-connectivity/airoc-wi-fi-plus-bluetooth-combos/cyw43439/)
 
