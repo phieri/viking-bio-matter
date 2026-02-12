@@ -229,6 +229,174 @@ viking-bio-matter/
         └── build-firmware.yml # CI/CD pipeline
 ```
 
+## Testing
+
+### Serial Simulator
+
+For testing without hardware, use the included simulator:
+
+```bash
+# Install dependencies
+pip3 install pyserial
+
+# Run simulator with binary protocol (default)
+python3 examples/viking_bio_simulator.py /dev/ttyUSB0
+
+# Run simulator with text protocol
+python3 examples/viking_bio_simulator.py -p text /dev/ttyUSB0
+
+# Change update interval
+python3 examples/viking_bio_simulator.py -i 2.0 /dev/ttyUSB0
+```
+
+### Manual Testing
+
+Send test data directly:
+
+```bash
+# Binary protocol (hex)
+echo -ne '\xAA\x01\x50\x00\x4B\x55' > /dev/ttyUSB0
+
+# Text protocol
+echo "F:1,S:80,T:75" > /dev/ttyUSB0
+```
+
+### Debug Output
+
+Connect to the Pico's USB serial port:
+
+```bash
+screen /dev/ttyACM0 115200
+```
+
+Expected output:
+```
+Viking Bio Matter Bridge starting...
+Setting up WiFi...
+Connecting to WiFi: YourNetworkName
+WiFi connected, IP: 192.168.1.xxx
+====================================
+   Matter Commissioning Info
+====================================
+Device MAC:     28:CD:C1:00:00:01
+Setup PIN Code: 24890840  (derived from MAC)
+Discriminator:  3840 (0x0F00)
+====================================
+Flame: ON, Fan Speed: 80%, Temp: 75°C
+Matter: OnOff cluster updated - Flame ON
+Matter: LevelControl cluster updated - Fan speed 80%
+```
+
+### Testing Matter Integration
+
+1. **Build and flash firmware:**
+   ```bash
+   cd build
+   cmake .. && make
+   # Flash viking_bio_matter.uf2 to Pico W
+   ```
+
+2. **Monitor commissioning info:**
+   ```bash
+   screen /dev/ttyACM0 115200
+   ```
+   
+   Look for the commissioning information displayed on boot.
+
+3. **Commission with chip-tool:**
+   ```bash
+   # Build chip-tool from Matter SDK (one-time setup)
+   cd third_party/connectedhomeip
+   ./scripts/examples/gn_build_example.sh examples/chip-tool out/host
+   
+   # Commission device using the PIN from your device's serial output
+   ./out/host/chip-tool pairing code 1 <PIN>
+   ```
+
+4. **Test attribute reads:**
+   ```bash
+   # Flame status
+   ./out/host/chip-tool onoff read on-off 1 1
+   
+   # Fan speed
+   ./out/host/chip-tool levelcontrol read current-level 1 1
+   
+   # Temperature
+   ./out/host/chip-tool temperaturemeasurement read measured-value 1 1
+   ```
+
+5. **Test attribute updates with simulator:**
+   ```bash
+   # In one terminal, run simulator
+   python3 examples/viking_bio_simulator.py /dev/ttyUSB0
+   
+   # In another, watch attributes change
+   watch -n 2 './out/host/chip-tool onoff read on-off 1 1'
+   ```
+
+## Known Limitations
+
+1. **No OTA support**: Firmware updates require physical USB access (hold BOOTSEL button and copy .uf2 file)
+2. **WiFi only**: No Thread or Ethernet support currently
+3. **Simple storage**: Basic key-value store without wear leveling
+4. **Limited fabrics**: Maximum 5 Matter fabrics due to memory constraints (264KB RAM on RP2040)
+5. **Crypto limitations**: DRBG and RNG functions are stubbed due to Pico SDK 1.5.1 mbedTLS bugs (SHA256 and AES work correctly)
+
+## Security Considerations
+
+⚠️ **CRITICAL**: Default commissioning credentials are for TESTING ONLY
+
+**Production deployment requires:**
+1. Unique per-device discriminator (0-4095, excluding reserved ranges)
+2. Device-specific setup PIN codes (each device has unique PIN derived from MAC)
+3. Update `platform/pico_w_chip_port/CHIPDevicePlatformConfig.h`:
+   - Discriminator 3840 is reserved for testing per Matter Core Specification 5.1.3.1
+   - Production devices MUST use unique discriminators
+
+**WiFi Security:**
+- WiFi credentials are hardcoded in `platform/pico_w_chip_port/network_adapter.cpp`
+- Never commit credentials to version control
+- Consider using a secure provisioning method for production
+
+## Future Enhancements
+
+1. **Full Matter SDK Integration**
+   - ✅ Commissioning flow
+   - ✅ Attribute subscriptions
+   - ✅ WiFi support (Pico W)
+   - ⏳ Command handling for bidirectional control
+   - ⏳ OTA firmware updates
+
+2. **Network Connectivity**
+   - ✅ WiFi support (Pico W)
+   - ⏳ Thread support (with external radio)
+   - ⏳ Ethernet support (with W5500 module)
+
+3. **Advanced Features**
+   - ⏳ OTA firmware updates over Matter
+   - ⏳ Enhanced error reporting via Matter events
+   - ⏳ Historical data logging
+   - ⏳ Alarm notifications
+
+4. **Protocol Extensions**
+   - ⏳ Support for multiple Viking Bio devices
+   - ⏳ Bidirectional communication (control burner)
+   - ⏳ Enhanced diagnostics
+
+5. **Production Readiness**
+   - ⏳ Per-device unique commissioning credentials
+   - ⏳ Secure boot and attestation
+   - ⏳ Flash wear leveling for storage
+   - ⏳ Watchdog and fault recovery
+
+## References
+
+- [Matter Specification](https://csa-iot.org/all-solutions/matter/)
+- [Raspberry Pi Pico SDK](https://github.com/raspberrypi/pico-sdk)
+- [Project CHIP (connectedhomeip)](https://github.com/project-chip/connectedhomeip)
+- [Viking Bio 20 Documentation](https://www.vikingbio.se/)
+- [Platform Port README](platform/pico_w_chip_port/README.md) - Detailed Matter configuration
+
 ## License
 
 This project is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0). This means you can use, modify, and share this project for non-commercial purposes, as long as you provide attribution and share derivatives under the same license.
