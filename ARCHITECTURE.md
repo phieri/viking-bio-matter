@@ -307,6 +307,63 @@ Matter: LevelControl cluster updated - Fan speed 80%
    - ⏳ Flash wear leveling for storage
    - ⏳ Watchdog and fault recovery
 
+## Performance Optimizations
+
+The firmware is built with aggressive compiler optimizations to prioritize execution speed over binary size:
+
+### Compiler Optimizations
+
+The following GCC flags are enabled in `CMakeLists.txt`:
+
+- **`-O3`**: Maximum optimization for speed
+  - Aggressive function inlining
+  - Loop optimizations and vectorization
+  - Instruction scheduling for target CPU
+
+- **`-ffast-math`**: Fast floating-point math
+  - Assumes IEEE compliance is not critical
+  - Safe for this application (no sensitive FP calculations)
+
+- **`-fno-signed-zeros`**: Treat +0.0 and -0.0 as equivalent
+  - Enables additional optimizations
+
+- **`-fno-trapping-math`**: Assume no FP exceptions
+  - Safe for embedded systems without FP exception handlers
+
+- **`-funroll-loops`**: Unroll loops for speed
+  - Reduces loop overhead at the cost of code size
+
+**Note**: Link Time Optimization (LTO) is intentionally disabled due to compatibility issues with Pico SDK's wrapped functions (`__wrap_printf`, etc.).
+
+### Code-Level Optimizations
+
+1. **Inline Hot Path Functions**
+   - `serial_handler_data_available()`: Inlined for zero-overhead checks in main loop
+   - Declared as `static inline` in header for cross-module optimization
+
+2. **Function Attributes**
+   - `__attribute__((hot))`: Applied to `viking_bio_parse_data()` to prioritize optimization
+   - Hints to compiler that this is a frequently-called function
+
+3. **Branch Prediction**
+   - `likely()` / `unlikely()` macros for expected paths in protocol parser
+   - Helps CPU branch predictor and compiler optimization
+   - Used in packet validation and format detection
+
+### Memory Usage
+
+With optimizations enabled:
+- **Text (code)**: 379 KB
+- **BSS (uninitialized data)**: 49 KB
+- **Data (initialized data)**: 0 KB
+- **Total UF2 image**: 742 KB
+
+### Trade-offs
+
+- **Speed over size**: `-O3` produces larger binaries than `-Os`, but significantly faster execution
+- **No LTO**: Would reduce size further but causes linker errors with SDK wrappers
+- **Fast math**: Safe for sensor data processing but may not be suitable for all applications
+
 ## References
 
 - [Matter Specification](https://csa-iot.org/all-solutions/matter/)

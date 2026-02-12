@@ -49,9 +49,9 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
     }
     
     for (size_t i = 0; i <= length - VIKING_BIO_MIN_PACKET_SIZE; i++) {
-        if (likely(buffer[i] == VIKING_BIO_START_BYTE)) {
+        if (unlikely(buffer[i] == VIKING_BIO_START_BYTE)) {
             // Check for valid end byte
-            if (likely(buffer[i + 5] == VIKING_BIO_END_BYTE)) {
+            if (unlikely(buffer[i + 5] == VIKING_BIO_END_BYTE)) {
                 uint8_t flags = buffer[i + 1];
                 uint8_t fan_speed = buffer[i + 2];
                 uint8_t temp_high = buffer[i + 3];
@@ -83,7 +83,7 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
     
     // If no valid packet found, try simple text protocol fallback
     // Format: "F:1,S:50,T:75\n" (Flame:bool, Speed:%, Temp:°C)
-    if (unlikely(length > 10 && length < VIKING_BIO_MAX_TEXT_LENGTH)) {  // Sanity check on input length
+    if (length > 10 && length < VIKING_BIO_MAX_TEXT_LENGTH) {  // Sanity check on input length
         char str_buffer[VIKING_BIO_MAX_TEXT_LENGTH];
         size_t copy_len = length < sizeof(str_buffer) - 1 ? length : sizeof(str_buffer) - 1;
         memcpy(str_buffer, buffer, copy_len);
