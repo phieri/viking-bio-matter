@@ -20,8 +20,6 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v6
-      with:
-        submodules: false  # We'll manually checkout connectedhomeip
     
     - name: Install dependencies
       run: |
@@ -46,23 +44,6 @@ jobs:
     
     - name: Set Pico SDK path
       run: echo "PICO_SDK_PATH=${{ github.workspace }}/pico-sdk" >> $GITHUB_ENV
-    
-    - name: Checkout connectedhomeip
-      uses: actions/checkout@v6
-      with:
-        repository: project-chip/connectedhomeip
-        ref: v1.3-branch
-        path: third_party/connectedhomeip
-    
-    - name: Verify connectedhomeip submodule
-      run: |
-        if [ -d "third_party/connectedhomeip/src" ]; then
-          echo "✓ connectedhomeip submodule initialized"
-          ls -la third_party/connectedhomeip/src | head -5
-        else
-          echo "✗ connectedhomeip submodule missing"
-          exit 1
-        fi
     
     - name: Create build directory
       run: mkdir -p build-matter
