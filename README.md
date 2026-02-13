@@ -403,6 +403,23 @@ viking-bio-matter/
         └── build-firmware.yml # CI/CD pipeline
 ```
 
+### Storage Implementation with LittleFS
+
+The firmware uses **LittleFS** for persistent storage, providing:
+
+- **Wear Leveling**: Automatically distributes writes across flash memory to extend lifespan
+- **Power-Loss Resilience**: Atomic operations recoverable from unexpected power loss
+- **Efficient**: Dynamic block allocation with minimal overhead
+- **Thread-Safe**: Protected by mutexes when compiled with `LFS_THREADSAFE=1`
+
+**Configuration:**
+- **Location**: Last 256KB of the 2MB flash
+- **Filesystem**: LittleFS via [pico-lfs](https://github.com/tjko/pico-lfs)
+- **Storage**: WiFi credentials, Matter fabric data, ACLs
+
+**Testing:**
+See `tests/storage/README.md` for test procedures including basic read/write, overwrite/delete, power cycle persistence, and wear leveling stress tests.
+
 ## Testing
 
 ### Serial Simulator
@@ -511,7 +528,7 @@ Matter: LevelControl cluster updated - Fan speed 80%
 
 1. **No OTA support**: Firmware updates require physical USB access (hold BOOTSEL button and copy .uf2 file)
 2. **WiFi only**: No Thread or Ethernet support currently
-3. **Simple storage**: Basic key-value store without wear leveling
+3. **Storage with wear leveling**: LittleFS-based key-value store with automatic wear leveling for extended flash lifespan
 4. **Limited fabrics**: Maximum 5 Matter fabrics due to memory constraints (264KB RAM on RP2040)
 5. **Crypto limitations**: DRBG and RNG functions are stubbed due to Pico SDK 1.5.1 mbedTLS bugs (SHA256 and AES work correctly)
 
@@ -559,7 +576,7 @@ Matter: LevelControl cluster updated - Fan speed 80%
 5. **Production Readiness**
    - ⏳ Per-device unique commissioning credentials
    - ⏳ Secure boot and attestation
-   - ⏳ Flash wear leveling for storage
+   - ✅ Flash wear leveling for storage (LittleFS)
    - ⏳ Watchdog and fault recovery
 
 ## References

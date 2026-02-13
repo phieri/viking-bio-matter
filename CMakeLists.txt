@@ -117,6 +117,7 @@ add_subdirectory(tests/transport)
 add_subdirectory(tests/security)
 add_subdirectory(tests/interaction)
 add_subdirectory(tests/clusters)
+add_subdirectory(tests/storage)
 
 # Add matter_minimal subdirectories for Pico build
 if(PICO_PLATFORM)
