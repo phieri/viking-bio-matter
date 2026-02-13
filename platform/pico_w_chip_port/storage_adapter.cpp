@@ -27,6 +27,20 @@ typedef struct {
 
 #define STORAGE_MAGIC 0x4D545254  // "MTTR" in hex
 
+// WiFi credential storage keys
+#define WIFI_CREDENTIALS_KEY "wifi_credentials"
+#define MAX_SSID_LENGTH 32
+#define MAX_PASSWORD_LENGTH 64
+
+// WiFi credentials structure
+typedef struct {
+    char ssid[MAX_SSID_LENGTH + 1];
+    char password[MAX_PASSWORD_LENGTH + 1];
+    uint8_t ssid_len;
+    uint8_t password_len;
+    bool valid;
+} wifi_credentials_t;
+
 static const uint8_t *storage_flash_base = (const uint8_t *)(XIP_BASE + STORAGE_FLASH_OFFSET);
 static bool storage_initialized = false;
 
@@ -173,6 +187,123 @@ int storage_adapter_clear_all(void) {
     
     printf("Storage cleared\n");
     return 0;
+}
+
+int storage_adapter_save_wifi_credentials(const char *ssid, const char *password) {
+    if (!storage_initialized || !ssid || !password) {
+        printf("ERROR: Invalid parameters for WiFi credential storage\n");
+        return -1;
+    }
+    
+    size_t ssid_len = strlen(ssid);
+    size_t password_len = strlen(password);
+    
+    if (ssid_len == 0 || ssid_len > MAX_SSID_LENGTH) {
+        printf("ERROR: Invalid SSID length: %zu (max %d)\n", ssid_len, MAX_SSID_LENGTH);
+        return -1;
+    }
+    
+    if (password_len > MAX_PASSWORD_LENGTH) {
+        printf("ERROR: Invalid password length: %zu (max %d)\n", password_len, MAX_PASSWORD_LENGTH);
+        return -1;
+    }
+    
+    // Prepare WiFi credentials structure
+    wifi_credentials_t creds = {0};
+    strncpy(creds.ssid, ssid, MAX_SSID_LENGTH);
+    strncpy(creds.password, password, MAX_PASSWORD_LENGTH);
+    creds.ssid[MAX_SSID_LENGTH] = '\0';
+    creds.password[MAX_PASSWORD_LENGTH] = '\0';
+    creds.ssid_len = ssid_len;
+    creds.password_len = password_len;
+    creds.valid = true;
+    
+    // Write to storage
+    int result = storage_adapter_write(WIFI_CREDENTIALS_KEY, 
+                                      (const uint8_t *)&creds, 
+                                      sizeof(wifi_credentials_t));
+    
+    if (result == 0) {
+        printf("WiFi credentials saved to flash (SSID: %s)\n", ssid);
+    } else {
+        printf("ERROR: Failed to save WiFi credentials\n");
+    }
+    
+    return result;
+}
+
+int storage_adapter_load_wifi_credentials(char *ssid, size_t ssid_buffer_len,
+                                         char *password, size_t password_buffer_len) {
+    if (!storage_initialized || !ssid || !password) {
+        return -1;
+    }
+    
+    wifi_credentials_t creds = {0};
+    size_t actual_len = 0;
+    
+    // Read from storage
+    int result = storage_adapter_read(WIFI_CREDENTIALS_KEY,
+                                     (uint8_t *)&creds,
+                                     sizeof(wifi_credentials_t),
+                                     &actual_len);
+    
+    if (result != 0 || actual_len < sizeof(wifi_credentials_t)) {
+        return -1;  // No credentials stored or read failed
+    }
+    
+    // Validate credentials
+    if (!creds.valid || creds.ssid_len == 0 || creds.ssid_len > MAX_SSID_LENGTH) {
+        printf("ERROR: Invalid WiFi credentials in storage\n");
+        return -1;
+    }
+    
+    // Copy to output buffers
+    if (ssid_buffer_len < creds.ssid_len + 1) {
+        printf("ERROR: SSID buffer too small\n");
+        return -1;
+    }
+    
+    if (password_buffer_len < creds.password_len + 1) {
+        printf("ERROR: Password buffer too small\n");
+        return -1;
+    }
+    
+    strncpy(ssid, creds.ssid, ssid_buffer_len);
+    strncpy(password, creds.password, password_buffer_len);
+    ssid[creds.ssid_len] = '\0';
+    password[creds.password_len] = '\0';
+    
+    printf("WiFi credentials loaded from flash (SSID: %s)\n", ssid);
+    return 0;
+}
+
+int storage_adapter_has_wifi_credentials(void) {
+    if (!storage_initialized) {
+        return 0;
+    }
+    
+    wifi_credentials_t creds = {0};
+    size_t actual_len = 0;
+    
+    int result = storage_adapter_read(WIFI_CREDENTIALS_KEY,
+                                     (uint8_t *)&creds,
+                                     sizeof(wifi_credentials_t),
+                                     &actual_len);
+    
+    if (result != 0 || actual_len < sizeof(wifi_credentials_t)) {
+        return 0;  // No credentials stored
+    }
+    
+    return (creds.valid && creds.ssid_len > 0 && creds.ssid_len <= MAX_SSID_LENGTH) ? 1 : 0;
+}
+
+int storage_adapter_clear_wifi_credentials(void) {
+    if (!storage_initialized) {
+        return -1;
+    }
+    
+    printf("Clearing WiFi credentials from storage...\n");
+    return storage_adapter_delete(WIFI_CREDENTIALS_KEY);
 }
 
 } // extern "C"

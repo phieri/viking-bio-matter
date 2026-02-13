@@ -1,6 +1,7 @@
 /*
  * network_adapter.cpp
  * Network adapter implementation for Pico W (CYW43439 WiFi chip)
+ * Supports both Station (STA) and Access Point (AP) modes for WiFi commissioning
  */
 
 #include <stdio.h>
@@ -9,18 +10,33 @@
 #include "pico/cyw43_arch.h"
 #include "lwip/netif.h"
 #include "lwip/ip_addr.h"
+#include "lwip/dhcp.h"
+#include "dhcpserver/dhcpserver.h"
 
-// Configuration - Update these for your WiFi network
-#ifndef WIFI_SSID
-#define WIFI_SSID "YourSSID"
-#endif
+// Forward declaration of storage functions
+extern "C" {
+    int storage_adapter_has_wifi_credentials(void);
+    int storage_adapter_load_wifi_credentials(char *ssid, size_t ssid_buffer_len,
+                                              char *password, size_t password_buffer_len);
+    int storage_adapter_save_wifi_credentials(const char *ssid, const char *password);
+}
 
-#ifndef WIFI_PASSWORD
-#define WIFI_PASSWORD "YourPassword"
-#endif
+// SoftAP configuration
+#define SOFTAP_SSID "VikingBio-Setup"
+#define SOFTAP_PASSWORD "vikingbio2026"
+#define SOFTAP_CHANNEL 1
+
+// Network mode
+typedef enum {
+    NETWORK_MODE_NONE = 0,
+    NETWORK_MODE_STA,      // Station mode (client)
+    NETWORK_MODE_AP        // Access Point mode (SoftAP)
+} network_mode_t;
 
 static bool wifi_connected = false;
 static bool wifi_initialized = false;
+static network_mode_t current_mode = NETWORK_MODE_NONE;
+static dhcp_server_t dhcp_server;
 
 extern "C" {
 
@@ -31,16 +47,82 @@ int network_adapter_init(void) {
 
     printf("Initializing CYW43439 WiFi adapter...\n");
 
-    // Initialize CYW43 in station mode with background LWIP
+    // Initialize CYW43 with background LWIP
     if (cyw43_arch_init_with_country(CYW43_COUNTRY_USA)) {
         printf("ERROR: Failed to initialize CYW43 WiFi chip\n");
         return -1;
     }
 
-    cyw43_arch_enable_sta_mode();
     wifi_initialized = true;
-
     printf("WiFi adapter initialized\n");
+    return 0;
+}
+
+int network_adapter_start_softap(void) {
+    if (!wifi_initialized) {
+        printf("ERROR: WiFi not initialized\n");
+        return -1;
+    }
+
+    if (current_mode == NETWORK_MODE_AP) {
+        printf("SoftAP already running\n");
+        return 0;
+    }
+
+    printf("Starting SoftAP mode...\n");
+    printf("  SSID: %s\n", SOFTAP_SSID);
+    printf("  Password: %s\n", SOFTAP_PASSWORD);
+    printf("  Channel: %d\n", SOFTAP_CHANNEL);
+
+    // Enable AP mode
+    cyw43_arch_enable_ap_mode(SOFTAP_SSID, SOFTAP_PASSWORD, CYW43_AUTH_WPA2_AES_PSK);
+
+    // Configure AP network interface with static IP
+    ip4_addr_t ap_ip, ap_netmask, ap_gw;
+    IP4_ADDR(&ap_ip, 192, 168, 4, 1);       // AP IP: 192.168.4.1
+    IP4_ADDR(&ap_netmask, 255, 255, 255, 0); // Netmask: 255.255.255.0
+    IP4_ADDR(&ap_gw, 192, 168, 4, 1);       // Gateway: 192.168.4.1
+
+    // Get the AP network interface
+    struct netif *ap_netif = &cyw43_state.netif[CYW43_ITF_AP];
+    netif_set_addr(ap_netif, &ap_ip, &ap_netmask, &ap_gw);
+    netif_set_up(ap_netif);
+
+    // Start DHCP server for AP
+    dhcp_server_init(&dhcp_server, &ap_ip, &ap_netmask);
+
+    current_mode = NETWORK_MODE_AP;
+    wifi_connected = true;  // Consider AP mode as "connected"
+
+    printf("SoftAP started successfully\n");
+    printf("  AP IP: %s\n", ip4addr_ntoa(&ap_ip));
+    printf("  Connect to '%s' to commission device\n", SOFTAP_SSID);
+
+    return 0;
+}
+
+int network_adapter_stop_softap(void) {
+    if (current_mode != NETWORK_MODE_AP) {
+        return 0;
+    }
+
+    printf("Stopping SoftAP mode...\n");
+
+    // Deinitialize DHCP server
+    dhcp_server_deinit(&dhcp_server);
+
+    // Disable AP mode by deinitializing and reinitializing
+    cyw43_arch_deinit();
+    if (cyw43_arch_init_with_country(CYW43_COUNTRY_USA)) {
+        printf("ERROR: Failed to reinitialize CYW43\n");
+        wifi_initialized = false;
+        return -1;
+    }
+
+    current_mode = NETWORK_MODE_NONE;
+    wifi_connected = false;
+    printf("SoftAP stopped\n");
+
     return 0;
 }
 
@@ -50,14 +132,46 @@ int network_adapter_connect(const char *ssid, const char *password) {
         return -1;
     }
 
-    const char *connect_ssid = ssid ? ssid : WIFI_SSID;
-    const char *connect_pass = password ? password : WIFI_PASSWORD;
+    // Stop SoftAP if running
+    if (current_mode == NETWORK_MODE_AP) {
+        network_adapter_stop_softap();
+    }
 
-    printf("Connecting to WiFi SSID: %s\n", connect_ssid);
+    // Try to load credentials from storage if not provided
+    char stored_ssid[33] = {0};
+    char stored_password[65] = {0};
+
+    if (!ssid && !password) {
+        printf("No WiFi credentials provided, checking flash storage...\n");
+        if (storage_adapter_has_wifi_credentials()) {
+            if (storage_adapter_load_wifi_credentials(stored_ssid, sizeof(stored_ssid),
+                                                     stored_password, sizeof(stored_password)) == 0) {
+                ssid = stored_ssid;
+                password = stored_password;
+                printf("Using WiFi credentials from flash\n");
+            } else {
+                printf("ERROR: Failed to load WiFi credentials from flash\n");
+                return -1;
+            }
+        } else {
+            printf("No WiFi credentials in flash storage\n");
+            return -1;
+        }
+    }
+
+    if (!ssid || strlen(ssid) == 0) {
+        printf("ERROR: No SSID provided\n");
+        return -1;
+    }
+
+    printf("Connecting to WiFi SSID: %s\n", ssid);
+
+    // Enable station mode
+    cyw43_arch_enable_sta_mode();
 
     int result = cyw43_arch_wifi_connect_timeout_ms(
-        connect_ssid,
-        connect_pass,
+        ssid,
+        password,
         CYW43_AUTH_WPA2_AES_PSK,
         30000  // 30 second timeout
     );
@@ -65,6 +179,7 @@ int network_adapter_connect(const char *ssid, const char *password) {
     if (result != 0) {
         printf("ERROR: Failed to connect to WiFi (error %d)\n", result);
         wifi_connected = false;
+        current_mode = NETWORK_MODE_NONE;
         return result;
     }
 
@@ -77,12 +192,38 @@ int network_adapter_connect(const char *ssid, const char *password) {
         printf("Gateway: %s\n", ip4addr_ntoa(netif_ip4_gw(netif)));
     }
 
+    current_mode = NETWORK_MODE_STA;
     wifi_connected = true;
     return 0;
 }
 
+int network_adapter_save_and_connect(const char *ssid, const char *password) {
+    if (!ssid || !password) {
+        printf("ERROR: Invalid SSID or password\n");
+        return -1;
+    }
+
+    // Save credentials to flash
+    printf("Saving WiFi credentials to flash...\n");
+    if (storage_adapter_save_wifi_credentials(ssid, password) != 0) {
+        printf("ERROR: Failed to save WiFi credentials\n");
+        return -1;
+    }
+
+    // Connect to WiFi
+    return network_adapter_connect(ssid, password);
+}
+
 bool network_adapter_is_connected(void) {
     return wifi_connected && wifi_initialized;
+}
+
+bool network_adapter_is_softap_mode(void) {
+    return current_mode == NETWORK_MODE_AP;
+}
+
+network_mode_t network_adapter_get_mode(void) {
+    return current_mode;
 }
 
 void network_adapter_get_ip_address(char *buffer, size_t buffer_len) {
@@ -90,13 +231,22 @@ void network_adapter_get_ip_address(char *buffer, size_t buffer_len) {
         return;
     }
 
-    if (!wifi_connected || !wifi_initialized) {
+    if (!wifi_initialized) {
         snprintf(buffer, buffer_len, "0.0.0.0");
         return;
     }
 
-    struct netif *netif = netif_default;
-    if (netif) {
+    struct netif *netif = NULL;
+    
+    if (current_mode == NETWORK_MODE_AP) {
+        // Get AP interface IP
+        netif = &cyw43_state.netif[CYW43_ITF_AP];
+    } else if (current_mode == NETWORK_MODE_STA) {
+        // Get STA interface IP
+        netif = netif_default;
+    }
+
+    if (netif && netif_is_up(netif)) {
         const char *ip_str = ip4addr_ntoa(netif_ip4_addr(netif));
         snprintf(buffer, buffer_len, "%s", ip_str);
     } else {
@@ -109,7 +259,7 @@ void network_adapter_get_mac_address(uint8_t *mac_addr) {
         return;
     }
 
-    // Get MAC address from CYW43
+    // Get MAC address from CYW43 (station mode MAC)
     cyw43_hal_get_mac(0, mac_addr);
 }
 
@@ -118,9 +268,15 @@ void network_adapter_deinit(void) {
         return;
     }
 
+    // Stop SoftAP if running
+    if (current_mode == NETWORK_MODE_AP) {
+        dhcp_server_deinit(&dhcp_server);
+    }
+
     cyw43_arch_deinit();
     wifi_initialized = false;
     wifi_connected = false;
+    current_mode = NETWORK_MODE_NONE;
     printf("WiFi adapter deinitialized\n");
 }
 
