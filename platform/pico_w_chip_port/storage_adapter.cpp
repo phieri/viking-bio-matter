@@ -30,6 +30,8 @@ typedef struct {
 static const uint8_t *storage_flash_base = (const uint8_t *)(XIP_BASE + STORAGE_FLASH_OFFSET);
 static bool storage_initialized = false;
 
+extern "C" {
+
 int storage_adapter_init(void) {
     if (storage_initialized) {
         return 0;
@@ -172,3 +174,5 @@ int storage_adapter_clear_all(void) {
     printf("Storage cleared\n");
     return 0;
 }
+
+} // extern "C"

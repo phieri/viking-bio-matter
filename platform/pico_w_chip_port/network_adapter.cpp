@@ -22,6 +22,8 @@
 static bool wifi_connected = false;
 static bool wifi_initialized = false;
 
+extern "C" {
+
 int network_adapter_init(void) {
     if (wifi_initialized) {
         return 0;
@@ -121,3 +123,5 @@ void network_adapter_deinit(void) {
     wifi_connected = false;
     printf("WiFi adapter deinitialized\n");
 }
+
+} // extern "C"

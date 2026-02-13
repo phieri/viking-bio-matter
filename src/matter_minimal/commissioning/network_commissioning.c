@@ -131,7 +131,7 @@ int commissioning_handle_pase_message(uint8_t opcode,
                 if (pase_derive_session_key(&g_pase_ctx, session_id,
                                            session_key, sizeof(session_key)) == 0) {
                     // Add session to session manager
-                    if (session_add(session_id, session_key, sizeof(session_key)) == 0) {
+                    if (session_create(session_id, session_key, sizeof(session_key)) == 0) {
                         printf("Commissioning: PASE completed, session ID %u established\n", session_id);
                         g_commissioning_ctx.state = COMMISSIONING_STATE_COMMISSIONED;
                         

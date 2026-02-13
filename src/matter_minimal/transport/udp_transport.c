@@ -411,3 +411,62 @@ int matter_transport_addr_to_string(const matter_transport_addr_t *addr,
                        ip4addr_ntoa(&ipv4_addr), addr->port);
     }
 }
+
+// Legacy wrapper functions for backward compatibility
+int udp_transport_init(void) {
+    return matter_transport_init();
+}
+
+void udp_transport_deinit(void) {
+    matter_transport_deinit();
+}
+
+int udp_transport_send(const char *dest_ip, uint16_t dest_port, 
+                      const uint8_t *data, size_t length) {
+    if (!dest_ip || !data) {
+        return MATTER_TRANSPORT_ERROR_INVALID_PARAM;
+    }
+    
+    matter_transport_addr_t addr;
+    int result;
+    
+    // Try IPv4 first
+    result = matter_transport_addr_from_ipv4(dest_ip, dest_port, &addr);
+    if (result < 0) {
+        // Try IPv6
+        result = matter_transport_addr_from_ipv6(dest_ip, dest_port, &addr);
+        if (result < 0) {
+            return result;
+        }
+    }
+    
+    return matter_transport_send(data, length, &addr);
+}
+
+int udp_transport_recv(uint8_t *buffer, size_t buffer_size, size_t *actual_length,
+                      char *source_ip, size_t source_ip_size, uint16_t *source_port) {
+    if (!buffer || !actual_length) {
+        return MATTER_TRANSPORT_ERROR_INVALID_PARAM;
+    }
+    
+    matter_transport_addr_t source_addr;
+    int result = matter_transport_receive(buffer, buffer_size, actual_length, 
+                                         &source_addr, 0);  // 0 ms timeout = non-blocking
+    
+    if (result == MATTER_TRANSPORT_SUCCESS && source_ip && source_port) {
+        // Convert address to string
+        if (source_addr.is_ipv6) {
+            ip6_addr_t ipv6_addr;
+            memcpy(ipv6_addr.addr, source_addr.addr, 16);
+            snprintf(source_ip, source_ip_size, "%s", ip6addr_ntoa(&ipv6_addr));
+        } else {
+            // Extract IPv4 from IPv4-mapped IPv6
+            ip4_addr_t ipv4_addr;
+            memcpy(&ipv4_addr.addr, &source_addr.addr[12], 4);
+            snprintf(source_ip, source_ip_size, "%s", ip4addr_ntoa(&ipv4_addr));
+        }
+        *source_port = source_addr.port;
+    }
+    
+    return result;
+}

@@ -33,7 +33,7 @@ int matter_protocol_init(void) {
     // Initialize layers from bottom to top
     
     // 1. Transport layer (UDP)
-    if (udp_transport_init() < 0) {
+    if (matter_transport_init() < 0) {
         return -1;
     }
     

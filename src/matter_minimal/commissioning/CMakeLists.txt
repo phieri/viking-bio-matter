@@ -7,7 +7,7 @@ add_library(matter_commissioning STATIC
 target_link_libraries(matter_commissioning
     pico_stdlib
     matter_security
-    matter_codec
+    matter_tlv
     pico_mbedtls
 )
 

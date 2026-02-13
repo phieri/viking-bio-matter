@@ -79,6 +79,7 @@ target_link_libraries(viking_bio_matter
     pico_cyw43_arch_lwip_threadsafe_background
     pico_mbedtls
     hardware_flash
+    -Wl,--start-group
     matter_protocol
     matter_tlv
     matter_transport
@@ -86,6 +87,7 @@ target_link_libraries(viking_bio_matter
     matter_commissioning
     matter_interaction
     matter_clusters
+    -Wl,--end-group
 )
 
 # Enable USB output, disable UART output

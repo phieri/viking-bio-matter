@@ -6,12 +6,13 @@ add_library(matter_protocol STATIC
 
 target_link_libraries(matter_protocol
     pico_stdlib
-    matter_codec
-    matter_transport
-    matter_security
     matter_commissioning
     matter_interaction
     matter_clusters
+    matter_security
+    matter_transport
+    matter_tlv
+    pico_mbedtls
 )
 
 target_include_directories(matter_protocol PUBLIC
