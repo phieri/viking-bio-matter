@@ -187,7 +187,7 @@ Each phase is implemented as a separate PR to allow for:
 ### Success Criteria
 - ✅ Build succeeds without SDK
 - ✅ All tests pass
-- ✅ Firmware size < 850KB (~837KB achieved)
+- ✅ Firmware size < 850KB (~508KB text, 497KB bin achieved)
 - ✅ CI pipeline green
 
 ### Dependencies
