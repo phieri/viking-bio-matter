@@ -3,6 +3,7 @@
 #include "pico/stdlib.h"
 #include "hardware/uart.h"
 #include "hardware/gpio.h"
+#include "hardware/watchdog.h"
 #include "serial_handler.h"
 #include "viking_bio_protocol.h"
 #include "matter_bridge.h"
@@ -42,6 +43,11 @@ int main() {
     
     printf("Initialization complete. Reading serial data...\n");
     
+    // Enable watchdog with 8 second timeout for system reliability
+    // The watchdog must be updated at least once every 8 seconds
+    watchdog_enable(8000, false);
+    printf("Watchdog enabled with 8 second timeout\n");
+    
     // Main loop
     uint8_t buffer[SERIAL_BUFFER_SIZE];
     viking_bio_data_t viking_data;
@@ -49,6 +55,9 @@ int main() {
     bool led_state = false;
     
     while (true) {
+        // Update watchdog to prevent system reset
+        watchdog_update();
+        
         // Handle serial data
         serial_handler_task();
         

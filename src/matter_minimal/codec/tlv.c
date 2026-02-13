@@ -587,6 +587,12 @@ int tlv_reader_next(tlv_reader_t *reader, tlv_element_t *element) {
             if (read_length_prefix(reader, length_encoding, &length) < 0) {
                 return -1;
             }
+            
+            // Bounds check: ensure string data fits in buffer
+            if (reader->offset + length > reader->buffer_size) {
+                return -1;  // String extends beyond buffer
+            }
+            
             element->value.string.data = (const char *)&reader->buffer[reader->offset];
             element->value.string.length = length;
             reader->offset += length;
@@ -601,6 +607,12 @@ int tlv_reader_next(tlv_reader_t *reader, tlv_element_t *element) {
             if (read_length_prefix(reader, length_encoding, &length) < 0) {
                 return -1;
             }
+            
+            // Bounds check: ensure byte string data fits in buffer
+            if (reader->offset + length > reader->buffer_size) {
+                return -1;  // Byte string extends beyond buffer
+            }
+            
             element->value.bytes.data = &reader->buffer[reader->offset];
             element->value.bytes.length = length;
             reader->offset += length;

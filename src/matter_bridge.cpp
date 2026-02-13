@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "pico/stdlib.h"
+#include "pico/critical_section.h"
 #include "matter_bridge.h"
 #include "../platform/pico_w_chip_port/platform_manager.h"
 #include "../platform/pico_w_chip_port/matter_attributes.h"
@@ -21,6 +22,9 @@ static matter_attributes_t attributes = {
 // Matter bridge state
 static bool initialized = false;
 
+// Critical section for thread-safe attribute access
+static critical_section_t bridge_lock;
+
 extern "C" {
 
 void matter_bridge_init(void) {
@@ -28,6 +32,9 @@ void matter_bridge_init(void) {
     printf("==========================================\n");
     printf("  Viking Bio Matter Bridge - Full Mode\n");
     printf("==========================================\n\n");
+    
+    // Initialize critical section for thread safety
+    critical_section_init(&bridge_lock);
     
     // Initialize Matter platform
     printf("Initializing Matter platform for Pico W...\n");
@@ -122,16 +129,27 @@ void matter_bridge_update_flame(bool flame_on) {
         return;
     }
     
-    if (attributes.flame_state != flame_on) {
+    critical_section_enter_blocking(&bridge_lock);
+    bool changed = (attributes.flame_state != flame_on);
+    if (changed) {
         attributes.flame_state = flame_on;
         attributes.last_update_time = to_ms_since_boot(get_absolute_time());
-        
+    }
+    critical_section_exit(&bridge_lock);
+    
+    if (changed) {
         printf("Matter: OnOff cluster updated - Flame %s\n", flame_on ? "ON" : "OFF");
         
         // Update Matter attribute
         matter_attr_value_t value;
         value.bool_val = flame_on;
-        matter_attributes_update(1, MATTER_CLUSTER_ON_OFF, MATTER_ATTR_ON_OFF, &value);
+        int ret = matter_attributes_update(1, MATTER_CLUSTER_ON_OFF, MATTER_ATTR_ON_OFF, &value);
+        if (ret != 0) {
+            printf("ERROR: Failed to update OnOff attribute (ret=%d)\n", ret);
+        } else {
+            // Notify platform of attribute change
+            platform_manager_report_onoff_change(1);
+        }
     }
 }
 
@@ -140,16 +158,27 @@ void matter_bridge_update_fan_speed(uint8_t speed) {
         return;
     }
     
-    if (attributes.fan_speed != speed) {
+    critical_section_enter_blocking(&bridge_lock);
+    bool changed = (attributes.fan_speed != speed);
+    if (changed) {
         attributes.fan_speed = speed;
         attributes.last_update_time = to_ms_since_boot(get_absolute_time());
-        
+    }
+    critical_section_exit(&bridge_lock);
+    
+    if (changed) {
         printf("Matter: LevelControl cluster updated - Fan speed %d%%\n", speed);
         
         // Update Matter attribute
         matter_attr_value_t value;
         value.uint8_val = speed;
-        matter_attributes_update(1, MATTER_CLUSTER_LEVEL_CONTROL, MATTER_ATTR_CURRENT_LEVEL, &value);
+        int ret = matter_attributes_update(1, MATTER_CLUSTER_LEVEL_CONTROL, MATTER_ATTR_CURRENT_LEVEL, &value);
+        if (ret != 0) {
+            printf("ERROR: Failed to update LevelControl attribute (ret=%d)\n", ret);
+        } else {
+            // Notify platform of attribute change
+            platform_manager_report_level_change(1);
+        }
     }
 }
 
@@ -158,16 +187,27 @@ void matter_bridge_update_temperature(uint16_t temp) {
         return;
     }
     
-    if (attributes.temperature != temp) {
+    critical_section_enter_blocking(&bridge_lock);
+    bool changed = (attributes.temperature != temp);
+    if (changed) {
         attributes.temperature = temp;
         attributes.last_update_time = to_ms_since_boot(get_absolute_time());
-        
+    }
+    critical_section_exit(&bridge_lock);
+    
+    if (changed) {
         printf("Matter: TemperatureMeasurement cluster updated - %d°C\n", temp);
         
         // Update Matter attribute (convert to centidegrees for Matter spec)
         matter_attr_value_t value;
         value.int16_val = (int16_t)(temp * 100); // Convert to centidegrees
-        matter_attributes_update(1, MATTER_CLUSTER_TEMPERATURE_MEASUREMENT, MATTER_ATTR_MEASURED_VALUE, &value);
+        int ret = matter_attributes_update(1, MATTER_CLUSTER_TEMPERATURE_MEASUREMENT, MATTER_ATTR_MEASURED_VALUE, &value);
+        if (ret != 0) {
+            printf("ERROR: Failed to update Temperature attribute (ret=%d)\n", ret);
+        } else {
+            // Notify platform of attribute change
+            platform_manager_report_temperature_change(1);
+        }
     }
 }
 
@@ -196,13 +236,20 @@ void matter_bridge_task(void) {
 
 void matter_bridge_get_attributes(matter_attributes_t *attrs) {
     if (attrs != NULL && initialized) {
+        critical_section_enter_blocking(&bridge_lock);
         memcpy(attrs, &attributes, sizeof(matter_attributes_t));
+        critical_section_exit(&bridge_lock);
     }
 }
 
 int matter_bridge_add_controller(const char *ip_address, uint16_t port) {
     if (!initialized) {
         printf("Matter: ERROR - Bridge not initialized\n");
+        return -1;
+    }
+    
+    if (!ip_address) {
+        printf("Matter: ERROR - Invalid IP address (NULL)\n");
         return -1;
     }
     
