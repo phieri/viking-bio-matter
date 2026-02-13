@@ -23,7 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added explicit type casts to prevent implicit conversions
 - Added tools/README.md with comprehensive documentation for derive_pin.py utility
 - Added detailed PIN derivation algorithm documentation in platform_manager.cpp
-- Added improved error messages in CMakeLists.txt for missing connectedhomeip dependency
 
 ### Changed
 - Improved bounds checking in `viking_bio_parse_data()` for clearer logic
