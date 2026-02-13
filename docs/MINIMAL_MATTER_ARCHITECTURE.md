@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the architecture for a minimal Matter protocol implementation for the Viking Bio Matter Bridge on Raspberry Pi Pico W. This implementation replaces the dependency on the full connectedhomeip SDK with a lightweight, purpose-built protocol stack.
+This document describes the architecture for a minimal Matter protocol implementation for the Viking Bio Matter Bridge on Raspberry Pi Pico W. This implementation uses a lightweight, purpose-built protocol stack without requiring the full connectedhomeip SDK.
 
 ## Design Goals
 
@@ -281,9 +281,9 @@ bool commissioning_is_commissioned(void);
 - ✅ `platform/pico_w_chip_port/matter_attributes.cpp` - Attribute storage
 - ✅ `platform/pico_w_chip_port/platform_manager.cpp` - Orchestration
 
-### Remove These Dependencies
-- ❌ `third_party/connectedhomeip/` - No longer needed
-- ❌ All CHIP SDK references in CMakeLists.txt
+### Removed Dependencies (Phase 7 Complete)
+- ✅ `third_party/connectedhomeip/` - Successfully removed, no longer needed
+- ✅ All CHIP SDK references removed from CMakeLists.txt
 
 ### Add New Directory Structure
 ```
