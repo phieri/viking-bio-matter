@@ -11,7 +11,6 @@
 #include "lwip/netif.h"
 #include "lwip/ip_addr.h"
 #include "lwip/dhcp.h"
-#include "dhcpserver/dhcpserver.h"
 
 // Forward declaration of storage functions
 extern "C" {
@@ -36,7 +35,6 @@ typedef enum {
 static bool wifi_connected = false;
 static bool wifi_initialized = false;
 static network_mode_t current_mode = NETWORK_MODE_NONE;
-static dhcp_server_t dhcp_server;
 
 extern "C" {
 
@@ -88,15 +86,14 @@ int network_adapter_start_softap(void) {
     netif_set_addr(ap_netif, &ap_ip, &ap_netmask, &ap_gw);
     netif_set_up(ap_netif);
 
-    // Start DHCP server for AP
-    dhcp_server_init(&dhcp_server, &ap_ip, &ap_netmask);
-
     current_mode = NETWORK_MODE_AP;
     wifi_connected = true;  // Consider AP mode as "connected"
 
     printf("SoftAP started successfully\n");
     printf("  AP IP: %s\n", ip4addr_ntoa(&ap_ip));
     printf("  Connect to '%s' to commission device\n", SOFTAP_SSID);
+    printf("  Clients should use static IP in 192.168.4.x range\n");
+    printf("  (DHCP server not available - use static IP configuration)\n");
 
     return 0;
 }
@@ -107,9 +104,6 @@ int network_adapter_stop_softap(void) {
     }
 
     printf("Stopping SoftAP mode...\n");
-
-    // Deinitialize DHCP server
-    dhcp_server_deinit(&dhcp_server);
 
     // Disable AP mode by deinitializing and reinitializing
     cyw43_arch_deinit();
@@ -266,11 +260,6 @@ void network_adapter_get_mac_address(uint8_t *mac_addr) {
 void network_adapter_deinit(void) {
     if (!wifi_initialized) {
         return;
-    }
-
-    // Stop SoftAP if running
-    if (current_mode == NETWORK_MODE_AP) {
-        dhcp_server_deinit(&dhcp_server);
     }
 
     cyw43_arch_deinit();
