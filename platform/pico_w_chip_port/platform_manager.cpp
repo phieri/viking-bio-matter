@@ -245,6 +245,16 @@ void platform_manager_print_commissioning_info(void) {
     printf("====================================\n\n");
 }
 
+int platform_manager_derive_setup_pin(const uint8_t *mac_addr, char *out_pin8) {
+    if (!mac_addr || !out_pin8) {
+        return -1;
+    }
+    
+    uint8_t mac[6];
+    memcpy(mac, mac_addr, 6);
+    return derive_setup_pin_from_mac(mac, out_pin8);
+}
+
 void platform_manager_task(void) {
     if (!platform_initialized) {
         return;

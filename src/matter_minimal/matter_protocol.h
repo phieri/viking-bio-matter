@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,6 +22,23 @@ extern "C" {
  * @return 0 on success, -1 on failure
  */
 int matter_protocol_init(void);
+
+/**
+ * Start commissioning mode
+ * Enables device for commissioning with the given PIN
+ * 
+ * @param setup_pin 8-digit setup PIN (null-terminated)
+ * @param discriminator Discriminator value (12 bits, e.g., 3840)
+ * @return 0 on success, -1 on error
+ */
+int matter_protocol_start_commissioning(const char *setup_pin, uint16_t discriminator);
+
+/**
+ * Check if device is commissioned
+ * 
+ * @return true if commissioned, false otherwise
+ */
+bool matter_protocol_is_commissioned(void);
 
 /**
  * Process incoming Matter messages

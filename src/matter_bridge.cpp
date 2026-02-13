@@ -8,6 +8,7 @@
 #include "../platform/pico_w_chip_port/matter_network_subscriber.h"
 #include "../platform/pico_w_chip_port/matter_network_transport.h"
 #include "matter_minimal/interaction/subscription_bridge.h"
+#include "matter_minimal/matter_protocol.h"
 
 // Matter attributes storage
 static matter_attributes_t attributes = {
@@ -80,9 +81,38 @@ void matter_bridge_init(void) {
         printf("         Subscriptions may not receive attribute updates\n");
     }
     
+    // Initialize Matter protocol stack
+    printf("Initializing Matter protocol stack...\n");
+    if (matter_protocol_init() != 0) {
+        printf("ERROR: Failed to initialize Matter protocol stack\n");
+        initialized = false;
+        return;
+    }
+    
+    // Start commissioning mode
+    printf("Starting Matter commissioning...\n");
+    uint8_t mac[6];
+    platform_manager_get_network_info(NULL, 0, mac);
+    
+    // Derive setup PIN from MAC
+    char setup_pin[9];
+    if (platform_manager_derive_setup_pin(mac, setup_pin) != 0) {
+        printf("ERROR: Failed to derive setup PIN\n");
+        initialized = false;
+        return;
+    }
+    
+    // Start commissioning with derived PIN and discriminator
+    if (matter_protocol_start_commissioning(setup_pin, 3840) != 0) {
+        printf("ERROR: Failed to start commissioning\n");
+        initialized = false;
+        return;
+    }
+    
     initialized = true;
     
     printf("✓ Matter Bridge fully initialized\n");
+    printf("✓ Matter protocol stack running\n");
     printf("✓ Device is ready for commissioning\n");
     printf("✓ Monitoring Viking Bio serial data...\n\n");
 }
@@ -156,6 +186,9 @@ void matter_bridge_task(void) {
     if (!initialized) {
         return;
     }
+    
+    // Process Matter protocol messages
+    matter_protocol_task();
     
     // Process Matter platform tasks (includes attribute reporting)
     platform_manager_task();
