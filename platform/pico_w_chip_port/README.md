@@ -18,9 +18,10 @@ The port consists of several adapter layers:
 
 ### 2. Storage Adapter (`storage_adapter.cpp`)
 - Persistent storage for Matter fabric commissioning data
-- Uses Pico's internal flash memory (last 256KB reserved)
-- Simple key-value store implementation
-- Stores pairing info, access control lists, etc.
+- Uses LittleFS on Pico's internal flash memory (last 256KB reserved)
+- Provides wear leveling for extended flash memory lifespan
+- Key-value store implementation with file-based storage
+- Stores pairing info, access control lists, WiFi credentials, etc.
 
 ### 3. Crypto Adapter (`crypto_adapter.cpp`)
 - Cryptographic operations using mbedTLS
@@ -247,18 +248,30 @@ For production:
 
 ### Storage Configuration
 
-Flash storage layout:
+Flash storage layout with LittleFS:
 
 - **Location**: Last 256KB of Pico's 2MB flash
 - **Size**: 256KB (configurable in `storage_adapter.cpp`)
 - **Purpose**: Fabric commissioning data, ACLs, credentials
+- **Filesystem**: LittleFS with automatic wear leveling
+- **Features**:
+  - Automatic wear leveling to extend flash lifespan
+  - Power-loss resilient operations
+  - Efficient space utilization
+  - Thread-safe operations (when compiled with LFS_THREADSAFE=1)
 
-Adjust if needed:
+Adjust storage size if needed:
 
 ```cpp
 #define STORAGE_FLASH_OFFSET (PICO_FLASH_SIZE_BYTES - (256 * 1024))
 #define STORAGE_FLASH_SIZE (256 * 1024)
 ```
+
+**LittleFS Integration:**
+- Uses [pico-lfs](https://github.com/tjko/pico-lfs) library
+- Automatic formatting on first use
+- Files stored with `/` prefix for LittleFS compatibility
+- See `tests/storage/README.md` for testing procedures
 
 ## Limitations
 
@@ -266,7 +279,6 @@ Adjust if needed:
 - **Single fabric**: Limited to 5 fabrics max due to memory constraints
 - **No Thread**: WiFi only (CYW43439 limitation)
 - **No BLE commissioning**: Uses WiFi commissioning only
-- **Simple storage**: Basic key-value store, no wear leveling
 - **Test credentials**: Ships with test setup codes
 
 ## Troubleshooting

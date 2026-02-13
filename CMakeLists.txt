@@ -19,6 +19,9 @@ set(CMAKE_CXX_STANDARD 17)
 # Initialize the Pico SDK
 pico_sdk_init()
 
+# Include pico-lfs library for LittleFS support
+add_subdirectory(libs/pico-lfs)
+
 # Compiler optimizations - prioritize speed over size
 # -O3: Aggressive optimization for speed
 # -ffast-math: Fast floating point math (safe for this application)
@@ -79,6 +82,7 @@ target_link_libraries(viking_bio_matter
     pico_cyw43_arch_lwip_threadsafe_background
     pico_mbedtls
     hardware_flash
+    pico-lfs
     -Wl,--start-group
     matter_protocol
     matter_tlv
@@ -88,6 +92,12 @@ target_link_libraries(viking_bio_matter
     matter_interaction
     matter_clusters
     -Wl,--end-group
+)
+
+# LittleFS compile definitions
+target_compile_definitions(viking_bio_matter PRIVATE
+    LFS_THREADSAFE=1
+    LFS_NO_DEBUG=1
 )
 
 # Enable USB output, disable UART output
@@ -107,6 +117,7 @@ add_subdirectory(tests/transport)
 add_subdirectory(tests/security)
 add_subdirectory(tests/interaction)
 add_subdirectory(tests/clusters)
+add_subdirectory(tests/storage)
 
 # Add matter_minimal subdirectories for Pico build
 if(PICO_PLATFORM)
