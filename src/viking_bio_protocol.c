@@ -43,7 +43,7 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
     // FLAGS bit 0: flame detected
     // FLAGS bit 1-7: error codes
     
-    for (size_t i = 0; i <= length - VIKING_BIO_MIN_PACKET_SIZE; i++) {
+    for (size_t i = 0; i + VIKING_BIO_MIN_PACKET_SIZE <= length; i++) {
         if (buffer[i] == VIKING_BIO_START_BYTE) {
             // Check for valid end byte
             if (buffer[i + 5] == VIKING_BIO_END_BYTE) {
