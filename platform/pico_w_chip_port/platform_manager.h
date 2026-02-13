@@ -58,6 +58,14 @@ int platform_manager_generate_qr_code(char *buffer, size_t buffer_len);
 void platform_manager_print_commissioning_info(void);
 
 /**
+ * Derive setup PIN from MAC address
+ * @param mac_addr MAC address (6 bytes)
+ * @param out_pin8 Output buffer for 8-digit PIN (must be 9 bytes for null terminator)
+ * @return 0 on success, -1 on failure
+ */
+int platform_manager_derive_setup_pin(const uint8_t *mac_addr, char *out_pin8);
+
+/**
  * Run periodic platform tasks
  * Call this regularly in main loop
  */

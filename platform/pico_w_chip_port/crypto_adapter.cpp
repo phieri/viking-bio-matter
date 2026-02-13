@@ -17,6 +17,8 @@
 
 static bool crypto_initialized = false;
 
+extern "C" {
+
 int crypto_adapter_init(void) {
     if (crypto_initialized) {
         return 0;
@@ -146,3 +148,5 @@ void crypto_adapter_deinit(void) {
     crypto_initialized = false;
     printf("Crypto adapter deinitialized (stub)\n");
 }
+
+} // extern "C"

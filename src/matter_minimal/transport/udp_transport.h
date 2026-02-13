@@ -130,6 +130,14 @@ int matter_transport_addr_from_ipv6(const char *addr_str, uint16_t port,
 int matter_transport_addr_to_string(const matter_transport_addr_t *addr, 
                                     char *buffer, size_t buffer_size);
 
+// Legacy wrapper functions for backward compatibility with simplified API
+int udp_transport_init(void);
+void udp_transport_deinit(void);
+int udp_transport_send(const char *dest_ip, uint16_t dest_port, 
+                      const uint8_t *data, size_t length);
+int udp_transport_recv(uint8_t *buffer, size_t buffer_size, size_t *actual_length,
+                      char *source_ip, size_t source_ip_size, uint16_t *source_port);
+
 #ifdef __cplusplus
 }
 #endif

@@ -33,6 +33,7 @@
 #define MBEDTLS_ECP_C
 #define MBEDTLS_ENTROPY_C
 #define MBEDTLS_GCM_C
+#define MBEDTLS_HKDF_C
 #define MBEDTLS_MD_C
 #define MBEDTLS_OID_C
 #define MBEDTLS_PK_C

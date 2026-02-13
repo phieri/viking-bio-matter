@@ -10,7 +10,8 @@
 #include "mbedtls/sha256.h"
 #include "matter_attributes.h"
 
-// Forward declarations of adapter functions (internal C++ functions)
+// Forward declarations of adapter functions
+extern "C" {
 int network_adapter_init(void);
 int network_adapter_connect(const char *ssid, const char *password);
 bool network_adapter_is_connected(void);
@@ -27,6 +28,7 @@ int storage_adapter_clear_all(void);
 int crypto_adapter_init(void);
 int crypto_adapter_random(uint8_t *buffer, size_t length);
 void crypto_adapter_deinit(void);
+}
 
 // Product salt for PIN derivation
 // This constant is combined with the device MAC address to derive a unique
@@ -243,6 +245,16 @@ void platform_manager_print_commissioning_info(void) {
     printf("   testing only. Use unique values for\n");
     printf("   production devices.\n");
     printf("====================================\n\n");
+}
+
+int platform_manager_derive_setup_pin(const uint8_t *mac_addr, char *out_pin8) {
+    if (!mac_addr || !out_pin8) {
+        return -1;
+    }
+    
+    uint8_t mac[6];
+    memcpy(mac, mac_addr, 6);
+    return derive_setup_pin_from_mac(mac, out_pin8);
 }
 
 void platform_manager_task(void) {

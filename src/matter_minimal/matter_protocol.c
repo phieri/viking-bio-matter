@@ -8,6 +8,7 @@
 #include "transport/udp_transport.h"
 #include "security/session_mgr.h"
 #include "security/pase.h"
+#include "commissioning/network_commissioning.h"
 #include "interaction/interaction_model.h"
 #include "interaction/read_handler.h"
 #include "interaction/subscribe_handler.h"
@@ -16,6 +17,7 @@
 #include "clusters/level_control.h"
 #include "clusters/temperature.h"
 #include <string.h>
+#include <stdio.h>
 
 // Internal state
 static bool initialized = false;
@@ -31,7 +33,7 @@ int matter_protocol_init(void) {
     // Initialize layers from bottom to top
     
     // 1. Transport layer (UDP)
-    if (udp_transport_init() < 0) {
+    if (matter_transport_init() < 0) {
         return -1;
     }
     
@@ -43,11 +45,12 @@ int matter_protocol_init(void) {
         return -1;
     }
     
-    if (pase_init() < 0) {
+    // 4. Commissioning layer
+    if (commissioning_init() < 0) {
         return -1;
     }
     
-    // 4. Interaction layer
+    // 5. Interaction layer
     if (read_handler_init() < 0) {
         return -1;
     }
@@ -82,13 +85,36 @@ int matter_protocol_init(void) {
  */
 static int process_pase_message(const matter_message_t *msg,
                                const char *source_ip, uint16_t source_port) {
-    // For now, PASE handling is deferred
-    // In a full implementation, this would handle:
-    // - PBKDF_PARAM_REQUEST/RESPONSE
-    // - PASE_PAKE1/PAKE2/PAKE3
-    (void)msg;
-    (void)source_ip;
-    (void)source_port;
+    uint8_t response_payload[1024];
+    size_t response_len;
+    uint8_t session_id;
+    
+    // Handle PASE message through commissioning system
+    int result = commissioning_handle_pase_message(msg->protocol_opcode,
+                                                   msg->payload, msg->payload_length,
+                                                   response_payload, sizeof(response_payload),
+                                                   &response_len, &session_id);
+    
+    if (result < 0) {
+        return -1; // Error
+    }
+    
+    if (result == 1) {
+        // PASE completed successfully, session established
+        printf("Matter Protocol: PASE commissioning completed\n");
+    }
+    
+    // Send response if we have one
+    if (response_len > 0) {
+        // Determine response opcode based on request
+        uint8_t response_opcode = msg->protocol_opcode + 1; // Response is typically request + 1
+        
+        return matter_protocol_send(source_ip, source_port,
+                                   PROTOCOL_SECURE_CHANNEL,
+                                   response_opcode,
+                                   response_payload, response_len);
+    }
+    
     return 0;
 }
 
@@ -262,6 +288,25 @@ int matter_protocol_send(const char *dest_ip, uint16_t dest_port,
 }
 
 /**
+ * Start commissioning mode
+ * Enables device for commissioning with the given PIN
+ */
+int matter_protocol_start_commissioning(const char *setup_pin, uint16_t discriminator) {
+    if (!initialized) {
+        return -1;
+    }
+    
+    return commissioning_start(setup_pin, discriminator);
+}
+
+/**
+ * Check if device is commissioned
+ */
+bool matter_protocol_is_commissioned(void) {
+    return commissioning_is_commissioned();
+}
+
+/**
  * Deinitialize Matter protocol stack
  */
 void matter_protocol_deinit(void) {
@@ -270,6 +315,7 @@ void matter_protocol_deinit(void) {
     }
     
     // Clean up in reverse order
+    commissioning_deinit();
     udp_transport_deinit();
     
     initialized = false;
