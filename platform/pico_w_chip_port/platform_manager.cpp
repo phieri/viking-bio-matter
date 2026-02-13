@@ -9,12 +9,17 @@
 #include "pico/stdlib.h"
 #include "mbedtls/sha256.h"
 #include "matter_attributes.h"
+#include "network_adapter.h"
 
 // Forward declarations of adapter functions
 extern "C" {
 int network_adapter_init(void);
 int network_adapter_connect(const char *ssid, const char *password);
+int network_adapter_save_and_connect(const char *ssid, const char *password);
+int network_adapter_start_softap(void);
+int network_adapter_stop_softap(void);
 bool network_adapter_is_connected(void);
+bool network_adapter_is_softap_mode(void);
 void network_adapter_get_ip_address(char *buffer, size_t buffer_len);
 void network_adapter_get_mac_address(uint8_t *mac_addr);
 void network_adapter_deinit(void);
@@ -176,7 +181,38 @@ int platform_manager_connect_wifi(const char *ssid, const char *password) {
         return -1;
     }
 
-    return network_adapter_connect(ssid, password);
+    // If credentials provided, save and connect
+    if (ssid && password) {
+        return network_adapter_save_and_connect(ssid, password);
+    }
+    
+    // Otherwise try to connect with stored credentials
+    return network_adapter_connect(NULL, NULL);
+}
+
+int platform_manager_start_commissioning_mode(void) {
+    if (!platform_initialized) {
+        printf("ERROR: Platform not initialized\n");
+        return -1;
+    }
+    
+    printf("\n");
+    printf("====================================\n");
+    printf("  Starting Commissioning Mode\n");
+    printf("====================================\n");
+    
+    // Start SoftAP for WiFi provisioning
+    if (network_adapter_start_softap() != 0) {
+        printf("ERROR: Failed to start SoftAP\n");
+        return -1;
+    }
+    
+    printf("\nDevice is now in commissioning mode.\n");
+    printf("Connect to the WiFi network and use\n");
+    printf("a Matter controller to provision.\n");
+    printf("====================================\n\n");
+    
+    return 0;
 }
 
 bool platform_manager_is_wifi_connected(void) {

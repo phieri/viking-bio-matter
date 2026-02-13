@@ -11,6 +11,11 @@
 #include "matter_minimal/interaction/subscription_bridge.h"
 #include "matter_minimal/matter_protocol.h"
 
+// Forward declare storage function
+extern "C" {
+    int storage_adapter_has_wifi_credentials(void);
+}
+
 // Matter attributes storage
 static matter_attributes_t attributes = {
     .flame_state = false,
@@ -45,14 +50,29 @@ void matter_bridge_init(void) {
         return;
     }
     
-    // Connect to WiFi
-    printf("Connecting to WiFi...\n");
-    if (platform_manager_connect_wifi(NULL, NULL) != 0) {
-        printf("ERROR: Failed to connect to WiFi\n");
-        printf("Update WiFi credentials in platform/pico_w_chip_port/network_adapter.cpp\n");
-        printf("Device will continue without network connectivity\n");
-        initialized = false;
-        return;
+    // Check for WiFi credentials in storage
+    bool has_credentials = storage_adapter_has_wifi_credentials();
+    
+    if (has_credentials) {
+        // Try to connect with stored credentials
+        printf("WiFi credentials found in flash. Connecting...\n");
+        if (platform_manager_connect_wifi(NULL, NULL) == 0) {
+            printf("Successfully connected to WiFi using stored credentials\n");
+        } else {
+            printf("WARNING: Failed to connect with stored credentials\n");
+            printf("Starting commissioning mode for WiFi setup...\n");
+            platform_manager_start_commissioning_mode();
+        }
+    } else {
+        // No credentials - start commissioning mode
+        printf("No WiFi credentials found in storage\n");
+        printf("Starting commissioning mode for WiFi setup...\n");
+        if (platform_manager_start_commissioning_mode() != 0) {
+            printf("ERROR: Failed to start commissioning mode\n");
+            printf("Device will continue without network connectivity\n");
+            initialized = false;
+            return;
+        }
     }
     
     // Print commissioning information
