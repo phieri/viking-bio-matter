@@ -23,11 +23,22 @@ int platform_manager_init(void);
 
 /**
  * Connect to WiFi network
- * @param ssid WiFi SSID (NULL to use default from network_adapter.cpp)
- * @param password WiFi password (NULL to use default from network_adapter.cpp)
+ * If ssid and password are NULL, tries to load from storage
+ * If ssid and password are provided, saves them and connects
+ * 
+ * @param ssid WiFi SSID (NULL to load from storage or use default)
+ * @param password WiFi password (NULL to load from storage or use default)
  * @return 0 on success, -1 on failure
  */
 int platform_manager_connect_wifi(const char *ssid, const char *password);
+
+/**
+ * Start commissioning mode (SoftAP)
+ * Enables WiFi access point for provisioning
+ * 
+ * @return 0 on success, -1 on error
+ */
+int platform_manager_start_commissioning_mode(void);
 
 /**
  * Check if WiFi is connected
