@@ -40,6 +40,16 @@ static bool storage_initialized = false;
 
 extern "C" {
 
+// Helper function to construct filesystem path from key
+static void construct_filename(const char *key, char *filename, size_t filename_size) {
+    if (key[0] != '/') {
+        snprintf(filename, filename_size, "/%s", key);
+    } else {
+        strncpy(filename, key, filename_size - 1);
+        filename[filename_size - 1] = '\0';
+    }
+}
+
 int storage_adapter_init(void) {
     if (storage_initialized) {
         return 0;
@@ -108,12 +118,7 @@ int storage_adapter_write(const char *key, const uint8_t *value, size_t value_le
     
     // Construct filename (prefix with / for LittleFS)
     char filename[LFS_NAME_MAX + 1];
-    if (key[0] != '/') {
-        snprintf(filename, sizeof(filename), "/%s", key);
-    } else {
-        strncpy(filename, key, sizeof(filename) - 1);
-        filename[sizeof(filename) - 1] = '\0';
-    }
+    construct_filename(key, filename, sizeof(filename));
 
     // Open file for writing (create if doesn't exist, truncate if exists)
     lfs_file_t file;
@@ -125,8 +130,12 @@ int storage_adapter_write(const char *key, const uint8_t *value, size_t value_le
 
     // Write data
     lfs_ssize_t written = lfs_file_write(&lfs, &file, value, value_len);
-    if (written < 0 || (size_t)written != value_len) {
+    if (written < 0) {
         printf("ERROR: Failed to write data (error %d)\n", (int)written);
+        lfs_file_close(&lfs, &file);
+        return -1;
+    } else if ((size_t)written != value_len) {
+        printf("ERROR: Incomplete write (wrote %d of %zu bytes)\n", (int)written, value_len);
         lfs_file_close(&lfs, &file);
         return -1;
     }
@@ -154,12 +163,7 @@ int storage_adapter_read(const char *key, uint8_t *value, size_t max_value_len, 
 
     // Construct filename (prefix with / for LittleFS)
     char filename[LFS_NAME_MAX + 1];
-    if (key[0] != '/') {
-        snprintf(filename, sizeof(filename), "/%s", key);
-    } else {
-        strncpy(filename, key, sizeof(filename) - 1);
-        filename[sizeof(filename) - 1] = '\0';
-    }
+    construct_filename(key, filename, sizeof(filename));
 
     // Open file for reading
     lfs_file_t file;
@@ -210,12 +214,7 @@ int storage_adapter_delete(const char *key) {
     
     // Construct filename (prefix with / for LittleFS)
     char filename[LFS_NAME_MAX + 1];
-    if (key[0] != '/') {
-        snprintf(filename, sizeof(filename), "/%s", key);
-    } else {
-        strncpy(filename, key, sizeof(filename) - 1);
-        filename[sizeof(filename) - 1] = '\0';
-    }
+    construct_filename(key, filename, sizeof(filename));
 
     // Remove file
     int err = lfs_remove(&lfs, filename);

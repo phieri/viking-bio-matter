@@ -27,7 +27,7 @@ This directory contains test cases for the LittleFS-based storage adapter. These
    ```cmake
    set(SOURCES
        # ... existing sources ...
-       tests/storage/test_storage_adapter.c
+       tests/storage/test_storage_adapter.cpp
    )
    ```
 
