@@ -1,7 +1,7 @@
 /*
  * storage_adapter.cpp
  * Storage/NVM adapter for Matter fabric commissioning data
- * Uses Pico's flash memory for persistent storage
+ * Uses LittleFS on Pico's flash memory for persistent storage with wear leveling
  */
 
 #include <stdio.h>
@@ -10,25 +10,18 @@
 #include "hardware/flash.h"
 #include "hardware/sync.h"
 
+// Include mutex header for LittleFS thread safety
+#include "pico/mutex.h"
+
+#include "pico_lfs.h"
+
 // Storage configuration
 // Use last 256KB of flash for Matter storage (adjustable based on your needs)
 #define STORAGE_FLASH_OFFSET (PICO_FLASH_SIZE_BYTES - (256 * 1024))
 #define STORAGE_FLASH_SIZE (256 * 1024)
-#define STORAGE_SECTOR_SIZE FLASH_SECTOR_SIZE  // 4096 bytes
-#define STORAGE_PAGE_SIZE FLASH_PAGE_SIZE      // 256 bytes
-
-// Storage entry header
-typedef struct {
-    uint32_t magic;
-    uint16_t key_len;
-    uint16_t value_len;
-    char key[64];  // Max key length
-} storage_entry_t;
-
-#define STORAGE_MAGIC 0x4D545254  // "MTTR" in hex
 
 // WiFi credential storage keys
-#define WIFI_CREDENTIALS_KEY "wifi_credentials"
+#define WIFI_CREDENTIALS_KEY "/wifi_credentials"
 #define MAX_SSID_LENGTH 32
 #define MAX_PASSWORD_LENGTH 64
 
@@ -41,7 +34,8 @@ typedef struct {
     bool valid;
 } wifi_credentials_t;
 
-static const uint8_t *storage_flash_base = (const uint8_t *)(XIP_BASE + STORAGE_FLASH_OFFSET);
+static struct lfs_config *lfs_cfg = NULL;
+static lfs_t lfs;
 static bool storage_initialized = false;
 
 extern "C" {
@@ -51,7 +45,7 @@ int storage_adapter_init(void) {
         return 0;
     }
 
-    printf("Initializing flash storage at offset 0x%lx\n", STORAGE_FLASH_OFFSET);
+    printf("Initializing LittleFS storage at offset 0x%lx\n", STORAGE_FLASH_OFFSET);
     
     // Check if storage area is accessible
     if (STORAGE_FLASH_OFFSET + STORAGE_FLASH_SIZE > PICO_FLASH_SIZE_BYTES) {
@@ -59,8 +53,43 @@ int storage_adapter_init(void) {
         return -1;
     }
 
+    // Initialize LittleFS configuration
+    lfs_cfg = pico_lfs_init(STORAGE_FLASH_OFFSET, STORAGE_FLASH_SIZE);
+    if (!lfs_cfg) {
+        printf("ERROR: Failed to initialize LittleFS configuration\n");
+        return -1;
+    }
+
+    // Try to mount the filesystem
+    int err = lfs_mount(&lfs, lfs_cfg);
+    if (err != LFS_ERR_OK) {
+        printf("LittleFS not formatted, formatting...\n");
+        
+        // Format the filesystem
+        err = lfs_format(&lfs, lfs_cfg);
+        if (err != LFS_ERR_OK) {
+            printf("ERROR: Failed to format filesystem (error %d)\n", err);
+            pico_lfs_destroy(lfs_cfg);
+            lfs_cfg = NULL;
+            return -1;
+        }
+        
+        // Mount the newly formatted filesystem
+        err = lfs_mount(&lfs, lfs_cfg);
+        if (err != LFS_ERR_OK) {
+            printf("ERROR: Failed to mount new filesystem (error %d)\n", err);
+            pico_lfs_destroy(lfs_cfg);
+            lfs_cfg = NULL;
+            return -1;
+        }
+        
+        printf("LittleFS formatted and mounted successfully\n");
+    } else {
+        printf("LittleFS mounted successfully\n");
+    }
+
     storage_initialized = true;
-    printf("Flash storage initialized (%d KB)\n", STORAGE_FLASH_SIZE / 1024);
+    printf("Flash storage initialized (%d KB) with wear leveling\n", STORAGE_FLASH_SIZE / 1024);
     return 0;
 }
 
@@ -70,43 +99,45 @@ int storage_adapter_write(const char *key, const uint8_t *value, size_t value_le
     }
 
     size_t key_len = strlen(key);
-    if (key_len == 0 || key_len >= 64) {
+    if (key_len == 0 || key_len >= LFS_NAME_MAX) {
         printf("ERROR: Invalid key length\n");
         return -1;
     }
 
-    // For simplicity, we'll use a simple append-only log structure
-    // In production, you'd want a more sophisticated key-value store
-    // This is a minimal implementation for demonstration
-    
     printf("Storage write: key='%s', value_len=%zu\n", key, value_len);
     
-    // Disable interrupts during flash operations
-    uint32_t ints = save_and_disable_interrupts();
-    
-    // Calculate required space
-    size_t entry_size = sizeof(storage_entry_t) + value_len;
-    entry_size = (entry_size + STORAGE_PAGE_SIZE - 1) & ~(STORAGE_PAGE_SIZE - 1);
-    
-    // For this simple implementation, we'll write to a fixed sector
-    // A real implementation would manage free space and garbage collection
-    uint32_t target_offset = STORAGE_FLASH_OFFSET;
-    
-    // Prepare data buffer aligned to page size
-    uint8_t buffer[STORAGE_SECTOR_SIZE] = {0};
-    storage_entry_t *entry = (storage_entry_t *)buffer;
-    entry->magic = STORAGE_MAGIC;
-    entry->key_len = key_len;
-    entry->value_len = value_len;
-    strncpy(entry->key, key, sizeof(entry->key) - 1);
-    memcpy(buffer + sizeof(storage_entry_t), value, value_len);
-    
-    // Erase and write sector
-    flash_range_erase(target_offset, STORAGE_SECTOR_SIZE);
-    flash_range_program(target_offset, buffer, STORAGE_SECTOR_SIZE);
-    
-    restore_interrupts(ints);
-    
+    // Construct filename (prefix with / for LittleFS)
+    char filename[LFS_NAME_MAX + 1];
+    if (key[0] != '/') {
+        snprintf(filename, sizeof(filename), "/%s", key);
+    } else {
+        strncpy(filename, key, sizeof(filename) - 1);
+        filename[sizeof(filename) - 1] = '\0';
+    }
+
+    // Open file for writing (create if doesn't exist, truncate if exists)
+    lfs_file_t file;
+    int err = lfs_file_open(&lfs, &file, filename, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC);
+    if (err < 0) {
+        printf("ERROR: Failed to open file for writing (error %d)\n", err);
+        return -1;
+    }
+
+    // Write data
+    lfs_ssize_t written = lfs_file_write(&lfs, &file, value, value_len);
+    if (written < 0 || (size_t)written != value_len) {
+        printf("ERROR: Failed to write data (error %d)\n", (int)written);
+        lfs_file_close(&lfs, &file);
+        return -1;
+    }
+
+    // Close file
+    err = lfs_file_close(&lfs, &file);
+    if (err < 0) {
+        printf("ERROR: Failed to close file (error %d)\n", err);
+        return -1;
+    }
+
     printf("Storage write complete\n");
     return 0;
 }
@@ -121,40 +152,53 @@ int storage_adapter_read(const char *key, uint8_t *value, size_t max_value_len, 
         return -1;
     }
 
-    // Scan storage for the key
-    // This is a simple linear search - production code would use indexing
-    const uint8_t *scan_ptr = storage_flash_base;
-    const uint8_t *scan_end = storage_flash_base + STORAGE_FLASH_SIZE;
-    
-    while (scan_ptr < scan_end) {
-        const storage_entry_t *entry = (const storage_entry_t *)scan_ptr;
-        
-        if (entry->magic == STORAGE_MAGIC) {
-            if (entry->key_len == key_len && 
-                strncmp(entry->key, key, key_len) == 0) {
-                // Found matching key
-                size_t copy_len = entry->value_len;
-                if (copy_len > max_value_len) {
-                    copy_len = max_value_len;
-                }
-                
-                const uint8_t *value_ptr = scan_ptr + sizeof(storage_entry_t);
-                memcpy(value, value_ptr, copy_len);
-                
-                if (actual_len) {
-                    *actual_len = entry->value_len;
-                }
-                
-                printf("Storage read: key='%s', value_len=%d\n", key, entry->value_len);
-                return 0;
-            }
-        }
-        
-        scan_ptr += STORAGE_SECTOR_SIZE;
+    // Construct filename (prefix with / for LittleFS)
+    char filename[LFS_NAME_MAX + 1];
+    if (key[0] != '/') {
+        snprintf(filename, sizeof(filename), "/%s", key);
+    } else {
+        strncpy(filename, key, sizeof(filename) - 1);
+        filename[sizeof(filename) - 1] = '\0';
     }
-    
-    // Key not found
-    return -1;
+
+    // Open file for reading
+    lfs_file_t file;
+    int err = lfs_file_open(&lfs, &file, filename, LFS_O_RDONLY);
+    if (err < 0) {
+        // File doesn't exist
+        return -1;
+    }
+
+    // Get file size
+    lfs_soff_t file_size = lfs_file_size(&lfs, &file);
+    if (file_size < 0) {
+        printf("ERROR: Failed to get file size (error %d)\n", (int)file_size);
+        lfs_file_close(&lfs, &file);
+        return -1;
+    }
+
+    // Read data
+    size_t copy_len = (size_t)file_size;
+    if (copy_len > max_value_len) {
+        copy_len = max_value_len;
+    }
+
+    lfs_ssize_t bytes_read = lfs_file_read(&lfs, &file, value, copy_len);
+    if (bytes_read < 0) {
+        printf("ERROR: Failed to read data (error %d)\n", (int)bytes_read);
+        lfs_file_close(&lfs, &file);
+        return -1;
+    }
+
+    // Close file
+    lfs_file_close(&lfs, &file);
+
+    if (actual_len) {
+        *actual_len = (size_t)file_size;
+    }
+
+    printf("Storage read: key='%s', value_len=%zu\n", key, (size_t)file_size);
+    return 0;
 }
 
 int storage_adapter_delete(const char *key) {
@@ -164,10 +208,22 @@ int storage_adapter_delete(const char *key) {
 
     printf("Storage delete: key='%s'\n", key);
     
-    // For this simple implementation, we'll just mark as deleted
-    // by erasing the sector containing the key
-    // A real implementation would use tombstones and garbage collection
-    
+    // Construct filename (prefix with / for LittleFS)
+    char filename[LFS_NAME_MAX + 1];
+    if (key[0] != '/') {
+        snprintf(filename, sizeof(filename), "/%s", key);
+    } else {
+        strncpy(filename, key, sizeof(filename) - 1);
+        filename[sizeof(filename) - 1] = '\0';
+    }
+
+    // Remove file
+    int err = lfs_remove(&lfs, filename);
+    if (err < 0 && err != LFS_ERR_NOENT) {
+        printf("ERROR: Failed to delete file (error %d)\n", err);
+        return -1;
+    }
+
     return 0;
 }
 
@@ -178,12 +234,24 @@ int storage_adapter_clear_all(void) {
 
     printf("Clearing all storage...\n");
     
-    uint32_t ints = save_and_disable_interrupts();
+    // Unmount filesystem
+    lfs_unmount(&lfs);
     
-    // Erase entire storage area
-    flash_range_erase(STORAGE_FLASH_OFFSET, STORAGE_FLASH_SIZE);
+    // Format (this erases everything)
+    int err = lfs_format(&lfs, lfs_cfg);
+    if (err != LFS_ERR_OK) {
+        printf("ERROR: Failed to format filesystem (error %d)\n", err);
+        // Try to remount the old filesystem
+        lfs_mount(&lfs, lfs_cfg);
+        return -1;
+    }
     
-    restore_interrupts(ints);
+    // Remount
+    err = lfs_mount(&lfs, lfs_cfg);
+    if (err != LFS_ERR_OK) {
+        printf("ERROR: Failed to remount filesystem (error %d)\n", err);
+        return -1;
+    }
     
     printf("Storage cleared\n");
     return 0;
