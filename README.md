@@ -95,13 +95,7 @@ F:1,S:50,T:75\n
 
 ### Build Steps
 
-1. **Configure WiFi credentials** in `platform/pico_w_chip_port/network_adapter.cpp`:
-   ```cpp
-   #define WIFI_SSID "YourNetworkName"
-   #define WIFI_PASSWORD "YourPassword"
-   ```
-
-2. **Build the firmware:**
+1. **Build the firmware:**
    ```bash
    mkdir build
    cd build
@@ -110,13 +104,69 @@ F:1,S:50,T:75\n
    ```
 
 This generates Matter-enabled firmware that:
-- Connects to WiFi on boot
+- **Automatically checks for stored WiFi credentials on boot**
+- **Falls back to SoftAP mode if no credentials are found**
+- **Connects to WiFi using stored credentials if available**
 - Initializes the Matter stack
 - Prints commissioning QR code and PIN
 - Exposes Viking Bio data as Matter attributes
 - Can be commissioned by Matter controllers (e.g., chip-tool)
 
 See [platform/pico_w_chip_port/README.md](platform/pico_w_chip_port/README.md) for detailed Matter configuration and commissioning instructions.
+
+### WiFi Commissioning Flow
+
+The device supports two WiFi commissioning modes:
+
+#### Mode 1: SoftAP Commissioning (Default)
+When the device boots without stored WiFi credentials, it automatically starts in SoftAP mode:
+
+1. **Device boots in SoftAP mode**
+   - SSID: `VikingBio-Setup`
+   - Password: `vikingbio2026`
+   - Device IP: `192.168.4.1`
+
+2. **Connect to the SoftAP**
+   ```bash
+   # On your commissioning device (laptop/phone):
+   # - Connect to WiFi: VikingBio-Setup
+   # - Password: vikingbio2026
+   # - Configure static IP: 192.168.4.2, Netmask: 255.255.255.0
+   ```
+
+3. **Commission via Matter**
+   ```bash
+   # Use chip-tool or other Matter controller
+   # The controller will send WiFi credentials via Matter commands
+   chip-tool networkcommissioning add-or-update-wifi-network hex:YOUR_SSID hex:YOUR_PASSWORD 1 0
+   chip-tool networkcommissioning connect-network hex:YOUR_SSID 1 0
+   ```
+
+4. **Device automatically connects to WiFi**
+   - Credentials are saved to flash
+   - Device stops SoftAP mode
+   - Device connects to your WiFi network
+   - Continues Matter commissioning on the WiFi network
+
+#### Mode 2: Pre-Configured WiFi (Optional)
+If you want to pre-configure WiFi credentials via flash storage:
+
+1. Use the storage API to save credentials during build/flash
+2. Device will automatically connect on boot
+3. No SoftAP mode needed
+
+### Building with Pre-configured WiFi (Legacy)
+
+**Note**: This method is deprecated. Use SoftAP commissioning instead.
+
+If you absolutely need to hardcode WiFi credentials for testing:
+
+1. **Configure WiFi credentials** by calling the storage API programmatically:
+   ```c
+   storage_adapter_save_wifi_credentials("YourSSID", "YourPassword");
+   ```
+
+2. **Build the firmware** as shown above.
 
 ### Flashing the Firmware
 
@@ -162,9 +212,32 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
    python3 tools/derive_pin.py 28:CD:C1:00:00:01
    ```
 
-5. Commission the device using chip-tool with the **printed PIN**:
+5. **Commission the device using Matter controller:**
+   
+   **Option A: Via SoftAP (Recommended - No credentials needed)**
    ```bash
-   # Use the PIN from your device's serial output
+   # Step 1: Connect your computer to the SoftAP
+   # WiFi SSID: VikingBio-Setup
+   # Password: vikingbio2026
+   # Static IP: 192.168.4.2 (device is at 192.168.4.1)
+   
+   # Step 2: Convert your WiFi credentials to hex
+   echo -n "MySSID" | xxd -p    # Example output: 4d79535349441234
+   echo -n "MyPassword" | xxd -p # Example output: 4d7950617373776f7264
+   
+   # Step 3: Provision WiFi credentials via Matter
+   chip-tool networkcommissioning add-or-update-wifi-network hex:YOUR_SSID_HEX hex:YOUR_PASSWORD_HEX 1 0
+   
+   # Step 4: Connect to the WiFi network
+   chip-tool networkcommissioning connect-network hex:YOUR_SSID_HEX 1 0
+   
+   # Step 5: Complete Matter commissioning (device now on your WiFi)
+   chip-tool pairing onnetwork 1 24890840
+   ```
+   
+   **Option B: Direct WiFi (If credentials pre-stored)**
+   ```bash
+   # Use the printed PIN from device's serial output
    chip-tool pairing ble-wifi 1 MySSID MyPassword 24890840 3840
    ```
 
@@ -184,6 +257,20 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
 - **OnOff (0x0006)**: Flame detected state
 - **LevelControl (0x0008)**: Fan speed (0-100%)
 - **TemperatureMeasurement (0x0402)**: Burner temperature
+- **NetworkCommissioning (0x0031)**: WiFi network provisioning
+
+**NetworkCommissioning Commands:**
+```bash
+# Add or update WiFi credentials
+chip-tool networkcommissioning add-or-update-wifi-network hex:SSID_HEX hex:PASSWORD_HEX 1 0
+
+# Connect to WiFi network
+chip-tool networkcommissioning connect-network hex:SSID_HEX 1 0
+
+# Read network status
+chip-tool networkcommissioning read last-networking-status 1 0
+chip-tool networkcommissioning read last-network-id 1 0
+```
 
 ⚠️ **Security Note:** 
 - The Setup PIN is **unique per device**, derived from the device MAC address using SHA-256 with product salt `VIKINGBIO-2026`.
@@ -191,6 +278,89 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
 - The PIN derivation algorithm is documented in `tools/derive_pin.py` and can be computed offline from a printed MAC address.
 
 For detailed Matter configuration and troubleshooting, see [platform/pico_w_chip_port/README.md](platform/pico_w_chip_port/README.md).
+
+## Troubleshooting
+
+### WiFi Commissioning Issues
+
+**Problem: Device stuck in SoftAP mode**
+- **Cause**: WiFi credentials not saved or connection failed
+- **Solution**:
+  1. Verify credentials are correct (case-sensitive)
+  2. Check WiFi signal strength
+  3. Try clearing stored credentials: Power cycle device, it will restart in SoftAP mode
+  4. Check serial output for error messages
+
+**Problem: Cannot connect to SoftAP**
+- **Cause**: Static IP not configured correctly
+- **Solution**:
+  1. Manually configure network:
+     - IP: 192.168.4.2
+     - Netmask: 255.255.255.0
+     - Gateway: 192.168.4.1
+  2. Verify WiFi password: `vikingbio2026`
+  3. Check that device is actually in SoftAP mode (check serial output)
+
+**Problem: Matter commands fail over SoftAP**
+- **Cause**: Network connectivity or Matter protocol issues
+- **Solution**:
+  1. Verify you can ping 192.168.4.1 from your commissioning device
+  2. Ensure chip-tool is configured for IPv4
+  3. Check firewall settings
+  4. Try using the full hex format for SSID/password
+
+**Problem: Device doesn't connect after provisioning**
+- **Cause**: Credentials saved but connection failed
+- **Solution**:
+  1. Check serial output for connection error codes
+  2. Verify WiFi network is 2.4GHz (Pico W doesn't support 5GHz)
+  3. Ensure WiFi uses WPA2-PSK authentication
+  4. Try manually connecting: Use Option B with hardcoded credentials for testing
+
+**Problem: Lost WiFi credentials, need to re-provision**
+- **Solution**:
+  1. Clear flash storage by re-flashing firmware
+  2. Or: Power cycle - device will auto-start SoftAP if credentials fail
+  3. Serial command (if implemented): Send reset command via USB serial
+
+### Converting SSID/Password to Hex
+
+```bash
+# Using xxd (Linux/Mac)
+echo -n "MyWiFiNetwork" | xxd -p
+
+# Using Python
+python3 -c "import sys; print(sys.argv[1].encode('utf-8').hex())" "MyWiFiNetwork"
+
+# Using online tools
+# Search for "text to hex converter"
+```
+
+### Checking Device Status
+
+```bash
+# Connect to serial monitor
+screen /dev/ttyACM0 115200
+
+# Look for these status messages:
+# - "WiFi credentials found in flash" - Has stored credentials
+# - "Starting SoftAP mode" - In provisioning mode
+# - "WiFi connected successfully" - Connected to network
+# - "IP Address: x.x.x.x" - Device network address
+```
+
+### Matter Commissioning Debug
+
+```bash
+# Enable verbose logging in chip-tool
+chip-tool --trace_decode 1 networkcommissioning add-or-update-wifi-network ...
+
+# Check if device is discoverable
+dns-sd -B _matterc._udp
+
+# Verify device is commissioned
+chip-tool pairing code 1 <setup-code>
+```
 
 ## Development
 
