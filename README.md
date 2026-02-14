@@ -19,24 +19,38 @@ A Matter (CHIP) bridge for the Viking Bio 20 burner, built for Raspberry Pi Pico
 
 ## Wiring
 
-Connect Viking Bio 20 serial to Pico W. **Important**: Use level shifter if Viking Bio outputs 5V TTL (see note below).
+Connect the Viking Bio 20 TTL serial output to the Raspberry Pi Pico W:
+
+```mermaid
+graph LR
+    subgraph VB[Viking Bio 20 Burner Connector]
+        VB_TX["Pin 2: TX - Serial Out"]
+        VB_GND["Pin 3: GND"]
+    end
+    
+    LEVEL_SHIFTER[Level Shifter<br/>or<br/>Voltage Divider<br/>5V → 3.3V]
+    
+    subgraph PICO[Raspberry Pi Pico W]
+        PICO_GP1["Pin 2: GP1<br/>UART0 RX"]
+        PICO_GND["Pin 3: GND"]
+        PICO_USB[USB Port]
+    end
+    
+    VB_TX -->|5V TTL| LEVEL_SHIFTER
+    LEVEL_SHIFTER -->|3.3V| PICO_GP1
+    VB_GND --> PICO_GND
+    PICO_USB -.->|Power & Debug| PICO
+    
+    style VB fill:#e1f5ff
+    style PICO fill:#ffe1f5
+    style LEVEL_SHIFTER fill:#FFB6C1
+    style VB_TX fill:#90EE90
+    style PICO_GP1 fill:#90EE90
+    style VB_GND fill:#FFD700
+    style PICO_GND fill:#FFD700
 
 ```
-Viking Bio 20          Level Shifter          Raspberry Pi Pico W
-Connector              (if needed)            
-                                              ┌─────────────┐
-  TX ──────────────────► HV ──► LV ──────────┤ Pin 2 (GP1) │ UART0 RX
-                                              ├─────────────┤
- GND ───────────────────────────────────────►│ Pin 3 (GND) │
-                                              └─────────────┘
-                                              USB (bottom) for power
-
-Pin Reference:
-  Pin 2  = GP1 (UART0 RX) - Serial input from burner
-  Pin 3  = GND - Ground (any GND pin works: 3, 8, 13, 18, 23, 28, 33, 38)
-```
-
-**Note**: Pico W expects 3.3V logic. If Viking Bio outputs 5V, use a level shifter or voltage divider (2kΩ + 1kΩ resistors).
+**Note**: The Pico W RX pin (GP1) expects 3.3V logic levels. The Viking Bio 20's TTL output voltage should be verified before connecting directly. If it outputs 5V TTL (which is common), a level shifter (e.g., bi-directional logic level converter) or voltage divider (two resistors: 2kΩ from TX to RX, 1kΩ from RX to GND) is required for safe voltage conversion. The diagram above shows the configuration with level shifting, which is the recommended safe approach.
 
 ## Serial Protocol
 
