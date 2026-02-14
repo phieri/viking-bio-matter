@@ -19,7 +19,7 @@ A Matter bridge for the [Viking Bio 20](https://varmebaronen.se/produkter/single
 
 ## Wiring
 
-Connect the Viking Bio 20 TTL serial output to the Raspberry Pi Pico W:
+Connect the Viking Bio 20 TTL serial output to the Raspberry Pi Pico W by RJ12 cable:
 
 ```mermaid
 graph LR
@@ -527,9 +527,8 @@ Matter: LevelControl cluster updated - Fan speed 80%
 
 1. **No OTA support**: Firmware updates require physical USB access (hold BOOTSEL button and copy .uf2 file)
 2. **WiFi only**: No Thread or Ethernet support currently
-3. **Storage with wear leveling**: LittleFS-based key-value store with automatic wear leveling for extended flash lifespan
-4. **Limited fabrics**: Maximum 5 Matter fabrics due to memory constraints (264KB RAM on RP2040)
-5. **Crypto limitations**: DRBG and RNG functions are stubbed due to Pico SDK 1.5.1 mbedTLS bugs (SHA256 and AES work correctly)
+3. **Limited fabrics**: Maximum 5 Matter fabrics due to memory constraints (264KB RAM on RP2040)
+4. **Crypto limitations**: DRBG and RNG functions are stubbed due to Pico SDK 1.5.1 mbedTLS bugs (SHA256 and AES work correctly)
 
 ## Security Considerations
 
