@@ -23,23 +23,22 @@ Connect the Viking Bio 20 TTL serial output to the Raspberry Pi Pico W:
 
 ```mermaid
 graph LR
-    subgraph VB[Viking Bio 20 Burner Connector]
-        VB_TX["Pin 2: TX - Serial Out"]
+    subgraph VB["Viking Bio 20<br/>Burner Connector"]
+        VB_TX["Pin 2: TX<br/>Serial Out"]
         VB_GND["Pin 3: GND"]
     end
     
-    LEVEL_SHIFTER[Level Shifter<br/>or<br/>Voltage Divider<br/>5V → 3.3V]
+    LEVEL_SHIFTER["Level Shifter<br/>or Voltage Divider<br/>5V → 3.3V"]
     
-    subgraph PICO[Raspberry Pi Pico W]
+    subgraph PICO["Raspberry Pi<br/>Pico W"]
         PICO_GP1["Pin 2: GP1<br/>UART0 RX"]
         PICO_GND["Pin 3: GND"]
-        PICO_USB[USB Port]
+        PICO_USB["USB Port<br/>(Power & Debug)"]
     end
     
     VB_TX -->|5V TTL| LEVEL_SHIFTER
     LEVEL_SHIFTER -->|3.3V| PICO_GP1
     VB_GND --> PICO_GND
-    PICO_USB -.->|Power & Debug| PICO
     
     style VB fill:#e1f5ff
     style PICO fill:#ffe1f5
