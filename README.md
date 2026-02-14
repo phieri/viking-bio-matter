@@ -1,6 +1,6 @@
 # Viking Bio Matter Bridge
 
-A Matter bridge for the [Viking Bio 20](https://varmebaronen.se/produkter/single/p-15/viking-bio-pelletsbrannare) burner, built for [Raspberry Pi Pico W](https://www.raspberrypi.com/products/raspberry-pi-zero-w/). This firmware reads TTL serial data from the burner and exposes flame status and fan speed through the Matter protocol.
+A Matter bridge for the [Viking Bio 20](https://varmebaronen.se/produkter/single/p-15/viking-bio-pelletsbrannare) burner, built for [Raspberry Pi Pico W](https://www.raspberrypi.com/products/raspberry-pi-pico/). This firmware reads TTL serial data from the burner and exposes flame status and fan speed through the Matter protocol.
 
 ## Features
 
@@ -23,20 +23,20 @@ Connect the Viking Bio 20 TTL serial output to the Raspberry Pi Pico W:
 
 ```mermaid
 graph LR
-    subgraph VB["Viking Bio 20<br/>Burner Connector"]
-        VB_TX["Pin 2: TX<br/>Serial Out"]
+    subgraph VB["Viking Bio 20 burner connector"]
+        VB_TX["Pin 2: TX Serial Out"]
         VB_GND["Pin 3: GND"]
     end
     
-    LEVEL_SHIFTER["Level Shifter<br/>or Voltage Divider<br/>5&nbsp;V → 3,3&nbsp;V"]
+    LEVEL_SHIFTER["Level Shifter or Voltage Divider from 5&nbsp;V to 3,3&nbsp;V"]
     
     subgraph PICO["Raspberry Pi<br/>Pico W"]
-        PICO_GP1["Pin 2: GP1<br/>UART0 RX"]
+        PICO_GP1["Pin 2: GP1 UART0 RX"]
         PICO_GND["Pin 3: GND"]
         PICO_USB["USB Port<br/>(Power & Debug)"]
     end
     
-    VB_TX -->|5V TTL| LEVEL_SHIFTER
+    VB_TX -->|5&nbsp;V TTL| LEVEL_SHIFTER
     LEVEL_SHIFTER -->|3,3&nbsp;V| PICO_GP1
     VB_GND --> PICO_GND
     
