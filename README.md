@@ -68,7 +68,7 @@ The firmware supports two serial data formats:
 F:1,S:50,T:75\n
 ```
 - `F`: Flame status (0=off, 1=on)
-- `S`: Fan speed (0-100%)
+- `S`: Fan speed (0-100&nbsp;%)
 - `T`: Temperature (°C)
 
 ## Building Firmware

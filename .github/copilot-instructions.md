@@ -90,7 +90,7 @@ cmake .. && make -j$(nproc)
 2. **Interrupt serial**: hardware_sync lib (save/restore_interrupts), circular buffer
 3. **PIN per device**: SHA256(MAC||"VIKINGBIO-2026")%100000000, `tools/derive_pin.py`
 4. **No OTA**: Physical USB only (BOOTSEL + copy .uf2)
-5. **Flash**: Last 256KB for Matter fabrics, simple key-value, no wear leveling
+5. **Flash**: Last 256KB for Matter fabrics, simple key-value, with wear leveling
 6. **RAM limits**: 264KB → max 5 fabrics. mbedTLS DRBG/RNG stubbed (SDK 1.5.1 bugs), SHA256/AES work.
 7. **Optimizations**: `-O3 -ffast-math -fno-signed-zeros -fno-trapping-math -funroll-loops`, LTO off (SDK wrapper issues), `serial_handler_data_available()` inlined, `viking_bio_parse_data()` `__attribute__((hot))`
 8. **Known TODOs**: crypto_adapter.cpp DRBG/RNG (documented SDK bug workaround) - do NOT remove
@@ -123,7 +123,7 @@ export PICO_SDK_PATH=$(pwd)/pico-sdk && rm -rf build && mkdir build && cd build 
 
 **Components**: serial_handler.c (interrupt RX), viking_bio_protocol.c (binary/text parser), matter_bridge.cpp (3 clusters), main.c (coordinator), platform port (network/storage/crypto/manager)
 
-**Limitations**: No OTA, WiFi only (no Thread/Ethernet), simple storage (no wear leveling), max 5 fabrics (RAM), test discriminator 3840, DRBG/RNG stubbed
+**Limitations**: No OTA, WiFi only (no Thread/Ethernet), TinyFS storage (for wear leveling), max 5 fabrics (RAM), test discriminator 3840, DRBG/RNG stubbed
 
 ## Trust & Verify
 
