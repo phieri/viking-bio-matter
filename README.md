@@ -1,12 +1,12 @@
 # Viking Bio Matter Bridge
 
-A Matter (CHIP) bridge for the Viking Bio 20 burner, built for Raspberry Pi Pico W. This firmware reads TTL serial data from the burner and exposes flame status and fan speed through the Matter protocol.
+A Matter bridge for the [Viking Bio 20](https://varmebaronen.se/produkter/single/p-15/viking-bio-pelletsbrannare) burner, built for [Raspberry Pi Pico W](https://www.raspberrypi.com/products/raspberry-pi-zero-w/). This firmware reads TTL serial data from the burner and exposes flame status and fan speed through the Matter protocol.
 
 ## Features
 
-- **Serial Communication**: Reads TTL serial data at 9600 baud from Viking Bio 20 burner
+- **Serial Communication**: Reads TTL serial data at 9600&nbsp;baud from Viking Bio 20 burner
 - **Flame Detection**: Reports real-time flame status
-- **Fan Speed Monitoring**: Reports current fan speed (0-100%)
+- **Fan Speed Monitoring**: Reports current fan speed (0-100&nbsp;%)
 - **Temperature Monitoring**: Reports burner temperature
 - **Matter Bridge**: Exposes burner data through Matter protocol over WiFi
 - **WiFi Connectivity**: Connects to your local network for Matter communication
@@ -28,7 +28,7 @@ graph LR
         VB_GND["Pin 3: GND"]
     end
     
-    LEVEL_SHIFTER["Level Shifter<br/>or Voltage Divider<br/>5V → 3.3V"]
+    LEVEL_SHIFTER["Level Shifter<br/>or Voltage Divider<br/>5&nbsp;V → 3,3&nbsp;V"]
     
     subgraph PICO["Raspberry Pi<br/>Pico W"]
         PICO_GP1["Pin 2: GP1<br/>UART0 RX"]
@@ -37,7 +37,7 @@ graph LR
     end
     
     VB_TX -->|5V TTL| LEVEL_SHIFTER
-    LEVEL_SHIFTER -->|3.3V| PICO_GP1
+    LEVEL_SHIFTER -->|3,3&nbsp;V| PICO_GP1
     VB_GND --> PICO_GND
     
     style VB fill:#e1f5ff
@@ -49,7 +49,7 @@ graph LR
     style PICO_GND fill:#FFD700
 
 ```
-**Note**: The Pico W RX pin (GP1) expects 3.3V logic levels. The Viking Bio 20's TTL output voltage should be verified before connecting directly. If it outputs 5V TTL (which is common), a level shifter (e.g., bi-directional logic level converter) or voltage divider (two resistors: 2kΩ from TX to RX, 1kΩ from RX to GND) is required for safe voltage conversion. The diagram above shows the configuration with level shifting, which is the recommended safe approach.
+**Note**: The Pico W RX pin (GP1) expects 3,3&nbsp;V logic levels. The Viking Bio 20's TTL output voltage should be verified before connecting directly. If it outputs 5&nbsp;V TTL (which is common), a level shifter (e.g., bi-directional logic level converter) or voltage divider (two resistors: 2kΩ from TX to RX, 1kΩ from RX to GND) is required for safe voltage conversion. The diagram above shows the configuration with level shifting, which is the recommended safe approach.
 
 ## Serial Protocol
 
@@ -553,23 +553,18 @@ Matter: LevelControl cluster updated - Fan speed 80%
    - ✅ Commissioning flow
    - ✅ Attribute subscriptions
    - ✅ WiFi support (Pico W)
-   - ⏳ Command handling for bidirectional control
-   - ⏳ OTA firmware updates
 
 2. **Network Connectivity**
    - ✅ WiFi support (Pico W)
-   - ⏳ Thread support (with external radio)
    - ⏳ Ethernet support (with W5500 module)
 
 3. **Advanced Features**
-   - ⏳ OTA firmware updates over Matter
    - ⏳ Enhanced error reporting via Matter events
    - ⏳ Historical data logging
    - ⏳ Alarm notifications
 
 4. **Protocol Extensions**
    - ⏳ Support for multiple Viking Bio devices
-   - ⏳ Bidirectional communication (control burner)
    - ⏳ Enhanced diagnostics
 
 5. **Production Readiness**
@@ -582,7 +577,7 @@ Matter: LevelControl cluster updated - Fan speed 80%
 
 - [Matter Specification](https://csa-iot.org/all-solutions/matter/)
 - [Raspberry Pi Pico SDK](https://github.com/raspberrypi/pico-sdk)
-- [Viking Bio 20 Documentation](https://www.vikingbio.se/)
+- [Viking Bio 20 Documentation](https://varmebaronen.se/content/uploads/24/10/vikingbio240226konv012se.pdf)
 - [Platform Port README](platform/pico_w_chip_port/README.md) - Detailed Matter configuration
 
 ## License
@@ -590,7 +585,3 @@ Matter: LevelControl cluster updated - Fan speed 80%
 This project is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0). This means you can use, modify, and share this project for non-commercial purposes, as long as you provide attribution and share derivatives under the same license.
 
 See the [LICENSE](LICENSE) file for details or visit https://creativecommons.org/licenses/by-nc-sa/4.0/
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
