@@ -32,7 +32,12 @@ The PASE implementation now correctly computes the full SPAKE2+ protocol includi
 **Implementation:**
 ```c
 // Compute pA - w0*M (proper elliptic curve point subtraction)
-// Step 1: Negate w0*M by computing Y_neg = (p - Y) mod p
+// Step 1: Create negated point -w0*M by copying w0*M and negating Y coordinate
+if (mbedtls_ecp_copy(&point_neg_w0M, &point_w0M) != 0) {
+    // error handling
+}
+
+// Negate Y coordinate: Y_neg = (p - Y) mod p
 mbedtls_mpi neg_y;
 mbedtls_mpi_init(&neg_y);
 
@@ -41,17 +46,18 @@ if (mbedtls_mpi_sub_mpi(&neg_y, &grp.P, &point_w0M.Y) != 0) {
     // error handling
 }
 
-// Replace Y coordinate with negated value to get -w0*M
-if (mbedtls_mpi_copy(&point_w0M.Y, &neg_y) != 0) {
+// Set negated Y coordinate in point_neg_w0M
+if (mbedtls_mpi_copy(&point_neg_w0M.Y, &neg_y) != 0) {
     // error handling
 }
 
 // Step 2: Add pA + (-w0*M) using proper elliptic curve point addition
-// Use mbedtls_ecp_muladd with scalars=1 to compute 1*pA + 1*(-w0*M)
+// mbedtls_ecp_muladd(grp, R, m1, P1, m2, P2) computes R = m1*P1 + m2*P2
+// With m1=1, P1=pA, m2=1, P2=(-w0*M), this gives R = 1*pA + 1*(-w0*M)
 mbedtls_mpi one;
 mbedtls_mpi_init(&one);
 mbedtls_mpi_lset(&one, 1);
-mbedtls_ecp_muladd(&grp, &point_temp, &one, &point_pA, &one, &point_w0M);
+mbedtls_ecp_muladd(&grp, &point_temp, &one, &point_pA, &one, &point_neg_w0M);
 
 // Compute Z = y * (pA - w0*M)
 mbedtls_ecp_mul(&grp, &point_Z, &scalar_y, &point_temp, NULL, NULL);

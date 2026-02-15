@@ -437,7 +437,9 @@ int pase_handle_pake1(pase_context_t *ctx,
     mbedtls_mpi_free(&neg_y);
     
     // Step 2: Add pA + (-w0*M) using proper elliptic curve point addition
-    // Use mbedtls_ecp_muladd with scalars=1 to compute 1*pA + 1*(-w0*M)
+    // mbedtls_ecp_muladd(grp, R, m1, P1, m2, P2) computes R = m1*P1 + m2*P2
+    // With m1=1, P1=point_pA, m2=1, P2=point_neg_w0M, this computes:
+    // point_temp = 1*point_pA + 1*point_neg_w0M = pA + (-w0*M) = pA - w0*M
     mbedtls_mpi one;
     mbedtls_mpi_init(&one);
     if (mbedtls_mpi_lset(&one, 1) != 0) {
