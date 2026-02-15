@@ -11,6 +11,18 @@ A Matter bridge for the [Viking Bio 20](https://varmebaronen.se/produkter/single
 - **Matter Bridge**: Exposes burner data through Matter protocol over WiFi
 - **WiFi Connectivity**: Connects to your local network for Matter communication
 
+## Security Status
+
+✅ **All Critical Security Issues Resolved** (as of February 15, 2026)
+
+This firmware has undergone comprehensive security review and all critical vulnerabilities have been addressed. See:
+- [CODEBASE_REVIEW_FINDINGS.md](CODEBASE_REVIEW_FINDINGS.md) - Detailed security audit results
+- [SECURITY_NOTES.md](SECURITY_NOTES.md) - Security considerations and known limitations
+
+**Known Limitations:**
+- PASE implementation uses simplified approach (suitable for development/testing)
+- For production deployment requiring full Matter certification, see SECURITY_NOTES.md
+
 ## Hardware Requirements
 
 - **Raspberry Pi Pico W** (WiFi required for Matter)
