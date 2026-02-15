@@ -77,6 +77,13 @@ void platform_manager_print_commissioning_info(void);
 int platform_manager_derive_setup_pin(const uint8_t *mac_addr, char *out_pin8);
 
 /**
+ * Get device discriminator value
+ * Returns the discriminator loaded from storage or generated on first boot
+ * @return 12-bit discriminator value (0-4095)
+ */
+uint16_t platform_manager_get_discriminator(void);
+
+/**
  * Run periodic platform tasks
  * Call this regularly in main loop
  */

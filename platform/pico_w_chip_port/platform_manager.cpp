@@ -29,6 +29,10 @@ int storage_adapter_write(const char *key, const uint8_t *value, size_t value_le
 int storage_adapter_read(const char *key, uint8_t *value, size_t max_value_len, size_t *actual_len);
 int storage_adapter_delete(const char *key);
 int storage_adapter_clear_all(void);
+int storage_adapter_save_discriminator(uint16_t discriminator);
+int storage_adapter_load_discriminator(uint16_t *discriminator);
+int storage_adapter_has_discriminator(void);
+int storage_adapter_clear_discriminator(void);
 
 int crypto_adapter_init(void);
 int crypto_adapter_random(uint8_t *buffer, size_t length);
@@ -45,7 +49,13 @@ static const char *PRODUCT_SALT = "VIKINGBIO-2026";
 // Maximum salt length for PIN derivation buffer
 #define MAX_SALT_LENGTH 64
 
+// Testing discriminator range (0x0F00-0x0FFF, 3840-4095)
+// Per Matter spec, values 0xF00-0xFFF are commonly used for testing
+#define DISCRIMINATOR_TEST_MIN 0x0F00
+#define DISCRIMINATOR_TEST_MAX 0x0FFF
+
 static bool platform_initialized = false;
+static uint16_t device_discriminator = 0;  // Loaded from storage or generated
 
 /**
  * @brief Derive an 8-digit setup PIN from device MAC address
@@ -135,6 +145,44 @@ int platform_manager_init(void) {
     if (storage_adapter_init() != 0) {
         printf("ERROR: Failed to initialize storage adapter\n");
         return -1;
+    }
+    
+    // Initialize or load discriminator
+    printf("\nInitializing discriminator...\n");
+    if (storage_adapter_has_discriminator()) {
+        // Load from storage
+        if (storage_adapter_load_discriminator(&device_discriminator) == 0) {
+            printf("✓ Loaded discriminator from storage: %u (0x%03X)\n", 
+                   device_discriminator, device_discriminator);
+        } else {
+            printf("ERROR: Failed to load discriminator from storage\n");
+            return -1;
+        }
+    } else {
+        // First boot - generate random discriminator in testing range
+        printf("First boot detected - generating random discriminator\n");
+        
+        // Generate random value in testing range (0xF00-0xFFF)
+        uint8_t random_byte;
+        if (crypto_adapter_random(&random_byte, 1) != 0) {
+            printf("ERROR: Failed to generate random discriminator\n");
+            return -1;
+        }
+        
+        // Map to testing range: 0xF00 + (random % 256)
+        // This gives us exactly 256 values from 0xF00 (3840) to 0xFFF (4095)
+        device_discriminator = DISCRIMINATOR_TEST_MIN + random_byte;
+        
+        printf("Generated discriminator: %u (0x%03X)\n", 
+               device_discriminator, device_discriminator);
+        
+        // Save to storage
+        if (storage_adapter_save_discriminator(device_discriminator) != 0) {
+            printf("ERROR: Failed to save discriminator to storage\n");
+            return -1;
+        }
+        
+        printf("✓ Discriminator saved to flash\n");
     }
 
     // Initialize network
@@ -270,16 +318,16 @@ void platform_manager_print_commissioning_info(void) {
     printf("Device MAC:     %02X:%02X:%02X:%02X:%02X:%02X\n",
            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     printf("Setup PIN Code: %s\n", pin);
-    printf("Discriminator:  3840 (0x0F00)\n");
+    printf("Discriminator:  %u (0x%03X)\n", device_discriminator, device_discriminator);
     printf("\n");
     printf("⚠️  IMPORTANT:\n");
     printf("   PIN is derived from device MAC.\n");
     printf("   Use tools/derive_pin.py to compute\n");
     printf("   the PIN from the MAC address above.\n");
     printf("\n");
-    printf("⚠️  WARNING: Discriminator 3840 is for\n");
-    printf("   testing only. Use unique values for\n");
-    printf("   production devices.\n");
+    printf("⚠️  NOTE: Discriminator was randomly\n");
+    printf("   generated on first boot and saved\n");
+    printf("   to flash. Value is in testing range.\n");
     printf("====================================\n\n");
 }
 
@@ -291,6 +339,10 @@ int platform_manager_derive_setup_pin(const uint8_t *mac_addr, char *out_pin8) {
     uint8_t mac[6];
     memcpy(mac, mac_addr, 6);
     return derive_setup_pin_from_mac(mac, out_pin8);
+}
+
+uint16_t platform_manager_get_discriminator(void) {
+    return device_discriminator;
 }
 
 void platform_manager_task(void) {

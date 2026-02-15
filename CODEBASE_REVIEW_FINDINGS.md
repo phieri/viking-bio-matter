@@ -478,12 +478,13 @@ WiFi credentials are hardcoded in source:
 
 ### 18. Test Discriminator
 **File:** Multiple files  
-**Severity:** MEDIUM - Security
+**Severity:** ~~MEDIUM~~ **RESOLVED** - Security
 
 **Issue:**
-Discriminator 3840 is hardcoded for testing. This should be randomized or derived per-device for production.
+Discriminator 3840 was hardcoded for testing. This should be randomized or derived per-device for production.
 
-**Recommendation:** Document that this is test-only and must be changed for production deployments.
+**Resolution (Feb 2026):**
+✅ **FIXED** - Discriminator is now randomly generated on first boot from testing range (0xF00-0xFFF, 3840-4095) and persisted to flash storage. Each device gets a unique discriminator that is saved and reused across reboots. Implementation in `platform/pico_w_chip_port/platform_manager.cpp` and `storage_adapter.cpp`.
 
 ---
 

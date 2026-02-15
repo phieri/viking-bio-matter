@@ -196,12 +196,16 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
    ====================================
    Device MAC:     28:CD:C1:00:00:01
    Setup PIN Code: 24890840
-   Discriminator:  3840 (0x0F00)
+   Discriminator:  3912 (0xF48)
    
    ⚠️  IMPORTANT:
       PIN is derived from device MAC.
       Use tools/derive_pin.py to compute
       the PIN from the MAC address above.
+   
+   ⚠️  NOTE: Discriminator was randomly
+      generated on first boot and saved
+      to flash. Value is in testing range.
    ====================================
    ```
    
@@ -273,7 +277,7 @@ chip-tool networkcommissioning read last-network-id 1 0
 
 ⚠️ **Security Note:** 
 - The Setup PIN is **unique per device**, derived from the device MAC address using SHA-256 with product salt `VIKINGBIO-2026`.
-- The discriminator 3840 is for **testing only**. For production deployments, use unique discriminators per device (0-4095, excluding reserved ranges) and update `platform/pico_w_chip_port/CHIPDevicePlatformConfig.h`.
+- The discriminator is **randomly generated on first boot** and persisted to flash storage. Each device gets a unique value in the testing range (0xF00-0xFFF, 3840-4095).
 - The PIN derivation algorithm is documented in `tools/derive_pin.py` and can be computed offline from a printed MAC address.
 
 For detailed Matter configuration and troubleshooting, see [platform/pico_w_chip_port/README.md](platform/pico_w_chip_port/README.md).
@@ -534,12 +538,13 @@ Matter: LevelControl cluster updated - Fan speed 80%
 
 ⚠️ **CRITICAL**: Default commissioning credentials are for TESTING ONLY
 
-**Production deployment requires:**
-1. Unique per-device discriminator (0-4095, excluding reserved ranges)
-2. Device-specific setup PIN codes (each device has unique PIN derived from MAC)
-3. Update `platform/pico_w_chip_port/CHIPDevicePlatformConfig.h`:
-   - Discriminator 3840 is reserved for testing per Matter Core Specification 5.1.3.1
-   - Production devices MUST use unique discriminators
+**Current implementation:**
+1. **Discriminator**: Automatically randomized on first boot from testing range (0xF00-0xFFF) and persisted to flash. Each device gets a unique value.
+2. **Setup PIN**: Unique per device, derived from MAC address using SHA-256 with product salt `VIKINGBIO-2026`.
+
+**Production deployment notes:**
+- The discriminator range 0xF00-0xFFF (3840-4095) is commonly used for testing per Matter Core Specification 5.1.3.1
+- For production, consider using the full discriminator range (0-4095) by modifying `DISCRIMINATOR_TEST_MIN` and `DISCRIMINATOR_TEST_MAX` in `platform/pico_w_chip_port/platform_manager.cpp`
 
 **WiFi Security:**
 - WiFi credentials are hardcoded in `platform/pico_w_chip_port/network_adapter.cpp`

@@ -108,9 +108,9 @@ cmake .. && make -j$(nproc)
 - `network_adapter.cpp` - WiFi/lwIP (hardcoded creds lines 10-11), SoftAP support (192.168.4.1)
 - `storage_adapter.cpp` - LittleFS storage (last 256KB flash), key-value pairs, wear leveling
 - `crypto_adapter.cpp` - mbedTLS wrapper (DRBG/RNG stubbed due to SDK bug, SHA256/AES work)
-- `platform_manager.cpp` - Platform initialization coordinator
+- `platform_manager.cpp` - Platform initialization coordinator, discriminator management
 - `config/` - lwipopts.h (lwIP config, IPv6 enabled), mbedtls_config.h (crypto config)
-- `CHIPDevicePlatformConfig.h` - Matter device config (discriminator 3840, PIN from MAC)
+- `CHIPDevicePlatformConfig.h` - Matter device config (PIN from MAC, discriminator from storage)
 
 **Tests** (`tests/`):
 - `codec/` - TLV tests (host-runnable)
@@ -138,7 +138,7 @@ cmake .. && make -j$(nproc)
 
 **Config**: 
 - Build: CMakeLists.txt (lines 3-9: pico_w enforcement, lines 31-37: optimizations, line 23: pico-lfs submodule)
-- Matter creds: platform/pico_w_chip_port/CHIPDevicePlatformConfig.h (disc 3840=test only, PIN from MAC)
+- Matter creds: platform/pico_w_chip_port/platform_manager.cpp (discriminator random 0xF00-0xFFF from storage, PIN from MAC)
 - CI: .github/workflows/build-firmware.yml (Ubuntu, ARM GCC, Pico SDK 1.5.1)
 - No linting config (follow existing style)
 
@@ -148,7 +148,7 @@ cmake .. && make -j$(nproc)
 
 **Serial**: Binary 6 bytes or text "F:1,S:50,T:75\n"  
 **Matter**: 3 clusters on endpoint 1 - OnOff (flame bool), LevelControl (speed 0-100%), Temperature (centidegrees int16)  
-**Commissioning**: PIN derived from MAC (SHA256(MAC||"VIKINGBIO-2026")%100000000), discriminator 3840 (⚠️ test only), tool: `python3 tools/derive_pin.py <MAC>`
+**Commissioning**: PIN derived from MAC (SHA256(MAC||"VIKINGBIO-2026")%100000000), discriminator randomly generated on first boot (0xF00-0xFFF, saved to flash), tool: `python3 tools/derive_pin.py <MAC>`
 
 ## CI/CD
 
@@ -242,7 +242,7 @@ Before committing:
 |---------|------------|----------|
 | Device not connecting to WiFi | Wrong credentials or SoftAP mode | Check `network_adapter.cpp` lines 10-11, or use SoftAP commissioning |
 | Serial data not received | Wrong GPIO or baud rate | Verify GP1/UART0 at 9600 baud, check wiring (requires level shifter for 5V TTL) |
-| Matter pairing fails | Wrong PIN or discriminator | Use `tools/derive_pin.py <MAC>` to get correct PIN, discriminator is 3840 (test only) |
+| Matter pairing fails | Wrong PIN or discriminator | Use `tools/derive_pin.py <MAC>` to get correct PIN, discriminator is randomly generated (check device serial output) |
 | Device crashes after WiFi connect | RAM exhaustion | Check fabric count (max 5), reduce Matter sessions in CHIPDevicePlatformConfig.h |
 | Flash storage errors | Wear leveling exhausted | Flash has limited write cycles, storage uses last 256KB with LittleFS wear leveling |
 
@@ -284,7 +284,7 @@ export PICO_SDK_PATH=$(pwd)/pico-sdk && git submodule update --init --recursive 
 
 **Components**: serial_handler.c (interrupt RX, hardware_sync), viking_bio_protocol.c (binary/text parser with fallback), matter_bridge.cpp (3 clusters + NetworkCommissioning), main.c (coordinator), platform port (network/storage/crypto/manager), matter_minimal stack (7 phases complete)
 
-**Limitations**: No OTA, WiFi only (no Thread/Ethernet), LittleFS storage (last 256KB, wear leveling), max 5 fabrics (RAM 264KB), test discriminator 3840 (production should use random), DRBG/RNG stubbed (documented SDK 1.5.1 bug, SHA256/AES work), requires 5V→3.3V level shifter for serial input
+**Limitations**: No OTA, WiFi only (no Thread/Ethernet), LittleFS storage (last 256KB, wear leveling), max 5 fabrics (RAM 264KB), discriminator randomized on first boot (0xF00-0xFFF testing range), DRBG/RNG stubbed (documented SDK 1.5.1 bug, SHA256/AES work), requires 5V→3.3V level shifter for serial input
 
 ## Trust & Verify
 

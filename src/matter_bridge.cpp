@@ -129,8 +129,12 @@ void matter_bridge_init(void) {
         return;
     }
     
+    // Get discriminator from platform (loaded from storage or generated)
+    uint16_t discriminator = platform_manager_get_discriminator();
+    printf("Using discriminator: %u (0x%03X)\n", discriminator, discriminator);
+    
     // Start commissioning with derived PIN and discriminator
-    if (matter_protocol_start_commissioning(setup_pin, 3840) != 0) {
+    if (matter_protocol_start_commissioning(setup_pin, discriminator) != 0) {
         printf("ERROR: Failed to start commissioning\n");
         initialized = false;
         return;

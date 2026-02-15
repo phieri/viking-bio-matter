@@ -109,12 +109,16 @@ On boot, you'll see commissioning details:
 ====================================
 Device MAC:     28:CD:C1:00:00:01
 Setup PIN Code: 24890840
-Discriminator:  3840 (0x0F00)
+Discriminator:  3912 (0xF48)
 
 ⚠️  IMPORTANT:
    PIN is derived from device MAC.
    Use tools/derive_pin.py to compute
    the PIN from the MAC address above.
+
+⚠️  NOTE: Discriminator was randomly
+   generated on first boot and saved
+   to flash. Value is in testing range.
 ====================================
 ```
 
@@ -234,16 +238,17 @@ Edit `CHIPDevicePlatformConfig.h` to customize:
 
 ⚠️ **SECURITY WARNING**: Default credentials are for testing only!
 
-For production:
+**Current implementation:**
 
-1. Generate unique discriminator per device
-2. Use device-specific setup PIN codes
-3. Program credentials during manufacturing
-4. Update `CHIPDevicePlatformConfig.h`:
+1. **Discriminator**: Automatically randomized on first boot from testing range (0xF00-0xFFF) and persisted to flash storage. Each device gets a unique value.
+2. **Setup PIN**: Unique per device, derived from MAC address using SHA-256 with product salt `VIKINGBIO-2026`. See `tools/derive_pin.py` for offline computation.
 
-```cpp
-#define CHIP_DEVICE_CONFIG_USE_TEST_SETUP_DISCRIMINATOR <unique_value>
-#define CHIP_DEVICE_CONFIG_USE_TEST_SETUP_PIN_CODE <unique_pin>
+**For production:**
+
+- The discriminator range 0xF00-0xFFF (3840-4095) is commonly used for testing
+- To change the discriminator range, modify `DISCRIMINATOR_TEST_MIN` and `DISCRIMINATOR_TEST_MAX` in `platform_manager.cpp`
+- The discriminator is stored in flash at key `/discriminator` and persists across reboots
+- To force regeneration, delete the flash storage or call `storage_adapter_clear_discriminator()`
 ```
 
 ### Storage Configuration
