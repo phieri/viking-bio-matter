@@ -131,10 +131,8 @@ cmake .. && make -j$(nproc)
 
 **Documentation** (`docs/`):
 - `MINIMAL_MATTER_ARCHITECTURE.md` - Matter stack architecture
-- `PR_ROADMAP.md` - Phase-by-phase implementation roadmap (7 phases complete)
 - `WIFI_COMMISSIONING_SUMMARY.md` - WiFi commissioning with SoftAP
 - `SUBSCRIPTIONS_TESTING.md` - Matter subscriptions testing
-- `REFERENCE_IMPLEMENTATIONS.md` - Reference implementations used
 
 **Config**: 
 - Build: CMakeLists.txt (lines 3-9: pico_w enforcement, lines 31-37: optimizations, line 23: pico-lfs submodule)

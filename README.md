@@ -15,13 +15,9 @@ A Matter bridge for the [Viking Bio 20](https://varmebaronen.se/produkter/single
 
 ✅ **All Critical Security Issues Resolved** (as of February 15, 2026)
 
-This firmware has undergone comprehensive security review and all critical vulnerabilities have been addressed. See:
-- [CODEBASE_REVIEW_FINDINGS.md](CODEBASE_REVIEW_FINDINGS.md) - Detailed security audit results
-- [SECURITY_NOTES.md](SECURITY_NOTES.md) - Security considerations and known limitations
-
-**Known Limitations:**
-- PASE implementation uses simplified approach (suitable for development/testing)
-- For production deployment requiring full Matter certification, see SECURITY_NOTES.md
+This firmware has undergone comprehensive security review and all critical vulnerabilities have been addressed. For details, see:
+- [CODEBASE_REVIEW_FINDINGS.md](CODEBASE_REVIEW_FINDINGS.md) - Security audit results
+- [SECURITY_NOTES.md](SECURITY_NOTES.md) - Security considerations and best practices
 
 ## Hardware Requirements
 
@@ -125,59 +121,22 @@ This generates Matter-enabled firmware that:
 
 See [platform/pico_w_chip_port/README.md](platform/pico_w_chip_port/README.md) for detailed Matter configuration and commissioning instructions.
 
-### WiFi Commissioning Flow
+### WiFi Commissioning
 
-The device supports two WiFi commissioning modes:
+The device supports Matter-compliant WiFi commissioning with two modes:
 
-#### Mode 1: SoftAP Commissioning (Default)
-When the device boots without stored WiFi credentials, it automatically starts in SoftAP mode:
+**Mode 1: SoftAP Commissioning (Recommended)**  
+When no WiFi credentials are stored, the device automatically starts a WiFi access point:
+- SSID: `VikingBio-Setup`
+- Password: `vikingbio2026`
+- Device IP: `192.168.4.1`
 
-1. **Device boots in SoftAP mode**
-   - SSID: `VikingBio-Setup`
-   - Password: `vikingbio2026`
-   - Device IP: `192.168.4.1`
+Use Matter NetworkCommissioning commands to provision WiFi credentials. See commissioning examples below.
 
-2. **Connect to the SoftAP**
-   ```bash
-   # On your commissioning device (laptop/phone):
-   # - Connect to WiFi: VikingBio-Setup
-   # - Password: vikingbio2026
-   # - Configure static IP: 192.168.4.2, Netmask: 255.255.255.0
-   ```
+**Mode 2: Pre-configured WiFi**  
+Credentials can be stored in flash during initial setup. The device will automatically connect on boot.
 
-3. **Commission via Matter**
-   ```bash
-   # Use chip-tool or other Matter controller
-   # The controller will send WiFi credentials via Matter commands
-   chip-tool networkcommissioning add-or-update-wifi-network hex:YOUR_SSID hex:YOUR_PASSWORD 1 0
-   chip-tool networkcommissioning connect-network hex:YOUR_SSID 1 0
-   ```
-
-4. **Device automatically connects to WiFi**
-   - Credentials are saved to flash
-   - Device stops SoftAP mode
-   - Device connects to your WiFi network
-   - Continues Matter commissioning on the WiFi network
-
-#### Mode 2: Pre-Configured WiFi (Optional)
-If you want to pre-configure WiFi credentials via flash storage:
-
-1. Use the storage API to save credentials during build/flash
-2. Device will automatically connect on boot
-3. No SoftAP mode needed
-
-### Building with Pre-configured WiFi (Legacy)
-
-**Note**: This method is deprecated. Use SoftAP commissioning instead.
-
-If you absolutely need to hardcode WiFi credentials for testing:
-
-1. **Configure WiFi credentials** by calling the storage API programmatically:
-   ```c
-   storage_adapter_save_wifi_credentials("YourSSID", "YourPassword");
-   ```
-
-2. **Build the firmware** as shown above.
+For detailed implementation guide, see [docs/WIFI_COMMISSIONING_SUMMARY.md](docs/WIFI_COMMISSIONING_SUMMARY.md).
 
 ### Flashing the Firmware
 
@@ -229,31 +188,23 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
 
 5. **Commission the device using Matter controller:**
    
-   **Option A: Via SoftAP (Recommended - No credentials needed)**
+   **Via SoftAP (Recommended):**
    ```bash
-   # Step 1: Connect your computer to the SoftAP
-   # WiFi SSID: VikingBio-Setup
-   # Password: vikingbio2026
-   # Static IP: 192.168.4.2 (device is at 192.168.4.1)
+   # 1. Connect to device SoftAP: VikingBio-Setup (password: vikingbio2026)
+   #    Configure static IP: 192.168.4.2
    
-   # Step 2: Convert your WiFi credentials to hex
-   echo -n "MySSID" | xxd -p    # Example output: 4d79535349441234
-   echo -n "MyPassword" | xxd -p # Example output: 4d7950617373776f7264
-   
-   # Step 3: Provision WiFi credentials via Matter
+   # 2. Provision WiFi credentials (convert SSID/password to hex first)
+   echo -n "MySSID" | xxd -p     # Get hex SSID
    chip-tool networkcommissioning add-or-update-wifi-network hex:YOUR_SSID_HEX hex:YOUR_PASSWORD_HEX 1 0
-   
-   # Step 4: Connect to the WiFi network
    chip-tool networkcommissioning connect-network hex:YOUR_SSID_HEX 1 0
    
-   # Step 5: Complete Matter commissioning (device now on your WiFi)
+   # 3. Complete commissioning (use PIN from serial output)
    chip-tool pairing onnetwork 1 24890840
    ```
    
-   **Option B: Direct WiFi (If credentials pre-stored)**
+   **With Pre-stored Credentials:**
    ```bash
-   # Use the printed PIN from device's serial output
-   chip-tool pairing ble-wifi 1 MySSID MyPassword 24890840 3840
+   chip-tool pairing onnetwork 1 24890840
    ```
 
 6. Control and monitor attributes:
@@ -274,25 +225,14 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
 - **TemperatureMeasurement (0x0402)**: Burner temperature
 - **NetworkCommissioning (0x0031)**: WiFi network provisioning
 
-**NetworkCommissioning Commands:**
-```bash
-# Add or update WiFi credentials
-chip-tool networkcommissioning add-or-update-wifi-network hex:SSID_HEX hex:PASSWORD_HEX 1 0
-
-# Connect to WiFi network
-chip-tool networkcommissioning connect-network hex:SSID_HEX 1 0
-
-# Read network status
-chip-tool networkcommissioning read last-networking-status 1 0
-chip-tool networkcommissioning read last-network-id 1 0
-```
-
 ⚠️ **Security Note:** 
 - The Setup PIN is **unique per device**, derived from the device MAC address using SHA-256 with product salt `VIKINGBIO-2026`.
 - The discriminator is **randomly generated on first boot** and persisted to flash storage. Each device gets a unique value in the testing range (0xF00-0xFFF, 3840-4095).
 - The PIN derivation algorithm is documented in `tools/derive_pin.py` and can be computed offline from a printed MAC address.
 
-For detailed Matter configuration and troubleshooting, see [platform/pico_w_chip_port/README.md](platform/pico_w_chip_port/README.md).
+For detailed commissioning steps and troubleshooting, see:
+- [docs/WIFI_COMMISSIONING_SUMMARY.md](docs/WIFI_COMMISSIONING_SUMMARY.md) - WiFi provisioning details
+- [platform/pico_w_chip_port/README.md](platform/pico_w_chip_port/README.md) - Matter configuration
 
 ## Troubleshooting
 
