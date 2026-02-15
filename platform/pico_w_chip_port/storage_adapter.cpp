@@ -20,8 +20,9 @@
 #define STORAGE_FLASH_OFFSET (PICO_FLASH_SIZE_BYTES - (256 * 1024))
 #define STORAGE_FLASH_SIZE (256 * 1024)
 
-// WiFi credential storage keys
+// Storage keys
 #define WIFI_CREDENTIALS_KEY "/wifi_credentials"
+#define DISCRIMINATOR_KEY "/discriminator"
 #define MAX_SSID_LENGTH 32
 #define MAX_PASSWORD_LENGTH 64
 
@@ -371,6 +372,81 @@ int storage_adapter_clear_wifi_credentials(void) {
     
     printf("Clearing WiFi credentials from storage...\n");
     return storage_adapter_delete(WIFI_CREDENTIALS_KEY);
+}
+
+int storage_adapter_save_discriminator(uint16_t discriminator) {
+    if (!storage_initialized) {
+        printf("ERROR: Storage not initialized\n");
+        return -1;
+    }
+    
+    // Validate discriminator is within 12-bit range (0-4095)
+    if (discriminator > 0x0FFF) {
+        printf("ERROR: Invalid discriminator value: %u (max 4095)\n", discriminator);
+        return -1;
+    }
+    
+    printf("Saving discriminator %u (0x%03X) to flash\n", discriminator, discriminator);
+    
+    // Write discriminator to storage as 16-bit value
+    int result = storage_adapter_write(DISCRIMINATOR_KEY, 
+                                      (const uint8_t *)&discriminator, 
+                                      sizeof(uint16_t));
+    
+    if (result == 0) {
+        printf("Discriminator saved successfully\n");
+    } else {
+        printf("ERROR: Failed to save discriminator\n");
+    }
+    
+    return result;
+}
+
+int storage_adapter_load_discriminator(uint16_t *discriminator) {
+    if (!storage_initialized || !discriminator) {
+        return -1;
+    }
+    
+    uint16_t stored_value = 0;
+    size_t actual_len = 0;
+    
+    // Read from storage
+    int result = storage_adapter_read(DISCRIMINATOR_KEY,
+                                     (uint8_t *)&stored_value,
+                                     sizeof(uint16_t),
+                                     &actual_len);
+    
+    if (result != 0 || actual_len < sizeof(uint16_t)) {
+        return -1;  // No discriminator stored or read failed
+    }
+    
+    // Validate discriminator is within 12-bit range
+    if (stored_value > 0x0FFF) {
+        printf("ERROR: Invalid discriminator in storage: %u\n", stored_value);
+        return -1;
+    }
+    
+    *discriminator = stored_value;
+    printf("Discriminator loaded from flash: %u (0x%03X)\n", stored_value, stored_value);
+    return 0;
+}
+
+int storage_adapter_has_discriminator(void) {
+    if (!storage_initialized) {
+        return 0;
+    }
+    
+    uint16_t discriminator = 0;
+    return (storage_adapter_load_discriminator(&discriminator) == 0) ? 1 : 0;
+}
+
+int storage_adapter_clear_discriminator(void) {
+    if (!storage_initialized) {
+        return -1;
+    }
+    
+    printf("Clearing discriminator from storage...\n");
+    return storage_adapter_delete(DISCRIMINATOR_KEY);
 }
 
 } // extern "C"
