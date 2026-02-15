@@ -358,10 +358,11 @@ int pase_handle_pake1(pase_context_t *ctx,
     }
     
     // Compute Z = y*(pA - w0*M)
-    mbedtls_ecp_point point_pA, point_M, point_w0M, point_temp;
+    mbedtls_ecp_point point_pA, point_M, point_w0M, point_neg_w0M, point_temp;
     mbedtls_ecp_point_init(&point_pA);
     mbedtls_ecp_point_init(&point_M);
     mbedtls_ecp_point_init(&point_w0M);
+    mbedtls_ecp_point_init(&point_neg_w0M);
     mbedtls_ecp_point_init(&point_temp);
     
     // Load pA
@@ -370,6 +371,7 @@ int pase_handle_pake1(pase_context_t *ctx,
         mbedtls_ecp_point_free(&point_pA);
         mbedtls_ecp_point_free(&point_M);
         mbedtls_ecp_point_free(&point_w0M);
+        mbedtls_ecp_point_free(&point_neg_w0M);
         mbedtls_ecp_point_free(&point_temp);
         goto pake1_cleanup;
     }
@@ -380,6 +382,7 @@ int pase_handle_pake1(pase_context_t *ctx,
         mbedtls_ecp_point_free(&point_pA);
         mbedtls_ecp_point_free(&point_M);
         mbedtls_ecp_point_free(&point_w0M);
+        mbedtls_ecp_point_free(&point_neg_w0M);
         mbedtls_ecp_point_free(&point_temp);
         goto pake1_cleanup;
     }
@@ -389,46 +392,77 @@ int pase_handle_pake1(pase_context_t *ctx,
         mbedtls_ecp_point_free(&point_pA);
         mbedtls_ecp_point_free(&point_M);
         mbedtls_ecp_point_free(&point_w0M);
+        mbedtls_ecp_point_free(&point_neg_w0M);
         mbedtls_ecp_point_free(&point_temp);
         goto pake1_cleanup;
     }
     
-    // Compute pA - w0*M (point subtraction: negate w0*M's Y coordinate and add)
-    mbedtls_mpi neg_one;
-    mbedtls_mpi_init(&neg_one);
-    mbedtls_mpi_lset(&neg_one, -1);
-    
-    // Negate w0*M by negating its Y coordinate
-    if (mbedtls_mpi_mul_mpi(&point_w0M.Y, &point_w0M.Y, &neg_one) != 0) {
+    // Compute pA - w0*M (proper elliptic curve point subtraction)
+    // Step 1: Create negated point -w0*M by copying w0*M and negating Y coordinate
+    if (mbedtls_ecp_copy(&point_neg_w0M, &point_w0M) != 0) {
         mbedtls_ecp_point_free(&point_pA);
         mbedtls_ecp_point_free(&point_M);
         mbedtls_ecp_point_free(&point_w0M);
+        mbedtls_ecp_point_free(&point_neg_w0M);
         mbedtls_ecp_point_free(&point_temp);
-        mbedtls_mpi_free(&neg_one);
         goto pake1_cleanup;
     }
     
-    // Now add: point_temp = pA + (-w0*M)
-    if (mbedtls_ecp_muladd(&grp, &point_temp, &scalar_y, &grp.G,
-                          &scalar_w0, &point_M) != 0) {
+    // Negate Y coordinate: Y_neg = (p - Y) mod p
+    mbedtls_mpi neg_y;
+    mbedtls_mpi_init(&neg_y);
+    
+    // Compute neg_y = grp.P - point_w0M.Y (modular negation on the curve)
+    if (mbedtls_mpi_sub_mpi(&neg_y, &grp.P, &point_w0M.Y) != 0) {
         mbedtls_ecp_point_free(&point_pA);
         mbedtls_ecp_point_free(&point_M);
         mbedtls_ecp_point_free(&point_w0M);
+        mbedtls_ecp_point_free(&point_neg_w0M);
         mbedtls_ecp_point_free(&point_temp);
-        mbedtls_mpi_free(&neg_one);
+        mbedtls_mpi_free(&neg_y);
         goto pake1_cleanup;
     }
     
-    // Simplified approach: For minimal implementation, use pA directly
-    // Full implementation would properly compute pA - w0*M
-    if (mbedtls_ecp_copy(&point_temp, &point_pA) != 0) {
+    // Set negated Y coordinate in point_neg_w0M
+    if (mbedtls_mpi_copy(&point_neg_w0M.Y, &neg_y) != 0) {
         mbedtls_ecp_point_free(&point_pA);
         mbedtls_ecp_point_free(&point_M);
         mbedtls_ecp_point_free(&point_w0M);
+        mbedtls_ecp_point_free(&point_neg_w0M);
         mbedtls_ecp_point_free(&point_temp);
-        mbedtls_mpi_free(&neg_one);
+        mbedtls_mpi_free(&neg_y);
         goto pake1_cleanup;
     }
+    
+    mbedtls_mpi_free(&neg_y);
+    
+    // Step 2: Add pA + (-w0*M) using proper elliptic curve point addition
+    // mbedtls_ecp_muladd(grp, R, m1, P1, m2, P2) computes R = m1*P1 + m2*P2
+    // With m1=1, P1=point_pA, m2=1, P2=point_neg_w0M, this computes:
+    // point_temp = 1*point_pA + 1*point_neg_w0M = pA + (-w0*M) = pA - w0*M
+    mbedtls_mpi one;
+    mbedtls_mpi_init(&one);
+    if (mbedtls_mpi_lset(&one, 1) != 0) {
+        mbedtls_ecp_point_free(&point_pA);
+        mbedtls_ecp_point_free(&point_M);
+        mbedtls_ecp_point_free(&point_w0M);
+        mbedtls_ecp_point_free(&point_neg_w0M);
+        mbedtls_ecp_point_free(&point_temp);
+        mbedtls_mpi_free(&one);
+        goto pake1_cleanup;
+    }
+    
+    if (mbedtls_ecp_muladd(&grp, &point_temp, &one, &point_pA, &one, &point_neg_w0M) != 0) {
+        mbedtls_ecp_point_free(&point_pA);
+        mbedtls_ecp_point_free(&point_M);
+        mbedtls_ecp_point_free(&point_w0M);
+        mbedtls_ecp_point_free(&point_neg_w0M);
+        mbedtls_ecp_point_free(&point_temp);
+        mbedtls_mpi_free(&one);
+        goto pake1_cleanup;
+    }
+    
+    mbedtls_mpi_free(&one);
     
     // Compute Z = y * (pA - w0*M)
     mbedtls_ecp_point point_Z;
@@ -437,9 +471,9 @@ int pase_handle_pake1(pase_context_t *ctx,
         mbedtls_ecp_point_free(&point_pA);
         mbedtls_ecp_point_free(&point_M);
         mbedtls_ecp_point_free(&point_w0M);
+        mbedtls_ecp_point_free(&point_neg_w0M);
         mbedtls_ecp_point_free(&point_temp);
         mbedtls_ecp_point_free(&point_Z);
-        mbedtls_mpi_free(&neg_one);
         goto pake1_cleanup;
     }
     
@@ -449,18 +483,18 @@ int pase_handle_pake1(pase_context_t *ctx,
         mbedtls_ecp_point_free(&point_pA);
         mbedtls_ecp_point_free(&point_M);
         mbedtls_ecp_point_free(&point_w0M);
+        mbedtls_ecp_point_free(&point_neg_w0M);
         mbedtls_ecp_point_free(&point_temp);
         mbedtls_ecp_point_free(&point_Z);
-        mbedtls_mpi_free(&neg_one);
         goto pake1_cleanup;
     }
     
     mbedtls_ecp_point_free(&point_pA);
     mbedtls_ecp_point_free(&point_M);
     mbedtls_ecp_point_free(&point_w0M);
+    mbedtls_ecp_point_free(&point_neg_w0M);
     mbedtls_ecp_point_free(&point_temp);
     mbedtls_ecp_point_free(&point_Z);
-    mbedtls_mpi_free(&neg_one);
     
     // Encode pB in response
     memcpy(response, ctx->pB, PASE_SPAKE2_POINT_LENGTH);
