@@ -55,11 +55,18 @@ set(SOURCES
     platform/pico_w_chip_port/matter_network_subscriber.cpp
 )
 
+# Add lwIP mDNS source files (not compiled by default in Pico SDK)
+set(LWIP_MDNS_SOURCES
+    ${PICO_SDK_PATH}/lib/lwip/src/apps/mdns/mdns.c
+    ${PICO_SDK_PATH}/lib/lwip/src/apps/mdns/mdns_out.c
+    ${PICO_SDK_PATH}/lib/lwip/src/apps/mdns/mdns_domain.c
+)
+
 # Matter is always enabled
 add_compile_definitions(ENABLE_MATTER=1)
 message(STATUS "Building with Matter support for Pico W")
 
-add_executable(viking_bio_matter ${SOURCES})
+add_executable(viking_bio_matter ${SOURCES} ${LWIP_MDNS_SOURCES})
 
 target_include_directories(viking_bio_matter PRIVATE
     platform/pico_w_chip_port/config
