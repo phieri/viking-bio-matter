@@ -134,6 +134,10 @@ void viking_bio_get_current_data(viking_bio_data_t *data) {
 
 bool viking_bio_is_data_stale(uint32_t timeout_ms) {
     uint32_t current_time = to_ms_since_boot(get_absolute_time());
+    // Calculate elapsed time using unsigned arithmetic
+    // This correctly handles wrap-around: if current_time wraps to 5 and 
+    // last_data_timestamp was 4294967290, elapsed = 5 - 4294967290 = 15 (mod 2^32)
+    // This works as long as the actual elapsed time is less than 2^31 ms (~24.8 days)
     uint32_t elapsed = current_time - last_data_timestamp;
     return elapsed >= timeout_ms;
 }
