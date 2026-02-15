@@ -268,7 +268,7 @@ For detailed commissioning steps and troubleshooting, see:
 - **Cause**: Credentials saved but connection failed
 - **Solution**:
   1. Check serial output for connection error codes
-  2. Verify WiFi network is 2.4GHz (Pico W doesn't support 5GHz)
+  2. Verify WiFi network is 2,4&nbsp;GHz (Pico W doesn't support 5&nbsp;GHz)
   3. Ensure WiFi uses WPA2-PSK authentication
   4. Try manually connecting: Use Option B with hardcoded credentials for testing
 
