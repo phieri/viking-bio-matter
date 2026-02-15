@@ -180,7 +180,7 @@ chip-tool pairing onnetwork 1 <PIN_FROM_SERIAL>
 3. **Default SoftAP configuration** - Production deployments should implement additional security measures such as timeout-based auto-disable after commissioning.
 
 ### Recommendations for Production
-1. Implement timeout for SoftAP mode (auto-disable after successful commissioning or after 30 minutes)
+1. Implement timeout for SoftAP mode (auto-disable after successful commissioning or after 30 minutes). Note: Successful commissioning can be detected when the device successfully connects to a WiFi network in station mode via the `network_adapter_connect()` function. After successful connection, call `network_adapter_stop_softap()` to disable the access point.
 2. Implement credential encryption if MCU resources allow
 3. Add rate limiting for Matter commissioning commands
 4. Implement audit logging for credential changes

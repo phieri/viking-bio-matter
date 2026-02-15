@@ -72,6 +72,8 @@ int network_adapter_start_softap(void) {
     printf("  Security: Open (no password)\n");
 
     // Enable AP mode with open authentication (no password)
+    // Note: Passing NULL for password is intentional and explicitly handled by the SDK.
+    // The SDK will automatically set auth to CYW43_AUTH_OPEN when password is NULL.
     cyw43_arch_enable_ap_mode(SOFTAP_SSID, NULL, CYW43_AUTH_OPEN);
 
     // Configure AP network interface with static IP
