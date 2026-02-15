@@ -88,8 +88,7 @@ Before deploying to production:
 
 ### Security Resources
 
-- [SECURITY_NOTES.md](SECURITY_NOTES.md) - Comprehensive security documentation
-- [SECURITY_FIXES_SUMMARY.md](SECURITY_FIXES_SUMMARY.md) - Detailed fix information
+- [SECURITY_NOTES.md](SECURITY_NOTES.md) - Comprehensive security documentation including all fixes
 - Matter Specification - Full protocol documentation
 - Pico SDK Documentation - Hardware-specific guidance
 
