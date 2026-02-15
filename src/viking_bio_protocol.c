@@ -16,6 +16,9 @@ static viking_bio_data_t current_data = {
     .valid = false
 };
 
+// Timestamp of last successfully parsed data packet (milliseconds since boot)
+static uint32_t last_data_timestamp = 0;
+
 // Protocol constants for Viking Bio 20 burner
 #define VIKING_BIO_START_BYTE 0xAA
 #define VIKING_BIO_END_BYTE 0x55
@@ -27,6 +30,9 @@ void viking_bio_init(void) {
     // Initialize data structure
     memset(&current_data, 0, sizeof(current_data));
     current_data.valid = false;
+    
+    // Initialize timestamp to current time to prevent false timeout on startup
+    last_data_timestamp = to_ms_since_boot(get_absolute_time());
 }
 
 bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data_t *data) {
@@ -71,6 +77,9 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
                 // Update current state
                 memcpy(&current_data, data, sizeof(viking_bio_data_t));
                 
+                // Update timestamp on successful parse
+                last_data_timestamp = to_ms_since_boot(get_absolute_time());
+                
                 return true;
             }
         }
@@ -107,6 +116,9 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
             // Update current state
             memcpy(&current_data, data, sizeof(viking_bio_data_t));
             
+            // Update timestamp on successful parse
+            last_data_timestamp = to_ms_since_boot(get_absolute_time());
+            
             return true;
         }
     }
@@ -118,4 +130,10 @@ void viking_bio_get_current_data(viking_bio_data_t *data) {
     if (data != NULL) {
         memcpy(data, &current_data, sizeof(viking_bio_data_t));
     }
+}
+
+bool viking_bio_is_data_stale(uint32_t timeout_ms) {
+    uint32_t current_time = to_ms_since_boot(get_absolute_time());
+    uint32_t elapsed = current_time - last_data_timestamp;
+    return elapsed >= timeout_ms;
 }
