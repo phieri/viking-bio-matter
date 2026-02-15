@@ -10,6 +10,12 @@
 #include "mbedtls/sha256.h"
 #include "matter_attributes.h"
 #include "network_adapter.h"
+#include "CHIPDevicePlatformConfig.h"
+
+// Matter DNS-SD discovery
+extern "C" {
+#include "dns_sd.h"
+}
 
 // Forward declarations of adapter functions
 extern "C" {
@@ -191,6 +197,14 @@ int platform_manager_init(void) {
         printf("ERROR: Failed to initialize network adapter\n");
         return -1;
     }
+    
+    // Initialize DNS-SD for Matter device discovery
+    printf("\nInitializing DNS-SD...\n");
+    if (dns_sd_init() != 0) {
+        printf("ERROR: Failed to initialize DNS-SD\n");
+        return -1;
+    }
+    printf("✓ DNS-SD initialized\n");
 
     // Initialize Matter attribute system
     printf("\nStep 4/4: Initializing Matter attributes...\n");
@@ -405,6 +419,66 @@ void platform_manager_report_temperature_change(uint8_t endpoint) {
     // TemperatureMeasurement cluster (0x0402), MeasuredValue attribute (0x0000)
     // Note: Actual update happens in matter_bridge via matter_attributes_update()
     platform_manager_report_attribute_change(MATTER_CLUSTER_TEMPERATURE_MEASUREMENT, MATTER_ATTR_MEASURED_VALUE, endpoint);
+}
+
+int platform_manager_start_dns_sd_advertisement(void) {
+    if (!platform_initialized) {
+        printf("ERROR: Platform not initialized\n");
+        return -1;
+    }
+    
+    // Only advertise if connected to network
+    if (!network_adapter_is_connected()) {
+        printf("WARNING: Not connected to network, cannot advertise DNS-SD\n");
+        return -1;
+    }
+    
+    printf("\n");
+    printf("====================================\n");
+    printf("  Starting DNS-SD Advertisement\n");
+    printf("====================================\n");
+    
+    // Get device info from config
+    uint16_t vendor_id = CHIP_DEVICE_CONFIG_DEVICE_VENDOR_ID;
+    uint16_t product_id = CHIP_DEVICE_CONFIG_DEVICE_PRODUCT_ID;
+    uint16_t device_type = 0x0302;  // Temperature Sensor (Matter Device Library)
+    uint8_t commissioning_mode = 1;  // Always in commissioning mode for this device
+    
+    // Advertise the commissionable node
+    int result = dns_sd_advertise_commissionable_node(
+        device_discriminator,
+        vendor_id,
+        product_id,
+        device_type,
+        commissioning_mode
+    );
+    
+    if (result == 0) {
+        printf("\n✓ Device is now discoverable via DNS-SD\n");
+        printf("  Use 'dns-sd -B _matterc._udp' to verify\n");
+        printf("====================================\n\n");
+    } else {
+        printf("ERROR: Failed to start DNS-SD advertisement\n");
+    }
+    
+    return result;
+}
+
+void platform_manager_stop_dns_sd_advertisement(void) {
+    if (!platform_initialized) {
+        return;
+    }
+    
+    printf("Stopping DNS-SD advertisement...\n");
+    dns_sd_stop();
+}
+
+bool platform_manager_is_dns_sd_advertising(void) {
+    if (!platform_initialized) {
+        return false;
+    }
+    
+    return dns_sd_is_advertising();
 }
 
 } // extern "C"

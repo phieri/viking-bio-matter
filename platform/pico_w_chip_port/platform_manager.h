@@ -130,6 +130,27 @@ void platform_manager_report_level_change(uint8_t endpoint);
  */
 void platform_manager_report_temperature_change(uint8_t endpoint);
 
+/**
+ * Start DNS-SD advertisement for Matter device discovery
+ * Advertises the device as a commissionable Matter node on _matterc._udp
+ * Should be called after network connection is established
+ * 
+ * @return 0 on success, -1 on failure
+ */
+int platform_manager_start_dns_sd_advertisement(void);
+
+/**
+ * Stop DNS-SD advertisement
+ */
+void platform_manager_stop_dns_sd_advertisement(void);
+
+/**
+ * Check if DNS-SD is currently advertising
+ * 
+ * @return true if advertising, false otherwise
+ */
+bool platform_manager_is_dns_sd_advertising(void);
+
 #ifdef __cplusplus
 }
 #endif

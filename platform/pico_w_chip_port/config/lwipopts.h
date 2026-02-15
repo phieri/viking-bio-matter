@@ -48,6 +48,11 @@
 #define DHCP_DOES_ARP_CHECK         0
 #define LWIP_DHCP_DOES_ACD_CHECK    0
 
+// mDNS options for Matter device discovery
+#define LWIP_MDNS_RESPONDER         1
+#define LWIP_IGMP                   1
+#define LWIP_NUM_NETIF_CLIENT_DATA  1
+
 // Threading
 #define TCPIP_THREAD_STACKSIZE      1024
 #define DEFAULT_THREAD_STACKSIZE    1024
