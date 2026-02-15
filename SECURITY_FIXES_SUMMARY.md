@@ -245,8 +245,8 @@ Before deploying to production:
 - [x] Thread safety issues resolved
 - [x] Error handling improved
 - [x] Watchdog enabled
+- [x] Discriminator randomized on first boot (no longer hardcoded)
 - [ ] Update WiFi credentials (never commit real creds)
-- [ ] Change test discriminator to production value
 - [ ] Run full test suite
 - [ ] Perform security audit of PASE implementation
 - [ ] Validate with real Viking Bio 20 hardware
