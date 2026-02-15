@@ -58,6 +58,13 @@ void matter_bridge_init(void) {
         printf("WiFi credentials found in flash. Connecting...\n");
         if (platform_manager_connect_wifi(NULL, NULL) == 0) {
             printf("Successfully connected to WiFi using stored credentials\n");
+            
+            // Start DNS-SD advertisement now that network is connected
+            printf("\nStarting DNS-SD device discovery...\n");
+            if (platform_manager_start_dns_sd_advertisement() != 0) {
+                printf("WARNING: DNS-SD advertisement failed\n");
+                printf("         Device will not be discoverable via mDNS\n");
+            }
         } else {
             printf("WARNING: Failed to connect with stored credentials\n");
             printf("Starting commissioning mode for WiFi setup...\n");
@@ -72,6 +79,13 @@ void matter_bridge_init(void) {
             printf("Device will continue without network connectivity\n");
             initialized = false;
             return;
+        }
+        
+        // In SoftAP mode, also advertise on the AP network
+        printf("\nStarting DNS-SD device discovery (SoftAP)...\n");
+        if (platform_manager_start_dns_sd_advertisement() != 0) {
+            printf("WARNING: DNS-SD advertisement failed in SoftAP mode\n");
+            printf("         Device may not be discoverable via mDNS\n");
         }
     }
     

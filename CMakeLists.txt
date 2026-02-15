@@ -70,6 +70,7 @@ target_include_directories(viking_bio_matter PRIVATE
     src/matter_minimal/commissioning
     src/matter_minimal/interaction
     src/matter_minimal/clusters
+    src/matter_minimal/discovery
 )
 
 # Pull in all dependencies
@@ -92,6 +93,7 @@ target_link_libraries(viking_bio_matter
     matter_commissioning
     matter_interaction
     matter_clusters
+    matter_discovery
     -Wl,--end-group
 )
 
@@ -129,5 +131,6 @@ if(PICO_PLATFORM)
     add_subdirectory(src/matter_minimal/commissioning)
     add_subdirectory(src/matter_minimal/interaction)
     add_subdirectory(src/matter_minimal/clusters)
+    add_subdirectory(src/matter_minimal/discovery)
 endif()
 
