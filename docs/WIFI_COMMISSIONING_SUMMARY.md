@@ -48,10 +48,9 @@ Successfully implemented Matter-compliant WiFi commissioning with SoftAP support
 **Features:**
 - SoftAP Configuration:
   - SSID: `VikingBio-Setup`
-  - Password: `vikingbio2026`
   - Channel: 1
   - IP: 192.168.4.1
-  - Auth: WPA2-PSK
+  - Auth: Open (no password)
 - Functions:
   - `network_adapter_start_softap()` - Starts AP mode
   - `network_adapter_stop_softap()` - Stops AP mode
@@ -130,7 +129,7 @@ Artifacts:
 
 # 2. Connect to SoftAP
 # SSID: VikingBio-Setup
-# Password: vikingbio2026
+# Security: Open (no password)
 # Static IP: 192.168.4.2
 
 # 3. Convert WiFi credentials to hex
@@ -164,9 +163,9 @@ chip-tool pairing onnetwork 1 <PIN_FROM_SERIAL>
    - Magic header validation (0x4D545254)
 
 2. **SoftAP Security**
-   - WPA2-PSK authentication required
-   - Default password (should be changed in production)
+   - Open network (no authentication required)
    - Limited to commissioning phase only
+   - Should only be enabled when needed for initial setup
 
 3. **Matter Protocol**
    - Standard Matter security (PASE, session keys)
@@ -178,14 +177,14 @@ chip-tool pairing onnetwork 1 <PIN_FROM_SERIAL>
 
 2. **No DHCP server** - SoftAP clients must use static IP (192.168.4.x). This is a Pico SDK limitation.
 
-3. **Default SoftAP password** - Production deployments should use unique passwords or additional security measures.
+3. **Default SoftAP configuration** - Production deployments should implement additional security measures such as timeout-based auto-disable after commissioning.
 
 ### Recommendations for Production
-1. Generate unique SoftAP passwords per device (from MAC or serial number)
+1. Implement timeout for SoftAP mode (auto-disable after successful commissioning or after 30 minutes)
 2. Implement credential encryption if MCU resources allow
-3. Add timeout for SoftAP mode (auto-disable after 30 minutes)
-4. Implement rate limiting for Matter commissioning commands
-5. Add audit logging for credential changes
+3. Add rate limiting for Matter commissioning commands
+4. Implement audit logging for credential changes
+5. Consider WPA2-PSK with device-unique passwords for enhanced security if needed
 
 ## Files Changed Summary
 

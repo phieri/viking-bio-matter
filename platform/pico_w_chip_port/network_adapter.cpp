@@ -22,7 +22,6 @@ extern "C" {
 
 // SoftAP configuration
 #define SOFTAP_SSID "VikingBio-Setup"
-#define SOFTAP_PASSWORD "vikingbio2026"
 #define SOFTAP_CHANNEL 1
 
 // Network mode
@@ -69,11 +68,11 @@ int network_adapter_start_softap(void) {
 
     printf("Starting SoftAP mode...\n");
     printf("  SSID: %s\n", SOFTAP_SSID);
-    printf("  Password: %s\n", SOFTAP_PASSWORD);
     printf("  Channel: %d\n", SOFTAP_CHANNEL);
+    printf("  Security: Open (no password)\n");
 
-    // Enable AP mode
-    cyw43_arch_enable_ap_mode(SOFTAP_SSID, SOFTAP_PASSWORD, CYW43_AUTH_WPA2_AES_PSK);
+    // Enable AP mode with open authentication (no password)
+    cyw43_arch_enable_ap_mode(SOFTAP_SSID, NULL, CYW43_AUTH_OPEN);
 
     // Configure AP network interface with static IP
     ip4_addr_t ap_ip, ap_netmask, ap_gw;
