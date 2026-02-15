@@ -10,6 +10,7 @@
 #define VIKING_BIO_DATA_BITS 8
 #define VIKING_BIO_STOP_BITS 1
 #define VIKING_BIO_PARITY UART_PARITY_NONE
+#define VIKING_BIO_TIMEOUT_MS 30000  // 30 second timeout for stale data detection
 
 // Data packet structure representing Viking Bio 20 burner state
 typedef struct {
@@ -46,5 +47,14 @@ bool viking_bio_parse_data(const uint8_t *buffer, size_t length, viking_bio_data
  * @param data Output structure to receive cached data (must not be NULL)
  */
 void viking_bio_get_current_data(viking_bio_data_t *data);
+
+/**
+ * Check if serial data is stale (no data received for timeout period)
+ * Used to detect when the Viking Bio unit has powered off
+ * 
+ * @param timeout_ms Timeout period in milliseconds
+ * @return true if no data received for timeout_ms, false otherwise
+ */
+bool viking_bio_is_data_stale(uint32_t timeout_ms);
 
 #endif // VIKING_BIO_PROTOCOL_H

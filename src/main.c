@@ -53,6 +53,7 @@ int main() {
     viking_bio_data_t viking_data;
     uint32_t last_blink = 0;
     bool led_state = false;
+    bool timeout_triggered = false;  // Track if timeout has been triggered
     
     while (true) {
         // Update watchdog to prevent system reset
@@ -68,6 +69,12 @@ int main() {
             if (bytes_read > 0) {
                 // Parse Viking Bio data
                 if (viking_bio_parse_data(buffer, bytes_read, &viking_data)) {
+                    // Check if data resumed after timeout
+                    if (timeout_triggered) {
+                        printf("Viking Bio: Data resumed after timeout\n");
+                        timeout_triggered = false;
+                    }
+                    
                     // Update Matter attributes
                     matter_bridge_update_attributes(&viking_data);
                     
@@ -78,6 +85,24 @@ int main() {
                            viking_data.temperature);
                 }
             }
+        }
+        
+        // Check for data timeout (Viking Bio unit powered off)
+        if (!timeout_triggered && viking_bio_is_data_stale(VIKING_BIO_TIMEOUT_MS)) {
+            timeout_triggered = true;
+            printf("Viking Bio: No data received for 30s - clearing attributes\n");
+            
+            // Create cleared data structure
+            viking_bio_data_t cleared_data = {
+                .flame_detected = false,
+                .fan_speed = 0,
+                .temperature = 0,
+                .error_code = 0,
+                .valid = true
+            };
+            
+            // Update Matter attributes with cleared state
+            matter_bridge_update_attributes(&cleared_data);
         }
         
         // Update Matter bridge
