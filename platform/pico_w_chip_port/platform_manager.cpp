@@ -163,21 +163,15 @@ int platform_manager_init(void) {
         printf("First boot detected - generating random discriminator\n");
         
         // Generate random value in testing range (0xF00-0xFFF)
-        uint8_t random_bytes[2];
-        if (crypto_adapter_random(random_bytes, 2) != 0) {
+        uint8_t random_byte;
+        if (crypto_adapter_random(&random_byte, 1) != 0) {
             printf("ERROR: Failed to generate random discriminator\n");
             return -1;
         }
         
         // Map to testing range: 0xF00 + (random % 256)
-        // This gives us values from 0xF00 (3840) to 0xFFF (4095)
-        uint16_t random_offset = random_bytes[0];
-        device_discriminator = DISCRIMINATOR_TEST_MIN + random_offset;
-        
-        // Ensure we stay within bounds
-        if (device_discriminator > DISCRIMINATOR_TEST_MAX) {
-            device_discriminator = DISCRIMINATOR_TEST_MAX;
-        }
+        // This gives us exactly 256 values from 0xF00 (3840) to 0xFFF (4095)
+        device_discriminator = DISCRIMINATOR_TEST_MIN + random_byte;
         
         printf("Generated discriminator: %u (0x%03X)\n", 
                device_discriminator, device_discriminator);
