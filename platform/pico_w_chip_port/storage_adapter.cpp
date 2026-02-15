@@ -436,8 +436,17 @@ int storage_adapter_has_discriminator(void) {
         return 0;
     }
     
-    uint16_t discriminator = 0;
-    return (storage_adapter_load_discriminator(&discriminator) == 0) ? 1 : 0;
+    // Try to read without validation or logging - just check if file exists
+    uint16_t temp;
+    size_t actual_len = 0;
+    
+    int result = storage_adapter_read(DISCRIMINATOR_KEY,
+                                     (uint8_t *)&temp,
+                                     sizeof(uint16_t),
+                                     &actual_len);
+    
+    // Return 1 if file exists and has correct size, 0 otherwise
+    return (result == 0 && actual_len == sizeof(uint16_t)) ? 1 : 0;
 }
 
 int storage_adapter_clear_discriminator(void) {
