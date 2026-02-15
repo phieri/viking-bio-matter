@@ -208,6 +208,11 @@ int matter_protocol_task(void) {
     size_t recv_len;
     int messages_processed = 0;
     
+    // Static buffer for decrypted payloads to avoid use-after-free concerns
+    // While the stack-local buffer was technically safe (in scope during route_message),
+    // using a static buffer is more robust and eliminates any potential lifetime issues
+    static uint8_t plaintext_buffer[MATTER_MAX_PAYLOAD_SIZE];
+    
     // Check subscription intervals for periodic reporting
     // Note: In production, this would use actual time from pico SDK
     // For now, we pass 0 to indicate time checking is not active
@@ -225,16 +230,16 @@ int matter_protocol_task(void) {
         
         // Check if message needs decryption
         if (msg.header.session_id != 0) {
-            // Secured message - decrypt payload
-            uint8_t plaintext[MATTER_MAX_PAYLOAD_SIZE];
+            // Secured message - decrypt payload into persistent buffer
             size_t plaintext_len;
             
             if (session_decrypt(msg.header.session_id,
                               msg.payload, msg.payload_length,
-                              plaintext, sizeof(plaintext),
+                              plaintext_buffer, sizeof(plaintext_buffer),
                               &plaintext_len) == 0) {
                 // Update message with decrypted payload
-                msg.payload = plaintext;
+                // Safe to use plaintext_buffer as it's static and persists
+                msg.payload = plaintext_buffer;
                 msg.payload_length = plaintext_len;
             } else {
                 // Decryption failed
@@ -243,6 +248,7 @@ int matter_protocol_task(void) {
         }
         
         // Route message to appropriate handler
+        // msg.payload is now either the original buffer (unsecured) or plaintext_buffer (secured)
         if (route_message(&msg, source_ip, source_port) == 0) {
             messages_processed++;
         }
