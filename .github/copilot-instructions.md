@@ -469,7 +469,7 @@ As of February 15, 2026, comprehensive security review completed with all vulner
 
 **Pico SDK Submodules**: If you see "lwip.h: No such file or directory" or similar mbedTLS errors, the Pico SDK submodules are not initialized. Run `cd pico-sdk && git submodule update --init`.
 
-**WiFi Credentials**: Hardcoded in `platform/pico_w_chip_port/network_adapter.cpp` lines 10-11. For production, use SoftAP commissioning (192.168.4.1, SSID: VikingBio-Setup, Password: vikingbio2026) or environment variables. Never commit real credentials.
+**WiFi Credentials**: Hardcoded in `platform/pico_w_chip_port/network_adapter.cpp` lines 10-11. For production, use SoftAP commissioning (192.168.4.1, SSID: VikingBio-Setup, open network - no password) or environment variables. Never commit real credentials.
 
 **Firmware Size Changes**: If firmware size changes significantly (>±20KB text), verify:
 - No accidental debug code left enabled

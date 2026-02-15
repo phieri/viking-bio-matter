@@ -128,7 +128,7 @@ The device supports Matter-compliant WiFi commissioning with two modes:
 **Mode 1: SoftAP Commissioning (Recommended)**  
 When no WiFi credentials are stored, the device automatically starts a WiFi access point:
 - SSID: `VikingBio-Setup`
-- Password: `vikingbio2026`
+- Security: Open (no password required)
 - Device IP: `192.168.4.1`
 
 Use Matter NetworkCommissioning commands to provision WiFi credentials. See commissioning examples below.
@@ -190,7 +190,7 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
    
    **Via SoftAP (Recommended):**
    ```bash
-   # 1. Connect to device SoftAP: VikingBio-Setup (password: vikingbio2026)
+   # 1. Connect to device SoftAP: VikingBio-Setup (open network, no password)
    #    Configure static IP: 192.168.4.2
    
    # 2. Provision WiFi credentials (convert SSID/password to hex first)
@@ -253,7 +253,7 @@ For detailed commissioning steps and troubleshooting, see:
      - IP: 192.168.4.2
      - Netmask: 255.255.255.0
      - Gateway: 192.168.4.1
-  2. Verify WiFi password: `vikingbio2026`
+  2. Verify the network is open (no password required)
   3. Check that device is actually in SoftAP mode (check serial output)
 
 **Problem: Matter commands fail over SoftAP**
