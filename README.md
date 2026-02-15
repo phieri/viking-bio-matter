@@ -10,6 +10,8 @@ A Matter bridge for the [Viking Bio 20](https://varmebaronen.se/produkter/single
 - **Temperature Monitoring**: Reports burner temperature
 - **Matter Bridge**: Exposes burner data through Matter protocol over WiFi
 - **WiFi Connectivity**: Connects to your local network for Matter communication
+- **DNS-SD Discovery**: Automatic device discovery via mDNS (_matterc._udp)
+- **WiFi Commissioning**: SoftAP mode for easy network setup
 
 ## Security Status
 
@@ -233,6 +235,57 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
 For detailed commissioning steps and troubleshooting, see:
 - [docs/WIFI_COMMISSIONING_SUMMARY.md](docs/WIFI_COMMISSIONING_SUMMARY.md) - WiFi provisioning details
 - [platform/pico_w_chip_port/README.md](platform/pico_w_chip_port/README.md) - Matter configuration
+
+## Device Discovery
+
+The Viking Bio Matter Bridge implements DNS-SD (mDNS) for automatic device discovery, allowing Matter controllers to find the device without manual IP configuration.
+
+### Automatic Discovery
+
+Once the device is connected to WiFi, it automatically advertises itself as:
+- **Service Type**: `_matterc._udp.local`
+- **Hostname**: `matter-<discriminator>` (e.g., `matter-0F84`)
+- **Port**: 5540 (Matter commissioning port)
+
+### Verify Device is Discoverable
+
+**On macOS/Linux:**
+```bash
+# List all Matter commissionable devices
+dns-sd -B _matterc._udp
+
+# Get detailed information
+dns-sd -L matter-<discriminator> _matterc._udp
+```
+
+**On Linux with Avahi:**
+```bash
+# Browse for all services
+avahi-browse -a -r
+
+# Browse for Matter devices
+avahi-browse _matterc._udp -r
+```
+
+### TXT Records
+
+The device advertises the following TXT records (per Matter specification):
+- **D=**: Discriminator (12-bit value, e.g., `D=3972`)
+- **VP=**: Vendor:Product ID (format: `VID,PID`, e.g., `VP=65521,32769`)
+- **DT=**: Device Type (e.g., `DT=0x0302` for Temperature Sensor)
+- **CM=**: Commissioning Mode (`CM=1` = accepting commissioning)
+
+### Using chip-tool with Discovery
+
+```bash
+# Discover commissionable devices (finds device automatically)
+chip-tool discover commissionables
+
+# Commission using discovered device (no IP needed)
+chip-tool pairing code 1 <SETUP_PIN_FROM_SERIAL>
+```
+
+For complete DNS-SD implementation details, see [docs/DNS_SD_IMPLEMENTATION.md](docs/DNS_SD_IMPLEMENTATION.md).
 
 ## Troubleshooting
 
