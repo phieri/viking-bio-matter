@@ -55,7 +55,7 @@ int main() {
     uint32_t last_blink = 0;
     bool led_state = false;
     bool timeout_triggered = false;  // Track if timeout has been triggered
-    bool softap_timeout_logged = false;  // Track if SoftAP timeout message was logged
+    bool softap_timeout_handled = false;  // Track if SoftAP timeout has been handled to prevent re-execution
     
     while (true) {
         // Update watchdog to prevent system reset
@@ -112,8 +112,8 @@ int main() {
         
         // Check for SoftAP timeout (auto-disable after 30 minutes)
         // Only check once to avoid repeated calls to stop function
-        if (!softap_timeout_logged && network_adapter_softap_timeout_expired()) {
-            softap_timeout_logged = true;  // Set flag first to prevent re-entry
+        if (!softap_timeout_handled && network_adapter_softap_timeout_expired()) {
+            softap_timeout_handled = true;  // Set flag first to prevent re-entry
             printf("\n===========================================\n");
             printf("SoftAP TIMEOUT: 30 minutes have elapsed\n");
             printf("Automatically disabling SoftAP for security\n");
