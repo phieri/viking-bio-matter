@@ -25,7 +25,7 @@ static void network_subscriber_callback(uint8_t endpoint, uint32_t cluster_id,
 extern "C" int matter_network_subscriber_init(void) {
     // Initialize network transport
     if (matter_network_transport_init() != 0) {
-        printf("Matter Network: ERROR - Failed to initialize network transport\n");
+        printf("[Matter Network] ERROR: Failed to initialize network transport\n");
         return -1;
     }
     
@@ -38,7 +38,7 @@ extern "C" int matter_network_subscriber_init(void) {
         printf("Matter Network: Use matter_network_transport_add_controller() to register controllers\n\n");
         return 0;
     } else {
-        printf("Matter Network: ERROR - Failed to register network subscriber\n");
+        printf("[Matter Network] ERROR: Failed to register network subscriber\n");
         return -1;
     }
 }

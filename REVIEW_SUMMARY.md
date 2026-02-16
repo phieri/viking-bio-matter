@@ -167,21 +167,21 @@ Created comprehensive `docs/BLE_COMMISSIONING_SUMMARY.md` covering:
 ### Immediate (None Required)
 ✅ No immediate fixes needed. Code is production-ready.
 
-### Short-Term (Optional Enhancements)
-1. **Complete BLE TODOs** (3 items in `ble_adapter.cpp`):
-   - Implement Matter characteristic reads
-   - Add discriminator in manufacturer data
-   - Implement TX characteristic notification
+### Short-Term (Completed)
+1. ✅ **Complete BLE TODOs** (3 items in `ble_adapter.cpp`):
+   - ✅ Implement Matter characteristic reads (enhanced with informative implementation)
+   - ✅ Add discriminator in manufacturer data (implemented)
+   - ✅ Implement TX characteristic notification (enhanced with connection checking)
    
-2. **Add defensive NULL checks** to TLV writer functions
+2. ✅ **Add defensive NULL checks** to TLV writer functions (verified as already implemented)
 
-3. **Hardware validation** of BLE commissioning flow
+3. ⏳ **Hardware validation** of BLE commissioning flow (requires hardware)
 
 ### Long-Term (Future Improvements)
 1. Add unit tests for BLE commissioning
 2. Implement QR code generation for easier pairing
 3. Consider adding Web Bluetooth support
-4. Add more specific error codes to network commissioning
+4. Add more specific error codes to network commissioning (✅ partially completed)
 
 ---
 

@@ -586,14 +586,13 @@ Matter: LevelControl cluster updated - Fan speed 80%
    - ⏳ Alarm notifications
 
 4. **Protocol Extensions**
-   - ⏳ Support for multiple Viking Bio devices
-   - ⏳ Enhanced diagnostics
+   - ⏳ Enhanced diagnostics and monitoring
 
 5. **Production Readiness**
-   - ⏳ Per-device unique commissioning credentials
+   - ✅ Per-device unique commissioning credentials (MAC-derived PIN + random discriminator)
    - ⏳ Secure boot and attestation
    - ✅ Flash wear leveling for storage (LittleFS)
-   - ⏳ Watchdog and fault recovery
+   - ✅ Watchdog and fault recovery (8-second watchdog enabled)
 
 ## References
 

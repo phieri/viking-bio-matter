@@ -57,7 +57,7 @@ int matter_attributes_register(uint8_t endpoint, uint32_t cluster_id,
     }
     
     if (attribute_count >= MAX_ATTRIBUTES) {
-        printf("Matter: ERROR - Maximum attributes reached\n");
+        printf("[Matter] ERROR: Maximum attributes reached\n");
         return -1;
     }
     
@@ -227,7 +227,7 @@ int matter_attributes_subscribe(matter_subscriber_callback_t callback) {
     }
     
     critical_section_exit(&attr_lock);
-    printf("Matter: ERROR - Maximum subscribers reached\n");
+    printf("[Matter] ERROR: Maximum subscribers reached\n");
     return -1;
 }
 

@@ -60,14 +60,14 @@ int storage_adapter_init(void) {
     
     // Check if storage area is accessible
     if (STORAGE_FLASH_OFFSET + STORAGE_FLASH_SIZE > PICO_FLASH_SIZE_BYTES) {
-        printf("ERROR: Storage area exceeds flash size\n");
+        printf("[Storage] ERROR: Storage area exceeds flash size\n");
         return -1;
     }
 
     // Initialize LittleFS configuration
     lfs_cfg = pico_lfs_init(STORAGE_FLASH_OFFSET, STORAGE_FLASH_SIZE);
     if (!lfs_cfg) {
-        printf("ERROR: Failed to initialize LittleFS configuration\n");
+        printf("[Storage] ERROR: Failed to initialize LittleFS configuration\n");
         return -1;
     }
 
@@ -79,7 +79,7 @@ int storage_adapter_init(void) {
         // Format the filesystem
         err = lfs_format(&lfs, lfs_cfg);
         if (err != LFS_ERR_OK) {
-            printf("ERROR: Failed to format filesystem (error %d)\n", err);
+            printf("[Storage] ERROR: Failed to format filesystem (error %d)\n", err);
             pico_lfs_destroy(lfs_cfg);
             lfs_cfg = NULL;
             return -1;
@@ -88,7 +88,7 @@ int storage_adapter_init(void) {
         // Mount the newly formatted filesystem
         err = lfs_mount(&lfs, lfs_cfg);
         if (err != LFS_ERR_OK) {
-            printf("ERROR: Failed to mount new filesystem (error %d)\n", err);
+            printf("[Storage] ERROR: Failed to mount new filesystem (error %d)\n", err);
             pico_lfs_destroy(lfs_cfg);
             lfs_cfg = NULL;
             return -1;
@@ -111,7 +111,7 @@ int storage_adapter_write(const char *key, const uint8_t *value, size_t value_le
 
     size_t key_len = strlen(key);
     if (key_len == 0 || key_len >= LFS_NAME_MAX) {
-        printf("ERROR: Invalid key length\n");
+        printf("[Storage] ERROR: Invalid key length\n");
         return -1;
     }
 
@@ -125,18 +125,18 @@ int storage_adapter_write(const char *key, const uint8_t *value, size_t value_le
     lfs_file_t file;
     int err = lfs_file_open(&lfs, &file, filename, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC);
     if (err < 0) {
-        printf("ERROR: Failed to open file for writing (error %d)\n", err);
+        printf("[Storage] ERROR: Failed to open file for writing (error %d)\n", err);
         return -1;
     }
 
     // Write data
     lfs_ssize_t written = lfs_file_write(&lfs, &file, value, value_len);
     if (written < 0) {
-        printf("ERROR: Failed to write data (error %d)\n", (int)written);
+        printf("[Storage] ERROR: Failed to write data (error %d)\n", (int)written);
         lfs_file_close(&lfs, &file);
         return -1;
     } else if ((size_t)written != value_len) {
-        printf("ERROR: Incomplete write (wrote %d of %zu bytes)\n", (int)written, value_len);
+        printf("[Storage] ERROR: Incomplete write (wrote %d of %zu bytes)\n", (int)written, value_len);
         lfs_file_close(&lfs, &file);
         return -1;
     }
@@ -144,7 +144,7 @@ int storage_adapter_write(const char *key, const uint8_t *value, size_t value_le
     // Close file
     err = lfs_file_close(&lfs, &file);
     if (err < 0) {
-        printf("ERROR: Failed to close file (error %d)\n", err);
+        printf("[Storage] ERROR: Failed to close file (error %d)\n", err);
         return -1;
     }
 
@@ -177,7 +177,7 @@ int storage_adapter_read(const char *key, uint8_t *value, size_t max_value_len, 
     // Get file size
     lfs_soff_t file_size = lfs_file_size(&lfs, &file);
     if (file_size < 0) {
-        printf("ERROR: Failed to get file size (error %d)\n", (int)file_size);
+        printf("[Storage] ERROR: Failed to get file size (error %d)\n", (int)file_size);
         lfs_file_close(&lfs, &file);
         return -1;
     }
@@ -190,7 +190,7 @@ int storage_adapter_read(const char *key, uint8_t *value, size_t max_value_len, 
 
     lfs_ssize_t bytes_read = lfs_file_read(&lfs, &file, value, copy_len);
     if (bytes_read < 0) {
-        printf("ERROR: Failed to read data (error %d)\n", (int)bytes_read);
+        printf("[Storage] ERROR: Failed to read data (error %d)\n", (int)bytes_read);
         lfs_file_close(&lfs, &file);
         return -1;
     }
@@ -220,7 +220,7 @@ int storage_adapter_delete(const char *key) {
     // Remove file
     int err = lfs_remove(&lfs, filename);
     if (err < 0 && err != LFS_ERR_NOENT) {
-        printf("ERROR: Failed to delete file (error %d)\n", err);
+        printf("[Storage] ERROR: Failed to delete file (error %d)\n", err);
         return -1;
     }
 
@@ -240,7 +240,7 @@ int storage_adapter_clear_all(void) {
     // Format (this erases everything)
     int err = lfs_format(&lfs, lfs_cfg);
     if (err != LFS_ERR_OK) {
-        printf("ERROR: Failed to format filesystem (error %d)\n", err);
+        printf("[Storage] ERROR: Failed to format filesystem (error %d)\n", err);
         // Try to remount the old filesystem
         lfs_mount(&lfs, lfs_cfg);
         return -1;
@@ -249,7 +249,7 @@ int storage_adapter_clear_all(void) {
     // Remount
     err = lfs_mount(&lfs, lfs_cfg);
     if (err != LFS_ERR_OK) {
-        printf("ERROR: Failed to remount filesystem (error %d)\n", err);
+        printf("[Storage] ERROR: Failed to remount filesystem (error %d)\n", err);
         return -1;
     }
     
@@ -259,7 +259,7 @@ int storage_adapter_clear_all(void) {
 
 int storage_adapter_save_wifi_credentials(const char *ssid, const char *password) {
     if (!storage_initialized || !ssid || !password) {
-        printf("ERROR: Invalid parameters for WiFi credential storage\n");
+        printf("[Storage] ERROR: Invalid parameters for WiFi credential storage\n");
         return -1;
     }
     
@@ -267,12 +267,12 @@ int storage_adapter_save_wifi_credentials(const char *ssid, const char *password
     size_t password_len = strlen(password);
     
     if (ssid_len == 0 || ssid_len > MAX_SSID_LENGTH) {
-        printf("ERROR: Invalid SSID length: %zu (max %d)\n", ssid_len, MAX_SSID_LENGTH);
+        printf("[Storage] ERROR: Invalid SSID length: %zu (max %d)\n", ssid_len, MAX_SSID_LENGTH);
         return -1;
     }
     
     if (password_len > MAX_PASSWORD_LENGTH) {
-        printf("ERROR: Invalid password length: %zu (max %d)\n", password_len, MAX_PASSWORD_LENGTH);
+        printf("[Storage] ERROR: Invalid password length: %zu (max %d)\n", password_len, MAX_PASSWORD_LENGTH);
         return -1;
     }
     
@@ -294,7 +294,7 @@ int storage_adapter_save_wifi_credentials(const char *ssid, const char *password
     if (result == 0) {
         printf("WiFi credentials saved to flash (SSID: %s)\n", ssid);
     } else {
-        printf("ERROR: Failed to save WiFi credentials\n");
+        printf("[Storage] ERROR: Failed to save WiFi credentials\n");
     }
     
     return result;
@@ -321,18 +321,18 @@ int storage_adapter_load_wifi_credentials(char *ssid, size_t ssid_buffer_len,
     
     // Validate credentials
     if (!creds.valid || creds.ssid_len == 0 || creds.ssid_len > MAX_SSID_LENGTH) {
-        printf("ERROR: Invalid WiFi credentials in storage\n");
+        printf("[Storage] ERROR: Invalid WiFi credentials in storage\n");
         return -1;
     }
     
     // Copy to output buffers
     if (ssid_buffer_len < creds.ssid_len + 1) {
-        printf("ERROR: SSID buffer too small\n");
+        printf("[Storage] ERROR: SSID buffer too small\n");
         return -1;
     }
     
     if (password_buffer_len < creds.password_len + 1) {
-        printf("ERROR: Password buffer too small\n");
+        printf("[Storage] ERROR: Password buffer too small\n");
         return -1;
     }
     
@@ -376,13 +376,13 @@ int storage_adapter_clear_wifi_credentials(void) {
 
 int storage_adapter_save_discriminator(uint16_t discriminator) {
     if (!storage_initialized) {
-        printf("ERROR: Storage not initialized\n");
+        printf("[Storage] ERROR: Storage not initialized\n");
         return -1;
     }
     
     // Validate discriminator is within 12-bit range (0-4095)
     if (discriminator > 0x0FFF) {
-        printf("ERROR: Invalid discriminator value: %u (max 4095)\n", discriminator);
+        printf("[Storage] ERROR: Invalid discriminator value: %u (max 4095)\n", discriminator);
         return -1;
     }
     
@@ -396,7 +396,7 @@ int storage_adapter_save_discriminator(uint16_t discriminator) {
     if (result == 0) {
         printf("Discriminator saved successfully\n");
     } else {
-        printf("ERROR: Failed to save discriminator\n");
+        printf("[Storage] ERROR: Failed to save discriminator\n");
     }
     
     return result;
@@ -422,7 +422,7 @@ int storage_adapter_load_discriminator(uint16_t *discriminator) {
     
     // Validate discriminator is within 12-bit range
     if (stored_value > 0x0FFF) {
-        printf("ERROR: Invalid discriminator in storage: %u\n", stored_value);
+        printf("[Storage] ERROR: Invalid discriminator in storage: %u\n", stored_value);
         return -1;
     }
     

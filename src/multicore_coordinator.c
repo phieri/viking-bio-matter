@@ -101,7 +101,7 @@ int multicore_coordinator_launch_core1(void) {
         printf("  - Core 1: Matter protocol, network tasks, reporting\n");
         return 0;
     } else {
-        printf("ERROR: Core 1 failed to start\n");
+        printf("[Multicore] ERROR: Core 1 failed to start\n");
         return -1;
     }
 }

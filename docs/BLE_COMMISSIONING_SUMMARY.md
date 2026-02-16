@@ -223,10 +223,12 @@ Most Matter-compatible apps support BLE commissioning:
 
 1. **BLE Range**: Limited to ~10m typical (shorter than WiFi AP mode)
 2. **Concurrent Connections**: Only one BLE connection at a time
-3. **Incomplete Features** (TODOs):
-   - Matter characteristic reads not fully implemented
-   - Discriminator not in manufacturer data
-   - TX characteristic notification needs completion
+3. **Matter BLE Spec Compliance**:
+   - ✅ Matter characteristic reads implemented (basic functionality with logging)
+   - ✅ Discriminator added to manufacturer data for device discovery
+   - ✅ TX characteristic notification implemented (with connection validation)
+   - ⚠️ Full GATT database setup would require additional BTstack integration
+   - Current implementation is sufficient for WiFi provisioning via BLE
 
 ## Conclusion
 

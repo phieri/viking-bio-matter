@@ -78,9 +78,19 @@ int network_commissioning_add_or_update_wifi(
     printf("  Credentials: %s\n", password_str[0] ? "***" : "(none)");
     
     // Save credentials to storage
-    if (storage_adapter_save_wifi_credentials(ssid_str, password_str) != 0) {
-        printf("NetworkCommissioning: Failed to save credentials\n");
-        last_status = NETWORK_STATUS_UNKNOWN_ERROR;
+    int storage_result = storage_adapter_save_wifi_credentials(ssid_str, password_str);
+    if (storage_result != 0) {
+        // Map storage error to specific network commissioning status
+        // Storage adapter logs detailed error, we provide high-level status
+        if (ssid_len == 0 || ssid_len > 32 || credentials_len > 64) {
+            // Length validation failed (should have been caught earlier)
+            last_status = NETWORK_STATUS_OUT_OF_RANGE;
+            printf("NetworkCommissioning: Failed to save credentials - parameter out of range\n");
+        } else {
+            // General storage failure (disk full, I/O error, corruption, etc.)
+            last_status = NETWORK_STATUS_OTHER_CONNECTION_FAILURE;
+            printf("NetworkCommissioning: Failed to save credentials - storage error\n");
+        }
         return -1;
     }
     

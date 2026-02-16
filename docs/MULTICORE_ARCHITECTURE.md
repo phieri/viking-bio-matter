@@ -254,11 +254,10 @@ Minimal changes in main.c:
 ## Future Enhancements
 
 Possible optimizations:
-1. **Adjustable queue size** - Runtime configuration based on load
-2. **Core 1 statistics** - More detailed performance metrics
-3. **Dynamic task distribution** - Move tasks between cores based on load
-4. **Wake-on-queue** - Use FIFO IRQ to wake Core 1 immediately (reduce sleep latency)
-5. **Load balancing** - Distribute Matter subscriptions across cores
+1. **Core 1 statistics** - More detailed performance metrics
+2. **Dynamic task distribution** - Move tasks between cores based on load
+3. **Wake-on-queue** - Use FIFO IRQ to wake Core 1 immediately (reduce sleep latency)
+4. **Load balancing** - Distribute Matter subscriptions across cores
 
 ## Conclusion
 

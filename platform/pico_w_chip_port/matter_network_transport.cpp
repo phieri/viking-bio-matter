@@ -31,7 +31,7 @@ int matter_network_transport_init(void) {
     // Create UDP socket for sending reports
     udp_pcb = udp_new();
     if (!udp_pcb) {
-        printf("Matter Transport: ERROR - Failed to create UDP socket\n");
+        printf("[Matter Transport] ERROR: Failed to create UDP socket\n");
         return -1;
     }
     
@@ -52,7 +52,7 @@ int matter_network_transport_add_controller(const char *ip_address, uint16_t por
             // Parse IP address
             ip_addr_t ipaddr;
             if (!ipaddr_aton(ip_address, &ipaddr)) {
-                printf("Matter Transport: ERROR - Invalid IP address: %s\n", ip_address);
+                printf("[Matter Transport] ERROR: Invalid IP address: %s\n", ip_address);
                 return -1;
             }
             
@@ -66,7 +66,7 @@ int matter_network_transport_add_controller(const char *ip_address, uint16_t por
         }
     }
     
-    printf("Matter Transport: ERROR - Maximum controllers reached\n");
+    printf("[Matter Transport] ERROR: Maximum controllers reached\n");
     return -1;
 }
 
@@ -159,7 +159,7 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
     
     // Check for truncation
     if (msg_len >= (int)sizeof(message)) {
-        printf("Matter Transport: ERROR - Message truncated\n");
+        printf("[Matter Transport] ERROR: Message truncated\n");
         return -1;
     }
     
@@ -184,7 +184,7 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
         // Allocate buffer for UDP packet (use msg_len for efficiency)
         struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, msg_len, PBUF_RAM);
         if (!p) {
-            printf("Matter Transport: ERROR - Failed to allocate pbuf\n");
+            printf("[Matter Transport] ERROR: Failed to allocate pbuf\n");
             continue;
         }
         
@@ -201,7 +201,7 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
             controllers[i].last_report_time = now;
             sent_count++;
         } else {
-            printf("Matter Transport: ERROR - Failed to send to controller [%d], error %d\n", i, err);
+            printf("[Matter Transport] ERROR: Failed to send to controller [%d], error %d\n", i, err);
         }
     }
     
