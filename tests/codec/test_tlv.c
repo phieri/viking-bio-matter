@@ -307,6 +307,19 @@ void test_buffer_overflow_handling(void) {
     PASS();
 }
 
+// Test: NULL buffer handling
+void test_null_buffer_handling(void) {
+    TEST("test_null_buffer_handling");
+
+    tlv_writer_t writer;
+    tlv_writer_init(&writer, NULL, 0);
+
+    int result = tlv_encode_uint8(&writer, 1, 10);
+    assert(result == -1);
+
+    PASS();
+}
+
 int main(void) {
     printf("=== TLV Codec Test Suite ===\n\n");
     
@@ -323,6 +336,7 @@ int main(void) {
     test_decode_all_types();
     test_reader_find_tag();
     test_buffer_overflow_handling();
+    test_null_buffer_handling();
     
     printf("\n=== All tests passed! ===\n");
     return 0;

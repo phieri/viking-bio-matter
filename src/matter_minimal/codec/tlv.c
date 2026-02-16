@@ -50,6 +50,10 @@
  * Helper function to write a control byte and optional tag
  */
 static int write_control_and_tag(tlv_writer_t *writer, uint8_t type, uint8_t length, uint8_t tag) {
+    if (writer == NULL || writer->buffer == NULL) {
+        return -1;
+    }
+
     if (writer->offset >= writer->buffer_size) {
         return -1;
     }
@@ -79,6 +83,10 @@ static int write_control_and_tag(tlv_writer_t *writer, uint8_t type, uint8_t len
  * Helper function to write bytes in little-endian order
  */
 static int write_bytes(tlv_writer_t *writer, const void *data, size_t size) {
+    if (writer == NULL || writer->buffer == NULL) {
+        return -1;
+    }
+
     if (writer->offset + size > writer->buffer_size) {
         return -1;
     }

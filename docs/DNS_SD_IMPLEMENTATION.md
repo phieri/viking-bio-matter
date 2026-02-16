@@ -266,7 +266,7 @@ None reported. Implementation follows lwIP mDNS API best practices.
 **Problem**: `dns-sd -B _matterc._udp` doesn't show device
 
 **Checks**:
-1. Verify network connection: Device must be connected (STA or AP mode)
+1. Verify network connection: Device must be connected in STA mode
 2. Check firewall: Ensure UDP port 5353 (mDNS) is not blocked
 3. Same network: Controller and device must be on same network/subnet
 4. Serial output: Look for "DNS-SD advertisement started successfully" message
