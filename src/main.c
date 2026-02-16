@@ -121,7 +121,7 @@ int main() {
     uint8_t buffer[SERIAL_BUFFER_SIZE];
     viking_bio_data_t viking_data;
     bool timeout_triggered = false;  // Track if timeout has been triggered
-    bool softap_timeout_handled = false;  // Track if SoftAP timeout has been handled to prevent re-execution
+    bool ble_commissioning_stopped = false;  // Track if BLE has been stopped after WiFi connection
     uint32_t led_tick_off_time = 0;  // Timestamp when LED tick should turn off
     bool led_tick_active = false;    // Track if LED tick is active
     uint32_t led_grace_period_end = 0;  // Timestamp when grace period after tick ends
@@ -218,22 +218,26 @@ int main() {
                 }
             }
             
-            // Check for SoftAP timeout (auto-disable after 30 minutes)
-            // Only check once to avoid repeated calls to stop function
-            if (!softap_timeout_handled && network_adapter_softap_timeout_expired()) {
-                softap_timeout_handled = true;  // Set flag first to prevent re-entry
-                printf("\n===========================================\n");
-                printf("SoftAP TIMEOUT: 30 minutes have elapsed\n");
-                printf("Automatically disabling SoftAP for security\n");
-                printf("===========================================\n\n");
+            // Check if WiFi is connected and BLE commissioning should be stopped
+            if (!ble_commissioning_stopped && network_adapter_is_connected() && matter_protocol_is_commissioned()) {
+                ble_commissioning_stopped = true;  // Set flag first to prevent re-entry
                 
-                if (network_adapter_stop_softap() == 0) {
-                    printf("✓ SoftAP disabled successfully\n");
-                    printf("  Device will continue operating without SoftAP\n");
-                    printf("  To re-enable commissioning mode, restart device\n\n");
+                printf("\n");
+                printf("====================================\n");
+                printf("  WiFi Connected & Commissioned\n");
+                printf("====================================\n");
+                printf("Stopping BLE commissioning mode...\n");
+                
+                // Stop BLE commissioning after WiFi is connected and device is commissioned
+                extern int platform_manager_stop_commissioning_mode(void);
+                if (platform_manager_stop_commissioning_mode() == 0) {
+                    printf("✓ BLE commissioning stopped successfully\n");
+                    printf("Device will continue operating over WiFi\n");
                 } else {
-                    printf("ERROR: Failed to disable SoftAP\n\n");
+                    printf("WARNING: Failed to stop BLE commissioning\n");
                 }
+                
+                printf("====================================\n\n");
             }
             
             work_done = true;

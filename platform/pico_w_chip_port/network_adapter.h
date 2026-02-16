@@ -1,7 +1,7 @@
 /*
  * network_adapter.h
  * Network adapter API for Pico W (CYW43439 WiFi chip)
- * Supports both Station (STA) and Access Point (AP) modes
+ * Supports Station (STA) mode for WiFi connectivity
  */
 
 #ifndef NETWORK_ADAPTER_H
@@ -20,8 +20,7 @@ extern "C" {
  */
 typedef enum {
     NETWORK_MODE_NONE = 0,  // Not connected
-    NETWORK_MODE_STA,       // Station mode (WiFi client)
-    NETWORK_MODE_AP         // Access Point mode (SoftAP)
+    NETWORK_MODE_STA        // Station mode (WiFi client)
 } network_mode_t;
 
 /**
@@ -30,29 +29,6 @@ typedef enum {
  * @return 0 on success, -1 on error
  */
 int network_adapter_init(void);
-
-/**
- * Start SoftAP mode for commissioning
- * Creates a WiFi access point that clients can connect to
- * 
- * @return 0 on success, -1 on error
- */
-int network_adapter_start_softap(void);
-
-/**
- * Stop SoftAP mode
- * 
- * @return 0 on success, -1 on error
- */
-int network_adapter_stop_softap(void);
-
-/**
- * Check if SoftAP timeout has expired
- * SoftAP is automatically disabled after 30 minutes to improve security
- * 
- * @return true if SoftAP has been running for more than 30 minutes
- */
-bool network_adapter_softap_timeout_expired(void);
 
 /**
  * Connect to WiFi network in station mode
@@ -76,16 +52,9 @@ int network_adapter_save_and_connect(const char *ssid, const char *password);
 /**
  * Check if WiFi is connected
  * 
- * @return true if connected (either STA or AP mode)
+ * @return true if connected in STA mode
  */
 bool network_adapter_is_connected(void);
-
-/**
- * Check if in SoftAP mode
- * 
- * @return true if in AP mode
- */
-bool network_adapter_is_softap_mode(void);
 
 /**
  * Get current network mode
