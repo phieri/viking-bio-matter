@@ -185,7 +185,7 @@ void network_reporter(uint8_t endpoint, uint32_t cluster_id,
 }
 ```
 
-### Future Enhancements
+### Planned Enhancements
 - Add more standard Matter clusters
 - Implement persistent storage for attributes
 - Enhance Matter protocol features

@@ -230,12 +230,11 @@ Matter Transport: Sent report to 1 controller(s)
 
 ### Possible Improvements
 
-1. **TCP Transport**: Add reliable TCP option for critical attributes
-2. **TLS/DTLS**: Encrypt attribute reports
-3. **Binary Format**: Use efficient binary encoding instead of JSON
-4. **Matter Protocol**: Implement full Matter protocol messages
-5. **Subscription Management**: Allow controllers to subscribe/unsubscribe dynamically
-6. **ACK Mechanism**: Confirm receipt of reports
+1. **TLS/DTLS**: Encrypt attribute reports for secure transmission
+2. **Binary Format**: Use efficient binary encoding instead of JSON
+3. **Matter Protocol**: Implement full Matter protocol messages
+4. **Subscription Management**: Allow controllers to subscribe/unsubscribe dynamically
+5. **ACK Mechanism**: Confirm receipt of reports
 
 ## API Reference
 
