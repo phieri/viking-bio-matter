@@ -9,6 +9,9 @@
 #ifndef MBEDTLS_CONFIG_H
 #define MBEDTLS_CONFIG_H
 
+// Allow access to private struct members for compatibility
+#define MBEDTLS_ALLOW_PRIVATE_ACCESS
+
 // System support
 #define MBEDTLS_PLATFORM_C
 #define MBEDTLS_PLATFORM_MEMORY
@@ -41,6 +44,8 @@
 #define MBEDTLS_PK_WRITE_C
 #define MBEDTLS_PKCS5_C
 #define MBEDTLS_RSA_C
+#define MBEDTLS_PKCS1_V15   // Required by MBEDTLS_RSA_C in mbedTLS 3.x
+#define MBEDTLS_PKCS1_V21   // Required by MBEDTLS_RSA_C in mbedTLS 3.x
 #define MBEDTLS_SHA1_C
 #define MBEDTLS_SHA256_C
 #define MBEDTLS_SHA512_C
