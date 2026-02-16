@@ -188,7 +188,7 @@ int ble_adapter_init(void) {
     att_server_init(NULL, att_read_callback, att_write_callback);
     
     // Register packet handler
-    hci_event_callback_registration_t hci_event_callback;
+    btstack_packet_callback_registration_t hci_event_callback;
     hci_event_callback.callback = &packet_handler;
     hci_add_event_handler(&hci_event_callback);
     
