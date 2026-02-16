@@ -114,8 +114,9 @@ int main() {
         matter_bridge_task();
         
         // Check for SoftAP timeout (auto-disable after 30 minutes)
+        // Only check once to avoid repeated calls to stop function
         if (!softap_timeout_logged && network_adapter_softap_timeout_expired()) {
-            softap_timeout_logged = true;
+            softap_timeout_logged = true;  // Set flag first to prevent re-entry
             printf("\n===========================================\n");
             printf("SoftAP TIMEOUT: 30 minutes have elapsed\n");
             printf("Automatically disabling SoftAP for security\n");

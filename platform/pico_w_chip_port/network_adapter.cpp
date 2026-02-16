@@ -194,11 +194,11 @@ int network_adapter_connect(const char *ssid, const char *password) {
     current_mode = NETWORK_MODE_STA;
     wifi_connected = true;
     
-    // Auto-disable SoftAP after successful connection to WiFi
-    // This improves security by closing the open access point
-    // Note: SoftAP should not be running at this point, but check anyway
+    // Note: SoftAP should not be running at this point since we call
+    // network_adapter_stop_softap() before connecting in station mode.
+    // However, we still clear the timestamp as a safety measure.
     if (softap_start_time != 0) {
-        printf("Auto-disabling SoftAP after successful WiFi connection\n");
+        printf("Note: Clearing SoftAP timestamp (should already be stopped)\n");
         softap_start_time = 0;
     }
     
@@ -293,9 +293,12 @@ bool network_adapter_softap_timeout_expired(void) {
     uint32_t current_time = to_ms_since_boot(get_absolute_time());
     uint32_t elapsed_time = current_time - softap_start_time;
     
-    // Handle timestamp wrap-around (occurs after ~49.7 days)
-    // Unsigned arithmetic naturally handles wrap-around correctly
-    // for elapsed time calculations up to 2^31 ms (~24.8 days)
+    // Handle timestamp wrap-around correctly for timeouts up to 30 minutes
+    // Unsigned arithmetic naturally handles wrap-around correctly for
+    // elapsed time calculations. The 30-minute timeout (1,800,000 ms) is
+    // well within the safe range for wrap-around handling.
+    // Note: This works correctly even if current_time wraps around to 0,
+    // as long as the timeout period is less than 2^31 ms (~24.8 days).
     return elapsed_time >= SOFTAP_TIMEOUT_MS;
 }
 
