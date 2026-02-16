@@ -58,6 +58,7 @@ int main() {
     bool softap_timeout_handled = false;  // Track if SoftAP timeout has been handled to prevent re-execution
     uint32_t led_tick_off_time = 0;  // Timestamp when LED tick should turn off
     bool led_tick_active = false;    // Track if LED tick is active
+    uint32_t led_grace_period_end = 0;  // Timestamp when grace period after tick ends
     
     while (true) {
         // Update watchdog to prevent system reset
@@ -141,11 +142,13 @@ int main() {
         if (led_tick_active && now >= led_tick_off_time) {
             LED_SET(0);
             led_tick_active = false;
+            // Set grace period: keep LED off for 800ms after tick to make it visible
+            led_grace_period_end = now + 800;
         }
         
         // LED behavior: Constantly ON when connected to WiFi + Matter fabric but not receiving serial data
         // When receiving serial data, show 200ms tick instead
-        if (!led_tick_active) {
+        if (!led_tick_active && now >= led_grace_period_end) {
             // Check if connected to WiFi and commissioned to Matter fabric
             if (network_adapter_is_connected() && matter_protocol_is_commissioned()) {
                 // Keep LED constantly on to indicate ready state
