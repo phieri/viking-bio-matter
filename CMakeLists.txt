@@ -21,6 +21,51 @@ project(viking_bio_matter C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
+# ============================================
+# Build Version Information
+# ============================================
+# Get git information for versioning
+execute_process(
+    COMMAND git describe --tags --always --dirty
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_VERSION
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+
+# If git describe fails, try to get just the commit hash
+if(NOT GIT_VERSION)
+    execute_process(
+        COMMAND git rev-parse --short HEAD
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_COMMIT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if(GIT_COMMIT)
+        set(GIT_VERSION "${GIT_COMMIT}")
+    else()
+        set(GIT_VERSION "unknown")
+    endif()
+endif()
+
+# Get current timestamp
+string(TIMESTAMP BUILD_TIMESTAMP "%Y-%m-%d %H:%M:%S UTC" UTC)
+
+# Set firmware version
+set(FIRMWARE_VERSION "${GIT_VERSION}")
+
+message(STATUS "Firmware Version: ${FIRMWARE_VERSION}")
+message(STATUS "Build Timestamp: ${BUILD_TIMESTAMP}")
+
+# Pass version info as compile definitions
+add_compile_definitions(
+    FIRMWARE_VERSION="${FIRMWARE_VERSION}"
+    BUILD_TIMESTAMP="${BUILD_TIMESTAMP}"
+    GIT_COMMIT_HASH="${GIT_VERSION}"
+)
+# ============================================
+
 # Initialize the Pico SDK
 pico_sdk_init()
 
@@ -47,6 +92,7 @@ add_compile_options(
 # Define source files (Matter platform included)
 set(SOURCES
     src/main.c
+    src/version.c
     src/serial_handler.c
     src/matter_bridge.cpp
     src/viking_bio_protocol.c
@@ -125,6 +171,24 @@ pico_enable_stdio_uart(viking_bio_matter 0)
 
 # Create map/bin/hex/uf2 file etc.
 pico_add_extra_outputs(viking_bio_matter)
+
+# Rename output files to include version
+# This creates versioned copies while keeping the original names for compatibility
+add_custom_command(TARGET viking_bio_matter POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_BINARY_DIR}/viking_bio_matter.uf2
+        ${CMAKE_BINARY_DIR}/viking_bio_matter-${FIRMWARE_VERSION}.uf2
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_BINARY_DIR}/viking_bio_matter.elf
+        ${CMAKE_BINARY_DIR}/viking_bio_matter-${FIRMWARE_VERSION}.elf
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_BINARY_DIR}/viking_bio_matter.bin
+        ${CMAKE_BINARY_DIR}/viking_bio_matter-${FIRMWARE_VERSION}.bin
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_BINARY_DIR}/viking_bio_matter.hex
+        ${CMAKE_BINARY_DIR}/viking_bio_matter-${FIRMWARE_VERSION}.hex
+    COMMENT "Creating versioned firmware files: viking_bio_matter-${FIRMWARE_VERSION}.*"
+)
 
 target_include_directories(viking_bio_matter PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
