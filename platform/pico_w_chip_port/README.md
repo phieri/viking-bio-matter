@@ -39,7 +39,7 @@ The port consists of several adapter layers:
 
 ### Prerequisites
 
-1. **Pico SDK** (version 1.5.0 or later)
+1. **Pico SDK** (version 2.2.0 or later)
    ```bash
    export PICO_SDK_PATH=/path/to/pico-sdk
    ```
@@ -52,6 +52,8 @@ The port consists of several adapter layers:
    # macOS
    brew install arm-none-eabi-gcc
    ```
+
+**Note**: Pico SDK 2.2.0 includes mbedTLS 3.6.2, which requires compatibility flags defined in the project's mbedtls_config.h.
 
 ### Build Configuration
 

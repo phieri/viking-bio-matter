@@ -85,9 +85,9 @@ F:1,S:50,T:75\n
 
 ### Prerequisites
 
-1. Install the Pico SDK:
+1. Install the Pico SDK (v2.2.0 or later):
    ```bash
-   git clone https://github.com/raspberrypi/pico-sdk.git
+   git clone --branch 2.2.0 https://github.com/raspberrypi/pico-sdk.git
    cd pico-sdk
    git submodule update --init
    export PICO_SDK_PATH=$(pwd)
@@ -101,6 +101,8 @@ F:1,S:50,T:75\n
    # macOS
    brew install cmake arm-none-eabi-gcc
    ```
+
+**Note**: This project requires Pico SDK 2.2.0 or later for full compatibility with mbedTLS 3.6.2 and latest platform features.
 
 ### Build Steps
 
@@ -539,7 +541,7 @@ Matter: LevelControl cluster updated - Fan speed 80%
 1. **No OTA support**: Firmware updates require physical USB access (hold BOOTSEL button and copy .uf2 file)
 2. **WiFi only**: No Thread or Ethernet support currently
 3. **Limited fabrics**: Maximum 5 Matter fabrics due to memory constraints (264KB RAM on RP2040)
-4. **Crypto limitations**: DRBG and RNG functions are stubbed due to Pico SDK 1.5.1 mbedTLS bugs (SHA256 and AES work correctly)
+4. **Crypto limitations**: mbedTLS CTR_DRBG wrapper (`crypto_adapter_random()`) is stubbed due to entropy source configuration complexity. However, the RP2040 hardware RNG (`get_rand_32()`) is fully functional and used by PASE for secure random number generation (SHA256 and AES also work correctly)
 
 ## Security Considerations
 

@@ -35,7 +35,7 @@ if [ -z "$PICO_SDK_PATH" ]; then
     if [[ "$response" =~ ^[Yy]$ ]]; then
         echo "Downloading Pico SDK..."
         if [ ! -d "pico-sdk" ]; then
-            git clone --depth 1 --branch 1.5.1 https://github.com/raspberrypi/pico-sdk.git
+            git clone --depth 1 --branch 2.2.0 https://github.com/raspberrypi/pico-sdk.git
             cd pico-sdk
             git submodule update --init
             cd ..

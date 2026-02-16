@@ -8,6 +8,11 @@ elseif(NOT PICO_BOARD STREQUAL "pico_w")
     message(FATAL_ERROR "This firmware requires PICO_BOARD=pico_w (current: ${PICO_BOARD})")
 endif()
 
+# Set custom mbedTLS configuration (SDK 2.x) - must be before pico_sdk_import.cmake
+# Define MBEDTLS_ALLOW_PRIVATE_ACCESS to enable access to private members in mbedTLS 3.x
+add_compile_definitions(MBEDTLS_ALLOW_PRIVATE_ACCESS)
+set(PICO_MBEDTLS_CONFIG_HEADER "${CMAKE_CURRENT_LIST_DIR}/platform/pico_w_chip_port/config/mbedtls_config.h" CACHE STRING "Custom mbedTLS config" FORCE)
+
 # Initialize the Pico SDK
 include(pico_sdk_import.cmake)
 
