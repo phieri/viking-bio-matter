@@ -7,7 +7,7 @@
 #include "serial_handler.h"
 #include "viking_bio_protocol.h"
 #include "matter_bridge.h"
-#include "../platform/pico_w_chip_port/network_adapter.h"
+#include "network_adapter.h"
 
 // LED control for Pico W (CYW43 chip controls the LED, but requires complex setup)
 // LED is disabled for Matter builds to avoid lwIP dependency issues in main
