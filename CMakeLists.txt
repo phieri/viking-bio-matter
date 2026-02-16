@@ -173,21 +173,20 @@ pico_enable_stdio_uart(viking_bio_matter 0)
 pico_add_extra_outputs(viking_bio_matter)
 
 # Rename output files to include version
-# This creates versioned copies while keeping the original names for compatibility
 add_custom_command(TARGET viking_bio_matter POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
+    COMMAND ${CMAKE_COMMAND} -E rename
         ${CMAKE_BINARY_DIR}/viking_bio_matter.uf2
         ${CMAKE_BINARY_DIR}/viking_bio_matter-${FIRMWARE_VERSION}.uf2
-    COMMAND ${CMAKE_COMMAND} -E copy
+    COMMAND ${CMAKE_COMMAND} -E rename
         ${CMAKE_BINARY_DIR}/viking_bio_matter.elf
         ${CMAKE_BINARY_DIR}/viking_bio_matter-${FIRMWARE_VERSION}.elf
-    COMMAND ${CMAKE_COMMAND} -E copy
+    COMMAND ${CMAKE_COMMAND} -E rename
         ${CMAKE_BINARY_DIR}/viking_bio_matter.bin
         ${CMAKE_BINARY_DIR}/viking_bio_matter-${FIRMWARE_VERSION}.bin
-    COMMAND ${CMAKE_COMMAND} -E copy
+    COMMAND ${CMAKE_COMMAND} -E rename
         ${CMAKE_BINARY_DIR}/viking_bio_matter.hex
         ${CMAKE_BINARY_DIR}/viking_bio_matter-${FIRMWARE_VERSION}.hex
-    COMMENT "Creating versioned firmware files: viking_bio_matter-${FIRMWARE_VERSION}.*"
+    COMMENT "Renaming firmware files to include version: viking_bio_matter-${FIRMWARE_VERSION}.*"
 )
 
 target_include_directories(viking_bio_matter PRIVATE
