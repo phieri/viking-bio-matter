@@ -12,6 +12,10 @@ static volatile size_t buffer_head = 0;
 static volatile size_t buffer_tail = 0;
 volatile size_t buffer_count = 0;  // Made non-static for inline function in header
 
+// Event flags from main.c (for waking from sleep)
+extern volatile uint32_t event_flags;
+#define EVENT_SERIAL_DATA (1 << 0)
+
 // UART RX interrupt handler
 static void on_uart_rx() {
     while (uart_is_readable(UART_ID)) {
@@ -22,6 +26,10 @@ static void on_uart_rx() {
             serial_buffer[buffer_head] = ch;
             buffer_head = (buffer_head + 1) % SERIAL_BUFFER_SIZE;
             buffer_count++;
+            
+            // Set event flag to wake main loop
+            event_flags |= EVENT_SERIAL_DATA;
+            __sev();  // Wake CPU from WFE if sleeping
         }
     }
 }

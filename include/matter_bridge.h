@@ -35,8 +35,10 @@ void matter_bridge_update_attributes(const viking_bio_data_t *data);
  * Periodic task for Matter bridge processing
  * Processes Matter platform tasks
  * Call regularly in main loop
+ * 
+ * @return true if any work was done (messages processed), false if idle
  */
-void matter_bridge_task(void);
+bool matter_bridge_task(void);
 
 /**
  * Get current Matter attributes

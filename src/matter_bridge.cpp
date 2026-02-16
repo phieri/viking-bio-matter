@@ -260,16 +260,23 @@ void matter_bridge_update_attributes(const viking_bio_data_t *data) {
     matter_bridge_update_temperature(data->temperature);
 }
 
-void matter_bridge_task(void) {
+bool matter_bridge_task(void) {
     if (!initialized) {
-        return;
+        return false;
     }
     
-    // Process Matter protocol messages
-    matter_protocol_task();
+    bool work_done = false;
+    
+    // Process Matter protocol messages (returns number of messages processed)
+    int messages_processed = matter_protocol_task();
+    if (messages_processed > 0) {
+        work_done = true;
+    }
     
     // Process Matter platform tasks (includes attribute reporting)
     platform_manager_task();
+    
+    return work_done;
 }
 
 void matter_bridge_get_attributes(matter_attributes_t *attrs) {

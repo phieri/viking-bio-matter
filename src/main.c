@@ -5,6 +5,7 @@
 #include "hardware/uart.h"
 #include "hardware/gpio.h"
 #include "hardware/watchdog.h"
+#include "hardware/timer.h"
 #include "serial_handler.h"
 #include "viking_bio_protocol.h"
 #include "matter_bridge.h"
@@ -16,6 +17,46 @@
 #define LED_ENABLED 1
 #define LED_INIT() do { /* LED initialized as part of cyw43_arch_init */ } while(0)
 #define LED_SET(state) cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, (state))
+
+// Event system for efficient interrupt-driven architecture
+// Volatile since modified from interrupt context
+volatile uint32_t event_flags = 0;
+
+// Event flag definitions
+#define EVENT_SERIAL_DATA    (1 << 0)  // Serial data received in UART interrupt
+#define EVENT_MATTER_MSG     (1 << 1)  // Matter message needs processing
+#define EVENT_TIMEOUT_CHECK  (1 << 2)  // Periodic timeout check needed
+#define EVENT_LED_UPDATE     (1 << 3)  // LED state needs update
+
+/**
+ * Periodic timer callback - runs every 1 second
+ * Sets event flags for periodic tasks (timeout checks, LED management)
+ * Timer runs in interrupt context, so keep work minimal
+ */
+bool periodic_timer_callback(struct repeating_timer *t) {
+    // Set event flags for periodic tasks
+    event_flags |= EVENT_TIMEOUT_CHECK | EVENT_LED_UPDATE;
+    __sev();  // Wake CPU from WFE if sleeping
+    return true;  // Keep timer repeating
+}
+
+/**
+ * Calculate time until next scheduled wakeup event
+ * Returns duration in milliseconds until next event, or 100ms default
+ */
+uint32_t calculate_next_wakeup(uint32_t led_tick_off_time, bool led_tick_active) {
+    uint32_t now = to_ms_since_boot(get_absolute_time());
+    uint32_t next_wakeup = UINT32_MAX;
+    
+    // LED tick timeout
+    if (led_tick_active && led_tick_off_time > now) {
+        uint32_t led_delta = led_tick_off_time - now;
+        next_wakeup = (led_delta < next_wakeup) ? led_delta : next_wakeup;
+    }
+    
+    // Default to 100ms if nothing scheduled soon (cap for responsiveness)
+    return (next_wakeup == UINT32_MAX) ? 100 : next_wakeup;
+}
 
 int main() {
     // Initialize standard I/O
@@ -51,7 +92,16 @@ int main() {
     watchdog_enable(8000, false);
     printf("Watchdog enabled with 8 second timeout\n");
     
-    // Main loop
+    // Initialize hardware timer for periodic tasks (1 second interval)
+    struct repeating_timer timer;
+    if (!add_repeating_timer_ms(1000, periodic_timer_callback, NULL, &timer)) {
+        printf("WARNING: Failed to initialize periodic timer\n");
+        printf("         Falling back to polling for periodic tasks\n");
+    } else {
+        printf("Periodic timer enabled (1 second interval)\n");
+    };
+    
+    // Main loop - event-driven architecture
     uint8_t buffer[SERIAL_BUFFER_SIZE];
     viking_bio_data_t viking_data;
     bool timeout_triggered = false;  // Track if timeout has been triggered
@@ -61,14 +111,20 @@ int main() {
     uint32_t led_grace_period_end = 0;  // Timestamp when grace period after tick ends
     
     while (true) {
-        // Update watchdog to prevent system reset
+        // Track if any work was done this iteration
+        bool work_done = false;
+        
+        // Update watchdog to prevent system reset (must be done every loop iteration)
         watchdog_update();
         
-        // Handle serial data
+        // Process serial data events
+        // Note: serial_handler_task() polls hardware but is lightweight
         serial_handler_task();
         
-        // Check for available data
-        if (serial_handler_data_available()) {
+        if ((event_flags & EVENT_SERIAL_DATA) || serial_handler_data_available()) {
+            // Clear serial event flag
+            event_flags &= ~EVENT_SERIAL_DATA;
+            
             size_t bytes_read = serial_handler_read(buffer, sizeof(buffer));
             
             if (bytes_read > 0) {
@@ -95,50 +151,69 @@ int main() {
                            viking_data.fan_speed,
                            viking_data.temperature);
                 }
+                work_done = true;
             }
         }
         
-        // Check for data timeout (Viking Bio unit powered off)
-        if (!timeout_triggered && viking_bio_is_data_stale(VIKING_BIO_TIMEOUT_MS)) {
-            timeout_triggered = true;
-            printf("Viking Bio: No data received for 30s - clearing attributes\n");
-            
-            // Create cleared data structure
-            viking_bio_data_t cleared_data = {
-                .flame_detected = false,
-                .fan_speed = 0,
-                .temperature = 0,
-                .error_code = 0,
-                .valid = true
-            };
-            
-            // Update Matter attributes with cleared state
-            matter_bridge_update_attributes(&cleared_data);
+        // Process Matter messages
+        // Always check Matter bridge since network activity may arrive anytime
+        if (matter_bridge_task()) {
+            work_done = true;
         }
         
-        // Update Matter bridge
-        matter_bridge_task();
-        
-        // Check for SoftAP timeout (auto-disable after 30 minutes)
-        // Only check once to avoid repeated calls to stop function
-        if (!softap_timeout_handled && network_adapter_softap_timeout_expired()) {
-            softap_timeout_handled = true;  // Set flag first to prevent re-entry
-            printf("\n===========================================\n");
-            printf("SoftAP TIMEOUT: 30 minutes have elapsed\n");
-            printf("Automatically disabling SoftAP for security\n");
-            printf("===========================================\n\n");
+        // Periodic timeout check (triggered by 1-second timer)
+        if (event_flags & EVENT_TIMEOUT_CHECK) {
+            event_flags &= ~EVENT_TIMEOUT_CHECK;
             
-            if (network_adapter_stop_softap() == 0) {
-                printf("✓ SoftAP disabled successfully\n");
-                printf("  Device will continue operating without SoftAP\n");
-                printf("  To re-enable commissioning mode, restart device\n\n");
-            } else {
-                printf("ERROR: Failed to disable SoftAP\n\n");
+            // Check for data timeout (Viking Bio unit powered off)
+            if (!timeout_triggered && viking_bio_is_data_stale(VIKING_BIO_TIMEOUT_MS)) {
+                timeout_triggered = true;
+                printf("Viking Bio: No data received for 30s - clearing attributes\n");
+                
+                // Create cleared data structure
+                viking_bio_data_t cleared_data = {
+                    .flame_detected = false,
+                    .fan_speed = 0,
+                    .temperature = 0,
+                    .error_code = 0,
+                    .valid = true
+                };
+                
+                // Update Matter attributes with cleared state
+                matter_bridge_update_attributes(&cleared_data);
             }
+            
+            // Check for SoftAP timeout (auto-disable after 30 minutes)
+            // Only check once to avoid repeated calls to stop function
+            if (!softap_timeout_handled && network_adapter_softap_timeout_expired()) {
+                softap_timeout_handled = true;  // Set flag first to prevent re-entry
+                printf("\n===========================================\n");
+                printf("SoftAP TIMEOUT: 30 minutes have elapsed\n");
+                printf("Automatically disabling SoftAP for security\n");
+                printf("===========================================\n\n");
+                
+                if (network_adapter_stop_softap() == 0) {
+                    printf("✓ SoftAP disabled successfully\n");
+                    printf("  Device will continue operating without SoftAP\n");
+                    printf("  To re-enable commissioning mode, restart device\n\n");
+                } else {
+                    printf("ERROR: Failed to disable SoftAP\n\n");
+                }
+            }
+            
+            work_done = true;
         }
+        
+        // LED update (triggered by timer or LED tick)
+        if (event_flags & EVENT_LED_UPDATE) {
+            event_flags &= ~EVENT_LED_UPDATE;
+            work_done = true;
+        }
+        
+        // Handle LED tick timeout and steady state
+        uint32_t now = to_ms_since_boot(get_absolute_time());
         
         // Turn off LED tick after 200ms
-        uint32_t now = to_ms_since_boot(get_absolute_time());
         if (led_tick_active && now >= led_tick_off_time) {
             LED_SET(0);
             led_tick_active = false;
@@ -159,8 +234,15 @@ int main() {
             }
         }
         
-        // Small delay to prevent CPU spinning
-        sleep_ms(10);
+        // Dynamic sleep if no work was done
+        if (!work_done) {
+            uint32_t sleep_duration = calculate_next_wakeup(led_tick_off_time, led_tick_active);
+            if (sleep_duration > 0) {
+                // Cap sleep at 100ms for responsiveness
+                uint32_t capped_sleep = (sleep_duration < 100) ? sleep_duration : 100;
+                sleep_ms(capped_sleep);
+            }
+        }
     }
     
     return 0;
