@@ -70,21 +70,10 @@ This produces `viking_bio_matter.uf2` with full Matter support for Pico W.
 
 ### WiFi Configuration
 
-Update WiFi credentials in `network_adapter.cpp`:
+WiFi credentials are provisioned via **Matter BLE commissioning** and stored in flash.
 
-```cpp
-#define WIFI_SSID "YourNetworkName"
-#define WIFI_PASSWORD "YourPassword"
-```
-
-Or define at build time:
-
-```bash
-cmake -DENABLE_MATTER=ON \
-      -DWIFI_SSID="MyNetwork" \
-      -DWIFI_PASSWORD="MyPassword" \
-      ..
-```
+- Recommended: commission with `chip-tool pairing ble-wifi ...`
+- Optional: use platform storage APIs to pre-store credentials for unattended bootstrapping
 
 ## Flashing the Firmware
 
@@ -165,7 +154,7 @@ Commission the device using the **derived PIN** from the serial console:
 
 ```bash
 # Replace 24890840 with the actual PIN from your device's serial output
-./out/host/chip-tool pairing ble-wifi 1 MySSID MyPassword 24890840 3840
+./out/host/chip-tool pairing ble-wifi 1 MySSID MyPassword 3840 24890840
 ```
 
 **Important**: The PIN changes per device (derived from MAC), so always check the serial console for the correct PIN.
