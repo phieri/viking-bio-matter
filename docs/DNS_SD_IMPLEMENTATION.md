@@ -98,7 +98,7 @@ High-level API that:
    │   ├─> network_adapter_init()
    │   └─> dns_sd_init()           # Initialize mDNS responder
    │
-   ├─> Network connection (WiFi STA or SoftAP)
+   ├─> Network connection (WiFi STA via BLE commissioning)
    │
    └─> platform_manager_start_dns_sd_advertisement()
        └─> dns_sd_advertise_commissionable_node()
@@ -113,7 +113,7 @@ High-level API that:
 
 The device automatically:
 1. Initializes DNS-SD during platform init
-2. Connects to WiFi (stored credentials or SoftAP)
+2. Connects to WiFi (stored credentials or BLE commissioning)
 3. Starts DNS-SD advertisement once network is up
 4. Prints discovery information:
 
@@ -180,11 +180,11 @@ When connected to WiFi network:
 - Discoverable by any Matter controller on same network
 - IP assigned by DHCP
 
-#### SoftAP Mode (Access Point)
+#### BLE Commissioning Mode
 When in commissioning mode without WiFi credentials:
-- Device advertises on SoftAP interface (192.168.4.1)
-- Discoverable by clients connected to "VikingBio-Setup" AP
-- Controller must join SoftAP network first
+- Device uses Bluetooth LE for discovery and provisioning
+- WiFi credentials provisioned via BLE
+- Once connected to WiFi, switches to Station Mode for Matter operations
 
 ## Configuration
 
@@ -238,9 +238,9 @@ This includes:
    - Discriminator and device info don't change
    - Commissioning mode always set to `1`
 
-3. **Network Interface**: Only advertises on active network interface
+3. **Network Interface**: Only advertises on active WiFi station interface
    - Station mode: WiFi STA interface
-   - SoftAP mode: AP interface
+   - BLE commissioning mode: WiFi not available until provisioned
    - No simultaneous advertisement on multiple interfaces
 
 4. **IPv4 Only**: Current lwIP configuration focuses on IPv4

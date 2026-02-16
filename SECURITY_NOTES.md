@@ -131,7 +131,7 @@ WiFi credentials are currently hardcoded for development purposes:
 2. Use commissioning mode to configure WiFi dynamically
 3. Store credentials in flash via Matter network commissioning
 4. For production, implement secure credential storage
-5. Consider using SoftAP mode for initial setup (already implemented at 192.168.4.1)
+5. Use BLE commissioning for secure initial WiFi setup (Matter-compliant)
 
 ### Firmware Updates
 
