@@ -289,12 +289,12 @@ void matter_bridge_get_attributes(matter_attributes_t *attrs) {
 
 int matter_bridge_add_controller(const char *ip_address, uint16_t port) {
     if (!initialized) {
-        printf("Matter: ERROR - Bridge not initialized\n");
+        printf("[Matter] ERROR: Bridge not initialized\n");
         return -1;
     }
     
     if (!ip_address) {
-        printf("Matter: ERROR - Invalid IP address (NULL)\n");
+        printf("[Matter] ERROR: Invalid IP address (NULL)\n");
         return -1;
     }
     

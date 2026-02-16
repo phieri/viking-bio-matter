@@ -92,8 +92,8 @@ int main() {
     // Initialize multicore coordination
     printf("\nInitializing multicore support...\n");
     if (multicore_coordinator_init() != 0) {
-        printf("ERROR: Failed to initialize multicore coordinator\n");
-        printf("Device will continue in single-core mode\n");
+        printf("[Main] ERROR: Failed to initialize multicore coordinator\n");
+        printf("[Main] Device will continue in single-core mode\n");
     } else {
         // Launch core 1 for Matter/network processing
         if (multicore_coordinator_launch_core1() == 0) {

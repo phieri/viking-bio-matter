@@ -215,7 +215,7 @@ int ble_adapter_init(void) {
 
 int ble_adapter_start_advertising(uint16_t discriminator, uint16_t vendor_id, uint16_t product_id) {
     if (!ble_initialized) {
-        printf("BLE: ERROR - Not initialized\n");
+        printf("[BLE] ERROR: Not initialized\n");
         return -1;
     }
     
