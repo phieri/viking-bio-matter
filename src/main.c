@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "pico/stdlib.h"
+#include "pico/cyw43_arch.h"
 #include "hardware/uart.h"
 #include "hardware/gpio.h"
 #include "hardware/watchdog.h"
@@ -9,11 +10,11 @@
 #include "matter_bridge.h"
 #include "network_adapter.h"
 
-// LED control for Pico W (CYW43 chip controls the LED, but requires complex setup)
-// LED is disabled for Matter builds to avoid lwIP dependency issues in main
-#define LED_ENABLED 0
-#define LED_INIT() do { /* LED disabled for Matter builds */ } while(0)
-#define LED_SET(state) do { /* LED disabled */ } while(0)
+// LED control for Pico W (CYW43 chip controls the LED)
+// LED is now enabled using CYW43 architecture functions
+#define LED_ENABLED 1
+#define LED_INIT() do { /* LED initialized as part of cyw43_arch_init */ } while(0)
+#define LED_SET(state) cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, (state))
 
 int main() {
     // Initialize standard I/O
@@ -56,6 +57,8 @@ int main() {
     bool led_state = false;
     bool timeout_triggered = false;  // Track if timeout has been triggered
     bool softap_timeout_handled = false;  // Track if SoftAP timeout has been handled to prevent re-execution
+    uint32_t led_tick_off_time = 0;  // Timestamp when LED tick should turn off
+    bool led_tick_active = false;    // Track if LED tick is active
     
     while (true) {
         // Update watchdog to prevent system reset
@@ -71,6 +74,11 @@ int main() {
             if (bytes_read > 0) {
                 // Parse Viking Bio data
                 if (viking_bio_parse_data(buffer, bytes_read, &viking_data)) {
+                    // Turn on LED for 200ms to indicate serial message received
+                    LED_SET(1);
+                    led_tick_active = true;
+                    led_tick_off_time = to_ms_since_boot(get_absolute_time()) + 200;
+                    
                     // Check if data resumed after timeout
                     if (timeout_triggered) {
                         printf("Viking Bio: Data resumed after timeout\n");
@@ -128,9 +136,15 @@ int main() {
             }
         }
         
-        // Blink LED every second to show activity
+        // Turn off LED tick after 200ms
         uint32_t now = to_ms_since_boot(get_absolute_time());
-        if (now - last_blink >= 1000) {
+        if (led_tick_active && now >= led_tick_off_time) {
+            LED_SET(0);
+            led_tick_active = false;
+        }
+        
+        // Blink LED every second to show activity (only if not in tick mode)
+        if (!led_tick_active && now - last_blink >= 1000) {
             led_state = !led_state;
             LED_SET(led_state);
             last_blink = now;
