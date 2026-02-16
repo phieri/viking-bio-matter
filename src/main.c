@@ -13,6 +13,7 @@
 #include "platform_manager.h"
 #include "matter_minimal/matter_protocol.h"
 #include "multicore_coordinator.h"
+#include "version.h"
 
 // LED control for Pico W (CYW43 chip controls the LED)
 // LED is now enabled using CYW43 architecture functions
@@ -63,6 +64,10 @@ uint32_t calculate_next_wakeup(uint32_t led_tick_off_time, bool led_tick_active)
 int main() {
     // Initialize standard I/O
     stdio_init_all();
+    
+    // Print version information
+    printf("\n");
+    version_print_info();
     
     printf("Viking Bio Matter Bridge starting...\n");
     

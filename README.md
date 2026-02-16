@@ -117,6 +117,14 @@ F:1,S:50,T:75\n
    make
    ```
 
+The build process generates firmware files with version information:
+- `viking_bio_matter-{version}.uf2` - Main firmware file for flashing (versioned)
+- `viking_bio_matter-{version}.elf` - ELF binary (versioned)
+- `viking_bio_matter-{version}.bin` - Raw binary (versioned)
+- `viking_bio_matter-{version}.hex` - Intel HEX format (versioned)
+
+**Version Format**: The version is automatically extracted from git (e.g., `78422fa` for commit hash, or `v1.0.0` for tags).
+
 This generates Matter-enabled firmware that:
 - **Automatically checks for stored WiFi credentials on boot**
 - **Starts BLE commissioning mode if no credentials are found**
