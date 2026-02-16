@@ -14,7 +14,7 @@ A Matter bridge for the [Viking Bio 20](https://varmebaronen.se/produkter/single
 - **Matter Bridge**: Exposes burner data through Matter protocol over WiFi
 - **WiFi Connectivity**: Connects to your local network for Matter communication
 - **DNS-SD Discovery**: Automatic device discovery via mDNS (_matterc._udp)
-- **WiFi Commissioning**: SoftAP mode for easy network setup
+- **BLE Commissioning**: Bluetooth LE for easy WiFi credential provisioning
 
 ## Security Status
 
@@ -119,7 +119,7 @@ F:1,S:50,T:75\n
 
 This generates Matter-enabled firmware that:
 - **Automatically checks for stored WiFi credentials on boot**
-- **Falls back to SoftAP mode if no credentials are found**
+- **Starts BLE commissioning mode if no credentials are found**
 - **Connects to WiFi using stored credentials if available**
 - Initializes the Matter stack
 - Prints commissioning QR code and PIN
@@ -128,23 +128,35 @@ This generates Matter-enabled firmware that:
 
 See [platform/pico_w_chip_port/README.md](platform/pico_w_chip_port/README.md) for detailed Matter configuration and commissioning instructions.
 
-### WiFi Commissioning
+### WiFi Commissioning via Bluetooth LE
 
-The device supports Matter-compliant WiFi commissioning with two modes:
+The device uses **Bluetooth LE (BLE)** for WiFi commissioning, following the Matter standard:
 
-**Mode 1: SoftAP Commissioning (Recommended)**  
-When no WiFi credentials are stored, the device automatically starts a WiFi access point:
-- SSID: `VikingBio-Setup`
-- Security: Open (no password required)
-- Device IP: `192.168.4.1`
-- **Auto-Disable**: SoftAP automatically disables after 30 minutes or when successfully connecting to WiFi for improved security
+**Commissioning Flow:**
+1. On first boot (no WiFi credentials), the device starts BLE advertising
+2. Use a Matter-compatible controller or app to:
+   - Discover the device via BLE
+   - Provision WiFi credentials securely over BLE
+   - Complete Matter commissioning
+3. Device automatically connects to WiFi and stops BLE advertising
+4. BLE commissioning also stops when WiFi is connected AND device is commissioned
 
-Use Matter NetworkCommissioning commands to provision WiFi credentials. See commissioning examples below.
+**Using chip-tool for BLE Commissioning:**
+```bash
+# Commission device over BLE (replace PIN with value from serial output)
+chip-tool pairing ble-wifi <node-id> <ssid> <password> <discriminator> <pin>
 
-**Mode 2: Pre-configured WiFi**  
-Credentials can be stored in flash during initial setup. The device will automatically connect on boot.
+# Example:
+chip-tool pairing ble-wifi 1 MyHomeWiFi MyPassword123 3912 24890840
+```
 
-For detailed implementation guide, see [docs/WIFI_COMMISSIONING_SUMMARY.md](docs/WIFI_COMMISSIONING_SUMMARY.md).
+**Using Matter Controller Apps:**
+- Google Home, Apple Home, Amazon Alexa, and other Matter controllers support BLE commissioning
+- Simply scan the QR code displayed on the device serial output
+- Or manually enter the setup code
+
+**Pre-configured WiFi (Optional):**
+Credentials can be stored in flash during initial setup. The device will automatically connect on boot without BLE commissioning.
 
 ### Flashing the Firmware
 
@@ -196,22 +208,22 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
 
 5. **Commission the device using Matter controller:**
    
-   **Via SoftAP (Recommended):**
+   **Via BLE (Recommended):**
    ```bash
-   # 1. Connect to device SoftAP: VikingBio-Setup (open network, no password)
-   #    Configure static IP: 192.168.4.2
+   # Commission device over Bluetooth LE with WiFi credentials
+   # Replace values with your network and PIN from serial output
+   chip-tool pairing ble-wifi 1 MyHomeWiFi MyPassword123 3912 24890840
    
-   # 2. Provision WiFi credentials (convert SSID/password to hex first)
-   echo -n "MySSID" | xxd -p     # Get hex SSID
-   chip-tool networkcommissioning add-or-update-wifi-network hex:YOUR_SSID_HEX hex:YOUR_PASSWORD_HEX 1 0
-   chip-tool networkcommissioning connect-network hex:YOUR_SSID_HEX 1 0
-   
-   # 3. Complete commissioning (use PIN from serial output)
-   chip-tool pairing onnetwork 1 24890840
+   # Or scan the QR code with a Matter-compatible app:
+   # - Google Home
+   # - Apple Home
+   # - Amazon Alexa
+   # - Samsung SmartThings
    ```
    
    **With Pre-stored Credentials:**
    ```bash
+   # If credentials are already stored, pair directly over WiFi
    chip-tool pairing onnetwork 1 24890840
    ```
 
@@ -297,59 +309,37 @@ For complete DNS-SD implementation details, see [docs/DNS_SD_IMPLEMENTATION.md](
 
 ### WiFi Commissioning Issues
 
-**Problem: Device stuck in SoftAP mode**
-- **Cause**: WiFi credentials not saved or connection failed, or SoftAP timeout hasn't expired yet (30 minutes)
+**Problem: Device not connecting to WiFi**
+- **Cause**: WiFi credentials not provisioned or incorrect
 - **Solution**:
-  1. Verify credentials are correct (case-sensitive)
-  2. Check WiFi signal strength
-  3. Try clearing stored credentials: Power cycle device, it will restart in SoftAP mode
+  1. Use BLE commissioning: `chip-tool pairing ble-wifi 1 <ssid> <password> <discriminator> <pin>`
+  2. Verify credentials are correct (case-sensitive)
+  3. Check WiFi signal strength
   4. Check serial output for error messages
-  5. Note: SoftAP auto-disables after 30 minutes for security. Device will continue operating without network connectivity after timeout.
+  5. Verify WiFi network is 2.4GHz (Pico W doesn't support 5GHz)
 
-**Problem: Cannot connect to SoftAP**
-- **Cause**: Static IP not configured correctly
+**Problem: Cannot discover device via BLE**
+- **Cause**: BLE not advertising or Bluetooth disabled
 - **Solution**:
-  1. Manually configure network:
-     - IP: 192.168.4.2
-     - Netmask: 255.255.255.0
-     - Gateway: 192.168.4.1
-  2. Verify the network is open (no password required)
-  3. Check that device is actually in SoftAP mode (check serial output)
-
-**Problem: Matter commands fail over SoftAP**
-- **Cause**: Network connectivity or Matter protocol issues
-- **Solution**:
-  1. Verify you can ping 192.168.4.1 from your commissioning device
-  2. Ensure chip-tool is configured for IPv4
-  3. Check firewall settings
-  4. Try using the full hex format for SSID/password
+  1. Check serial output for "BLE: Starting advertising..." message
+  2. Verify Bluetooth is enabled on your controller/phone
+  3. BLE stops after successful WiFi connection - power cycle to restart
+  4. Ensure discriminator matches (check serial output)
+  5. Try moving closer to the device (BLE range is limited)
 
 **Problem: Device doesn't connect after provisioning**
 - **Cause**: Credentials saved but connection failed
 - **Solution**:
   1. Check serial output for connection error codes
-  2. Verify WiFi network is 2,4&nbsp;GHz (Pico W doesn't support 5&nbsp;GHz)
+  2. Verify WiFi network is 2.4GHz (Pico W doesn't support 5GHz)
   3. Ensure WiFi uses WPA2-PSK authentication
-  4. Try manually connecting: Use Option B with hardcoded credentials for testing
+  4. Power cycle device and check if it reconnects automatically
 
 **Problem: Lost WiFi credentials, need to re-provision**
 - **Solution**:
   1. Clear flash storage by re-flashing firmware
-  2. Or: Power cycle - device will auto-start SoftAP if credentials fail
+  2. Or: Power cycle - device will restart BLE advertising if credentials fail
   3. Serial command (if implemented): Send reset command via USB serial
-
-### Converting SSID/Password to Hex
-
-```bash
-# Using xxd (Linux/Mac)
-echo -n "MyWiFiNetwork" | xxd -p
-
-# Using Python
-python3 -c "import sys; print(sys.argv[1].encode('utf-8').hex())" "MyWiFiNetwork"
-
-# Using online tools
-# Search for "text to hex converter"
-```
 
 ### Checking Device Status
 
@@ -359,7 +349,7 @@ screen /dev/ttyACM0 115200
 
 # Look for these status messages:
 # - "WiFi credentials found in flash" - Has stored credentials
-# - "Starting SoftAP mode" - In provisioning mode
+# - "BLE: Starting advertising..." - In commissioning mode
 # - "WiFi connected successfully" - Connected to network
 # - "IP Address: x.x.x.x" - Device network address
 ```

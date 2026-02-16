@@ -29,7 +29,7 @@ The Viking Bio Matter Bridge firmware utilizes both cores of the Raspberry Pi Pi
 │                                              ↓                  │
 │  LED Control  ←  Event Flags  ←  Timeout Detection             │
 │                                              ↓                  │
-│  Watchdog Update  ←  Main Loop  ←  SoftAP Timeout              │
+│  Watchdog Update  ←  Main Loop  ←  BLE Stop Check              │
 └─────────────────────────────────────────────────────────────────┘
                                     ↓ Inter-Core Queue
 ┌─────────────────────────────────────────────────────────────────┐

@@ -65,7 +65,7 @@
 
 **Size**: ~532KB binary, 590KB text, 75KB bss | **Languages**: C (firmware), C++ (Matter port), Python (tools) | **Target**: RP2040/Pico W | **Framework**: Pico SDK 2.2.0, minimal Matter implementation (src/matter_minimal/, no external SDK)
 
-**Key Features**: Matter protocol (no external SDK), LittleFS storage with wear leveling (last 256KB flash), SoftAP WiFi commissioning with 30-minute timeout, interrupt-driven serial with circular buffer, SHA256-based Matter PIN generation
+**Key Features**: Matter protocol (no external SDK), LittleFS storage with wear leveling (last 256KB flash), BLE commissioning for WiFi provisioning (BTstack), interrupt-driven serial with circular buffer, SHA256-based Matter PIN generation
 
 ## Build Commands (Validated Feb 2026)
 
@@ -145,11 +145,12 @@ cmake .. && make -j$(nproc)
   - `clusters/` - OnOff, LevelControl, Temperature, Descriptor, NetworkCommissioning
 
 **Platform** (`platform/pico_w_chip_port/`):
-- `network_adapter.cpp` - WiFi/lwIP, SoftAP support (192.168.4.1) with 30-min timeout
+- `network_adapter.cpp` - WiFi/lwIP, Station (STA) mode only
+- `ble_adapter.cpp` - Bluetooth LE commissioning using BTstack
 - `storage_adapter.cpp` - LittleFS storage (last 256KB flash), key-value pairs, wear leveling
 - `crypto_adapter.cpp` - mbedTLS wrapper (CTR_DRBG wrapper stubbed, hw RNG works, SHA256/AES work)
 - `platform_manager.cpp` - Platform initialization coordinator, discriminator management
-- `config/` - lwipopts.h (lwIP config, IPv6 enabled), mbedtls_config.h (crypto config)
+- `config/` - lwipopts.h (lwIP config, IPv6 enabled), mbedtls_config.h (crypto config), btstack_config.h (BLE config)
 - `CHIPDevicePlatformConfig.h` - Matter device config (PIN from MAC, discriminator from storage)
 
 **Tests** (`tests/`):
@@ -171,8 +172,10 @@ cmake .. && make -j$(nproc)
 
 **Documentation** (`docs/`):
 - `MINIMAL_MATTER_ARCHITECTURE.md` - Matter stack architecture
-- `WIFI_COMMISSIONING_SUMMARY.md` - WiFi commissioning with SoftAP
+- `BLE_COMMISSIONING_SUMMARY.md` - BLE commissioning implementation
 - `SUBSCRIPTIONS_TESTING.md` - Matter subscriptions testing
+- `MULTICORE_ARCHITECTURE.md` - Dual-core architecture details
+- `DNS_SD_IMPLEMENTATION.md` - mDNS/DNS-SD implementation
 
 **Config**: 
 - Build: CMakeLists.txt (lines 3-9: pico_w enforcement, lines 31-37: optimizations, line 23: pico-lfs submodule)
@@ -280,7 +283,7 @@ Before committing:
 
 | Symptom | Root Cause | Solution |
 |---------|------------|----------|
-| Device not connecting to WiFi | Wrong credentials or SoftAP mode | Check WiFi credentials via SoftAP commissioning (192.168.4.1, SSID: VikingBio-Setup). Note: SoftAP auto-disables after 30 minutes. |
+| Device not connecting to WiFi | Wrong credentials or not commissioned | Use BLE commissioning: `chip-tool pairing ble-wifi <node> <ssid> <password> <discriminator> <pin>` |
 | Serial data not received | Wrong GPIO or baud rate | Verify GP1/UART0 at 9600 baud, check wiring (requires level shifter for 5V TTL) |
 | Matter pairing fails | Wrong PIN or discriminator | Use `tools/derive_pin.py <MAC>` to get correct PIN, discriminator is randomly generated (check device serial output) |
 | Device crashes after WiFi connect | RAM exhaustion | Check fabric count (max 5), reduce Matter sessions in CHIPDevicePlatformConfig.h |
@@ -336,9 +339,13 @@ These instructions validated Feb 2026 via actual builds. Only search/explore if:
 - ✅ CI/CD updated to use SDK 2.2.0 with cached submodules
 - ✅ All documentation updated with new SDK version requirements
 
-### SoftAP Timeout Security Feature (Feb 16, 2026)
-- ✅ Implemented 30-minute timeout for SoftAP mode
-- ✅ Auto-disable SoftAP after successful WiFi connection
+### BLE Commissioning Implementation (Feb 16, 2026)
+- ✅ Implemented Bluetooth LE commissioning using Pico SDK BTstack
+- ✅ Auto-start BLE advertising on boot when no WiFi credentials
+- ✅ Auto-stop BLE when WiFi connected AND device commissioned
+- ✅ Matter-compliant BLE service (UUID 0000FFF6-0000-1000-8000-00805F9B34FB)
+- ✅ Replaced old SoftAP WiFi commissioning mode
+- ✅ Better user experience with native app support
 - ✅ Prevents device from running open access point indefinitely
 - ✅ Timeout tracked using system timestamp with wrap-around handling
 - ✅ Main loop periodically checks for timeout and disables AP gracefully
@@ -486,7 +493,7 @@ As of February 15, 2026, comprehensive security review completed with all vulner
 
 **Pico SDK Submodules**: If you see "lwip.h: No such file or directory" or similar mbedTLS errors, the Pico SDK submodules are not initialized. Run `cd pico-sdk && git submodule update --init`.
 
-**WiFi Credentials**: Use SoftAP commissioning (192.168.4.1, SSID: VikingBio-Setup, open network - no password, auto-disables after 30 minutes or successful WiFi connection) to provision WiFi credentials. Never commit real credentials to the codebase.
+**WiFi Credentials**: Use BLE commissioning to provision WiFi credentials securely. Command: `chip-tool pairing ble-wifi <node> <ssid> <password> <discriminator> <pin>`. Never commit real credentials to the codebase.
 
 **Firmware Size Changes**: If firmware size changes significantly (>±20KB text), verify:
 - No accidental debug code left enabled

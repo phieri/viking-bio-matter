@@ -48,7 +48,7 @@ All critical security vulnerabilities identified during the comprehensive codeba
 ### Medium Priority Improvements - Completed ✅
 
 All medium priority issues related to security and reliability have been addressed:
-- ✅ WiFi credential handling documented (SoftAP commissioning available)
+- ✅ WiFi credential handling via BLE commissioning (Matter-compliant)
 - ✅ Error handling throughout codebase
 - ✅ Thread safety protections
 - ✅ Memory safety validations
@@ -82,7 +82,7 @@ Before deploying to production:
 - [x] Watchdog protection enabled
 - [x] Discriminator randomized per device
 - [x] Review PASE limitation for your use case (✅ FIXED - Full SPAKE2+ now implemented)
-- [ ] Configure WiFi credentials securely (use SoftAP commissioning)
+- [ ] Configure WiFi credentials securely (use BLE commissioning)
 - [ ] Perform security audit if required
 - [ ] Validate with actual Viking Bio 20 hardware
 
