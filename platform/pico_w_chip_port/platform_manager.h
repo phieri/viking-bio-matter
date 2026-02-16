@@ -33,12 +33,21 @@ int platform_manager_init(void);
 int platform_manager_connect_wifi(const char *ssid, const char *password);
 
 /**
- * Start commissioning mode (SoftAP)
- * Enables WiFi access point for provisioning
+ * Start commissioning mode (BLE)
+ * Enables Bluetooth LE advertising for Matter commissioning
  * 
  * @return 0 on success, -1 on error
  */
 int platform_manager_start_commissioning_mode(void);
+
+/**
+ * Stop commissioning mode (BLE)
+ * Disables Bluetooth LE advertising and services
+ * Called automatically after successful commissioning
+ * 
+ * @return 0 on success, -1 on error
+ */
+int platform_manager_stop_commissioning_mode(void);
 
 /**
  * Check if WiFi is connected

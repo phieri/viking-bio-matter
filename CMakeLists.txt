@@ -59,6 +59,7 @@ set(SOURCES
     platform/pico_w_chip_port/matter_reporter.cpp
     platform/pico_w_chip_port/matter_network_transport.cpp
     platform/pico_w_chip_port/matter_network_subscriber.cpp
+    platform/pico_w_chip_port/ble_adapter.cpp
 )
 
 # Add lwIP mDNS source files (not compiled by default in Pico SDK)
@@ -98,6 +99,8 @@ target_link_libraries(viking_bio_matter
     pico_mbedtls
     hardware_flash
     pico-lfs
+    pico_btstack_ble
+    pico_btstack_cyw43
     -Wl,--start-group
     matter_protocol
     matter_tlv

@@ -10,6 +10,7 @@
 #include "mbedtls/sha256.h"
 #include "matter_attributes.h"
 #include "network_adapter.h"
+#include "ble_adapter.h"
 #include "CHIPDevicePlatformConfig.h"
 
 // Matter DNS-SD discovery
@@ -22,13 +23,16 @@ extern "C" {
 int network_adapter_init(void);
 int network_adapter_connect(const char *ssid, const char *password);
 int network_adapter_save_and_connect(const char *ssid, const char *password);
-int network_adapter_start_softap(void);
-int network_adapter_stop_softap(void);
 bool network_adapter_is_connected(void);
-bool network_adapter_is_softap_mode(void);
 void network_adapter_get_ip_address(char *buffer, size_t buffer_len);
 void network_adapter_get_mac_address(uint8_t *mac_addr);
 void network_adapter_deinit(void);
+
+int ble_adapter_init(void);
+int ble_adapter_start_advertising(uint16_t device_discriminator, uint16_t vendor_id, uint16_t product_id);
+int ble_adapter_stop_advertising(void);
+bool ble_adapter_is_connected(void);
+void ble_adapter_deinit(void);
 
 int storage_adapter_init(void);
 int storage_adapter_write(const char *key, const uint8_t *value, size_t value_len);
@@ -198,6 +202,14 @@ int platform_manager_init(void) {
         return -1;
     }
     
+    // Initialize BLE for Matter commissioning
+    printf("\nInitializing BLE for commissioning...\n");
+    if (ble_adapter_init() != 0) {
+        printf("ERROR: Failed to initialize BLE adapter\n");
+        return -1;
+    }
+    printf("✓ BLE initialized\n");
+    
     // Initialize DNS-SD for Matter device discovery
     printf("\nInitializing DNS-SD...\n");
     if (dns_sd_init() != 0) {
@@ -263,15 +275,43 @@ int platform_manager_start_commissioning_mode(void) {
     printf("  Starting Commissioning Mode\n");
     printf("====================================\n");
     
-    // Start SoftAP for WiFi provisioning
-    if (network_adapter_start_softap() != 0) {
-        printf("ERROR: Failed to start SoftAP\n");
+    // Get device info for BLE advertising
+    uint16_t vendor_id = CHIP_DEVICE_CONFIG_DEVICE_VENDOR_ID;
+    uint16_t product_id = CHIP_DEVICE_CONFIG_DEVICE_PRODUCT_ID;
+    
+    // Start BLE advertising for Matter commissioning
+    if (ble_adapter_start_advertising(device_discriminator, vendor_id, product_id) != 0) {
+        printf("ERROR: Failed to start BLE advertising\n");
         return -1;
     }
     
-    printf("\nDevice is now in commissioning mode.\n");
-    printf("Connect to the WiFi network and use\n");
-    printf("a Matter controller to provision.\n");
+    printf("\nDevice is now in BLE commissioning mode.\n");
+    printf("Use a Matter controller to discover and\n");
+    printf("commission the device over Bluetooth LE.\n");
+    printf("====================================\n\n");
+    
+    return 0;
+}
+
+int platform_manager_stop_commissioning_mode(void) {
+    if (!platform_initialized) {
+        printf("ERROR: Platform not initialized\n");
+        return -1;
+    }
+    
+    printf("\n");
+    printf("====================================\n");
+    printf("  Stopping Commissioning Mode\n");
+    printf("====================================\n");
+    
+    // Stop BLE advertising
+    if (ble_adapter_stop_advertising() != 0) {
+        printf("ERROR: Failed to stop BLE advertising\n");
+        return -1;
+    }
+    
+    printf("\nBLE commissioning mode stopped.\n");
+    printf("Device will remain connected to WiFi.\n");
     printf("====================================\n\n");
     
     return 0;
@@ -381,6 +421,10 @@ void platform_manager_deinit(void) {
 
     printf("Shutting down platform...\n");
     
+    // Shutdown BLE first
+    ble_adapter_deinit();
+    
+    // Then network and crypto
     network_adapter_deinit();
     crypto_adapter_deinit();
     

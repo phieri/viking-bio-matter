@@ -1,0 +1,60 @@
+/*
+ * btstack_config.h
+ * BTstack configuration for Matter commissioning over BLE
+ * Based on Pico SDK examples
+ */
+
+#ifndef BTSTACK_CONFIG_H
+#define BTSTACK_CONFIG_H
+
+// BTstack features
+#define ENABLE_BLE
+#define ENABLE_LE_PERIPHERAL
+#define ENABLE_LE_CENTRAL
+#define ENABLE_L2CAP_LE_CREDIT_BASED_FLOW_CONTROL_MODE
+
+// BTstack configuration
+#define MAX_NR_WHITELIST_ENTRIES 16
+#define MAX_NR_HCI_CONNECTIONS 1
+#define MAX_NR_L2CAP_SERVICES 3
+#define MAX_NR_L2CAP_CHANNELS 3
+#define MAX_NR_RFCOMM_MULTIPLEXERS 0
+#define MAX_NR_RFCOMM_SERVICES 0
+#define MAX_NR_RFCOMM_CHANNELS 0
+#define MAX_NR_BTSTACK_LINK_KEY_DB_MEMORY_ENTRIES 2
+#define MAX_NR_BNEP_SERVICES 0
+#define MAX_NR_BNEP_CHANNELS 0
+#define MAX_NR_HFP_CONNECTIONS 0
+#define MAX_NR_GATT_CLIENTS 0
+#define MAX_NR_SM_LOOKUP_ENTRIES 3
+#define MAX_NR_MESH_VIRTUAL_ADDRESSES 0
+
+// LE Security Manager
+#define ENABLE_LE_SECURE_CONNECTIONS
+#define ENABLE_LE_PRIVACY_ADDRESS_RESOLUTION
+
+// ATT DB configuration
+#define MAX_ATT_DB_SIZE 512
+#define MAX_NR_MESH_SUBNETS 0
+
+// Use async context for event processing
+#define HAVE_BTSTACK_ASYNC_CONTEXT
+
+// Logging
+#define ENABLE_LOG_INFO
+#define ENABLE_LOG_ERROR
+
+// HCI
+#define HCI_ACL_PAYLOAD_SIZE 52
+#define HCI_ACL_CHUNK_SIZE_ALIGNMENT 4
+
+// L2CAP
+#define ENABLE_LE_DATA_LENGTH_EXTENSION
+#define ENABLE_L2CAP_ENHANCED_RETRANSMISSION_MODE
+
+// Memory pools
+#define MAX_NR_AVDTP_STREAM_ENDPOINTS 0
+#define MAX_NR_AVDTP_CONNECTIONS 0
+#define MAX_NR_AVRCP_CONNECTIONS 0
+
+#endif // BTSTACK_CONFIG_H
