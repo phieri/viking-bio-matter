@@ -1,7 +1,7 @@
 /*
  * network_adapter.cpp
  * Network adapter implementation for Pico W (CYW43439 WiFi chip)
- * Supports both Station (STA) and Access Point (AP) modes for WiFi commissioning
+ * Supports Station (STA) mode for WiFi connectivity
  */
 
 #include <stdio.h>
@@ -20,22 +20,15 @@ extern "C" {
     int storage_adapter_save_wifi_credentials(const char *ssid, const char *password);
 }
 
-// SoftAP configuration
-#define SOFTAP_SSID "VikingBio-Setup"
-#define SOFTAP_CHANNEL 1
-#define SOFTAP_TIMEOUT_MS 1800000  // 30 minutes in milliseconds
-
 // Network mode
 typedef enum {
     NETWORK_MODE_NONE = 0,
-    NETWORK_MODE_STA,      // Station mode (client)
-    NETWORK_MODE_AP        // Access Point mode (SoftAP)
+    NETWORK_MODE_STA      // Station mode (client)
 } network_mode_t;
 
 static bool wifi_connected = false;
 static bool wifi_initialized = false;
 static network_mode_t current_mode = NETWORK_MODE_NONE;
-static uint32_t softap_start_time = 0;  // Timestamp when SoftAP was started
 
 extern "C" {
 
@@ -57,83 +50,10 @@ int network_adapter_init(void) {
     return 0;
 }
 
-int network_adapter_start_softap(void) {
-    if (!wifi_initialized) {
-        printf("ERROR: WiFi not initialized\n");
-        return -1;
-    }
-
-    if (current_mode == NETWORK_MODE_AP) {
-        printf("SoftAP already running\n");
-        return 0;
-    }
-
-    printf("Starting SoftAP mode...\n");
-    printf("  SSID: %s\n", SOFTAP_SSID);
-    printf("  Channel: %d\n", SOFTAP_CHANNEL);
-    printf("  Security: Open (no password)\n");
-
-    // Enable AP mode with open authentication (no password)
-    // Note: Passing NULL for password is intentional and explicitly handled by the SDK.
-    // The SDK will automatically set auth to CYW43_AUTH_OPEN when password is NULL.
-    cyw43_arch_enable_ap_mode(SOFTAP_SSID, NULL, CYW43_AUTH_OPEN);
-
-    // Configure AP network interface with static IP
-    ip4_addr_t ap_ip, ap_netmask, ap_gw;
-    IP4_ADDR(&ap_ip, 192, 168, 4, 1);       // AP IP: 192.168.4.1
-    IP4_ADDR(&ap_netmask, 255, 255, 255, 0); // Netmask: 255.255.255.0
-    IP4_ADDR(&ap_gw, 192, 168, 4, 1);       // Gateway: 192.168.4.1
-
-    // Get the AP network interface
-    struct netif *ap_netif = &cyw43_state.netif[CYW43_ITF_AP];
-    netif_set_addr(ap_netif, &ap_ip, &ap_netmask, &ap_gw);
-    netif_set_up(ap_netif);
-
-    current_mode = NETWORK_MODE_AP;
-    wifi_connected = true;  // Consider AP mode as "connected"
-    softap_start_time = to_ms_since_boot(get_absolute_time());  // Record start time
-
-    printf("SoftAP started successfully\n");
-    printf("  AP IP: %s\n", ip4addr_ntoa(&ap_ip));
-    printf("  Connect to '%s' to commission device\n", SOFTAP_SSID);
-    printf("  Clients should use static IP in 192.168.4.x range\n");
-    printf("  (DHCP server not available - use static IP configuration)\n");
-
-    return 0;
-}
-
-int network_adapter_stop_softap(void) {
-    if (current_mode != NETWORK_MODE_AP) {
-        return 0;
-    }
-
-    printf("Stopping SoftAP mode...\n");
-
-    // Disable AP mode by deinitializing and reinitializing
-    cyw43_arch_deinit();
-    if (cyw43_arch_init_with_country(CYW43_COUNTRY_USA)) {
-        printf("ERROR: Failed to reinitialize CYW43\n");
-        wifi_initialized = false;
-        return -1;
-    }
-
-    current_mode = NETWORK_MODE_NONE;
-    wifi_connected = false;
-    softap_start_time = 0;  // Clear start time
-    printf("SoftAP stopped\n");
-
-    return 0;
-}
-
 int network_adapter_connect(const char *ssid, const char *password) {
     if (!wifi_initialized) {
         printf("ERROR: WiFi not initialized. Call network_adapter_init() first\n");
         return -1;
-    }
-
-    // Stop SoftAP if running
-    if (current_mode == NETWORK_MODE_AP) {
-        network_adapter_stop_softap();
     }
 
     // Try to load credentials from storage if not provided
@@ -194,13 +114,6 @@ int network_adapter_connect(const char *ssid, const char *password) {
     current_mode = NETWORK_MODE_STA;
     wifi_connected = true;
     
-    // Safety measure: Clear SoftAP timestamp if it was somehow still set
-    // This should not normally happen since network_adapter_stop_softap()
-    // is called before connecting, but we handle it defensively.
-    if (softap_start_time != 0) {
-        softap_start_time = 0;
-    }
-    
     return 0;
 }
 
@@ -225,10 +138,6 @@ bool network_adapter_is_connected(void) {
     return wifi_connected && wifi_initialized;
 }
 
-bool network_adapter_is_softap_mode(void) {
-    return current_mode == NETWORK_MODE_AP;
-}
-
 network_mode_t network_adapter_get_mode(void) {
     return current_mode;
 }
@@ -245,10 +154,7 @@ void network_adapter_get_ip_address(char *buffer, size_t buffer_len) {
 
     struct netif *netif = NULL;
     
-    if (current_mode == NETWORK_MODE_AP) {
-        // Get AP interface IP
-        netif = &cyw43_state.netif[CYW43_ITF_AP];
-    } else if (current_mode == NETWORK_MODE_STA) {
+    if (current_mode == NETWORK_MODE_STA) {
         // Get STA interface IP
         netif = netif_default;
     }
@@ -279,26 +185,7 @@ void network_adapter_deinit(void) {
     wifi_initialized = false;
     wifi_connected = false;
     current_mode = NETWORK_MODE_NONE;
-    softap_start_time = 0;
     printf("WiFi adapter deinitialized\n");
-}
-
-bool network_adapter_softap_timeout_expired(void) {
-    // Check if SoftAP is running and timeout has expired
-    if (current_mode != NETWORK_MODE_AP || softap_start_time == 0) {
-        return false;  // Not in SoftAP mode
-    }
-    
-    uint32_t current_time = to_ms_since_boot(get_absolute_time());
-    uint32_t elapsed_time = current_time - softap_start_time;
-    
-    // Handle timestamp wrap-around correctly for timeouts up to 30 minutes
-    // Unsigned arithmetic naturally handles wrap-around correctly for
-    // elapsed time calculations. The 30-minute timeout (1,800,000 ms) is
-    // well within the safe range for wrap-around handling.
-    // Note: This works correctly even if current_time wraps around to 0,
-    // as long as the timeout period is less than 2^31 ms (~24.8 days).
-    return elapsed_time >= SOFTAP_TIMEOUT_MS;
 }
 
 } // extern "C"
