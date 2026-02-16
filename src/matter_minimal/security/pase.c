@@ -9,6 +9,7 @@
 #include <stdio.h>
 
 // mbedTLS headers
+#include "mbedtls/md.h"
 #include "mbedtls/pkcs5.h"
 #include "mbedtls/hkdf.h"
 #include "mbedtls/ecp.h"
@@ -83,19 +84,32 @@ static int derive_w0_w1_from_pin(const uint8_t *pin, size_t pin_len,
     
     // Derive 64 bytes (w0 || w1) using PBKDF2-HMAC-SHA256
     uint8_t derived[64];
-    const mbedtls_md_info_t *md = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-    if (!md) {
+    const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+    if (!md_info) {
         printf("PASE: Failed to get SHA256 MD info\n");
         return -1;
     }
     
-    int ret = mbedtls_pkcs5_pbkdf2_hmac(
-        md,
+    // Create and initialize MD context for PBKDF2
+    mbedtls_md_context_t md_ctx;
+    mbedtls_md_init(&md_ctx);
+    
+    int ret = mbedtls_md_setup(&md_ctx, md_info, 1);
+    if (ret != 0) {
+        printf("PASE: MD context setup failed: %d\n", ret);
+        mbedtls_md_free(&md_ctx);
+        return -1;
+    }
+    
+    ret = mbedtls_pkcs5_pbkdf2_hmac(
+        &md_ctx,
         pin, pin_len,
         salt, salt_len,
         iterations,
         64, derived
     );
+    
+    mbedtls_md_free(&md_ctx);
     
     if (ret != 0) {
         printf("PASE: PBKDF2 failed: %d\n", ret);

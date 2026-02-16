@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.17)
 
 # This firmware requires Pico W for Matter/WiFi support
 if(NOT DEFINED PICO_BOARD OR PICO_BOARD STREQUAL "")
