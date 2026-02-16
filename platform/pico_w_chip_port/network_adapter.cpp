@@ -194,11 +194,10 @@ int network_adapter_connect(const char *ssid, const char *password) {
     current_mode = NETWORK_MODE_STA;
     wifi_connected = true;
     
-    // Note: SoftAP should not be running at this point since we call
-    // network_adapter_stop_softap() before connecting in station mode.
-    // However, we still clear the timestamp as a safety measure.
+    // Safety measure: Clear SoftAP timestamp if it was somehow still set
+    // This should not normally happen since network_adapter_stop_softap()
+    // is called before connecting, but we handle it defensively.
     if (softap_start_time != 0) {
-        printf("Note: Clearing SoftAP timestamp (should already be stopped)\n");
         softap_start_time = 0;
     }
     
