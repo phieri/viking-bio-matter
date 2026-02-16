@@ -21,12 +21,13 @@ static queue_t viking_data_queue;
 static volatile bool core1_running = false;
 static volatile bool core1_should_exit = false;
 
-// Statistics
+// Statistics (only updated from Core 1, read from Core 0)
+// Note: These are only incremented on Core 1, so no atomic operations needed
 static volatile uint32_t core1_messages_processed = 0;
 static volatile uint32_t core1_data_updates_processed = 0;
 
-// Event signaling for Matter tasks
-static volatile bool matter_task_signaled = false;
+// Core 1 idle sleep duration when no work is available (microseconds)
+#define CORE1_IDLE_SLEEP_US 100
 
 /**
  * Core 1 entry point
@@ -60,17 +61,9 @@ static void core1_entry(void) {
         // Process Matter platform tasks (attribute reporting, maintenance)
         platform_manager_task();
         
-        // Clear Matter task signal flag
-        if (matter_task_signaled) {
-            matter_task_signaled = false;
-            work_done = true;
-        }
-        
-        // Yield CPU if no work was done
+        // Sleep briefly when idle to reduce power consumption and allow Core 0 to run
         if (!work_done) {
-            // Sleep briefly to avoid busy-waiting
-            // Use tight_loop_contents() to allow other core to run
-            sleep_us(100);  // 100 microseconds
+            sleep_us(CORE1_IDLE_SLEEP_US);
         }
     }
     
@@ -126,10 +119,6 @@ int multicore_coordinator_send_data(const viking_bio_data_t *data) {
         // This is acceptable as Viking Bio sends data frequently
         return -1;
     }
-}
-
-void multicore_coordinator_signal_matter_task(void) {
-    matter_task_signaled = true;
 }
 
 bool multicore_coordinator_is_core1_running(void) {

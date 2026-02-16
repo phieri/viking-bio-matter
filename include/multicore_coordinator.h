@@ -52,12 +52,6 @@ int multicore_coordinator_launch_core1(void);
 int multicore_coordinator_send_data(const viking_bio_data_t *data);
 
 /**
- * Signal core 1 to process Matter tasks
- * Called from core 0 when network activity may have occurred
- */
-void multicore_coordinator_signal_matter_task(void);
-
-/**
  * Check if core 1 is running
  * @return true if core 1 is active, false otherwise
  */

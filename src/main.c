@@ -125,6 +125,7 @@ int main() {
     uint32_t led_tick_off_time = 0;  // Timestamp when LED tick should turn off
     bool led_tick_active = false;    // Track if LED tick is active
     uint32_t led_grace_period_end = 0;  // Timestamp when grace period after tick ends
+    uint32_t queue_overflow_count = 0;  // Track queue overflows for rate-limited logging
     
     while (true) {
         // Track if any work was done this iteration
@@ -162,8 +163,12 @@ int main() {
                     // Falls back to direct call if multicore not running
                     if (multicore_coordinator_is_core1_running()) {
                         if (multicore_coordinator_send_data(&viking_data) != 0) {
-                            // Queue full - log warning but data will arrive again soon
-                            printf("Warning: Viking Bio data queue full\n");
+                            // Queue full - count overflow and log periodically (every 10 overflows)
+                            queue_overflow_count++;
+                            if (queue_overflow_count % 10 == 1) {
+                                printf("Warning: Viking Bio data queue full (%lu overflows)\n", 
+                                       (unsigned long)queue_overflow_count);
+                            }
                         }
                     } else {
                         // Fallback: update attributes directly on core 0
