@@ -9,6 +9,7 @@
 #include "viking_bio_protocol.h"
 #include "matter_bridge.h"
 #include "network_adapter.h"
+#include "matter_minimal/matter_protocol.h"
 
 // LED control for Pico W (CYW43 chip controls the LED)
 // LED is now enabled using CYW43 architecture functions
@@ -53,8 +54,6 @@ int main() {
     // Main loop
     uint8_t buffer[SERIAL_BUFFER_SIZE];
     viking_bio_data_t viking_data;
-    uint32_t last_blink = 0;
-    bool led_state = false;
     bool timeout_triggered = false;  // Track if timeout has been triggered
     bool softap_timeout_handled = false;  // Track if SoftAP timeout has been handled to prevent re-execution
     uint32_t led_tick_off_time = 0;  // Timestamp when LED tick should turn off
@@ -79,8 +78,6 @@ int main() {
                     LED_SET(1);
                     led_tick_active = true;
                     led_tick_off_time = now + 200;
-                    // Reset heartbeat timer to prevent immediate turn-on after tick
-                    last_blink = now;
                     
                     // Check if data resumed after timeout
                     if (timeout_triggered) {
@@ -146,11 +143,17 @@ int main() {
             led_tick_active = false;
         }
         
-        // Blink LED every second to show activity (only if not in tick mode)
-        if (!led_tick_active && now - last_blink >= 1000) {
-            led_state = !led_state;
-            LED_SET(led_state);
-            last_blink = now;
+        // LED behavior: Constantly ON when connected to WiFi + Matter fabric but not receiving serial data
+        // When receiving serial data, show 200ms tick instead
+        if (!led_tick_active) {
+            // Check if connected to WiFi and commissioned to Matter fabric
+            if (network_adapter_is_connected() && matter_protocol_is_commissioned()) {
+                // Keep LED constantly on to indicate ready state
+                LED_SET(1);
+            } else {
+                // Not fully connected/commissioned, keep LED off
+                LED_SET(0);
+            }
         }
         
         // Small delay to prevent CPU spinning
