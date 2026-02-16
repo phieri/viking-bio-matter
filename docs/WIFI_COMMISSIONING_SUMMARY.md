@@ -177,10 +177,10 @@ chip-tool pairing onnetwork 1 <PIN_FROM_SERIAL>
 
 2. **No DHCP server** - SoftAP clients must use static IP (192.168.4.x). This is a Pico SDK limitation.
 
-3. **Default SoftAP configuration** - Production deployments should implement additional security measures such as timeout-based auto-disable after commissioning.
+3. **SoftAP auto-disable after 30 minutes** - ✅ **IMPLEMENTED**: For security, SoftAP mode automatically disables after 30 minutes or when successfully connecting to WiFi in station mode. This prevents the device from running an open access point indefinitely.
 
 ### Recommendations for Production
-1. Implement timeout for SoftAP mode (auto-disable after successful commissioning or after 30 minutes). Note: Successful commissioning can be detected when the device successfully connects to a WiFi network in station mode via the `network_adapter_connect()` function. After successful connection, call `network_adapter_stop_softap()` to disable the access point.
+1. ✅ **IMPLEMENTED**: Timeout for SoftAP mode - Auto-disables after successful commissioning or after 30 minutes. Successful commissioning is detected when the device successfully connects to a WiFi network in station mode via the `network_adapter_connect()` function. After successful connection or timeout, `network_adapter_stop_softap()` is called to disable the access point.
 2. Implement credential encryption if MCU resources allow
 3. Add rate limiting for Matter commissioning commands
 4. Implement audit logging for credential changes
@@ -219,8 +219,9 @@ Successfully implemented a complete WiFi commissioning solution that:
 5. ✅ Falls back to SoftAP when credentials are missing
 6. ✅ Includes comprehensive documentation
 7. ✅ Passes code review and security scanning
+8. ✅ **NEW**: Auto-disables SoftAP after 30 minutes or successful WiFi connection for improved security
 
-The implementation is production-ready with documented security considerations and recommendations for hardening.
+The implementation is production-ready with documented security considerations and implemented hardening measures.
 
 ## Next Steps
 

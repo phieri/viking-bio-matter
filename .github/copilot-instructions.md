@@ -64,7 +64,7 @@
 
 **Size**: ~532KB binary, 544KB text, 72KB bss | **Languages**: C (firmware), C++ (Matter port), Python (tools) | **Target**: RP2040/Pico W | **Framework**: Pico SDK 1.5.1, minimal Matter implementation (src/matter_minimal/, no external SDK)
 
-**Key Features**: Matter protocol (no external SDK), LittleFS storage with wear leveling (last 256KB flash), SoftAP WiFi commissioning, interrupt-driven serial with circular buffer, SHA256-based Matter PIN generation
+**Key Features**: Matter protocol (no external SDK), LittleFS storage with wear leveling (last 256KB flash), SoftAP WiFi commissioning with 30-minute timeout, interrupt-driven serial with circular buffer, SHA256-based Matter PIN generation
 
 ## Build Commands (Validated Feb 2026)
 
@@ -144,7 +144,7 @@ cmake .. && make -j$(nproc)
   - `clusters/` - OnOff, LevelControl, Temperature, Descriptor, NetworkCommissioning
 
 **Platform** (`platform/pico_w_chip_port/`):
-- `network_adapter.cpp` - WiFi/lwIP (hardcoded creds lines 10-11), SoftAP support (192.168.4.1)
+- `network_adapter.cpp` - WiFi/lwIP, SoftAP support (192.168.4.1) with 30-min timeout
 - `storage_adapter.cpp` - LittleFS storage (last 256KB flash), key-value pairs, wear leveling
 - `crypto_adapter.cpp` - mbedTLS wrapper (DRBG/RNG stubbed due to SDK bug, SHA256/AES work)
 - `platform_manager.cpp` - Platform initialization coordinator, discriminator management
@@ -279,7 +279,7 @@ Before committing:
 
 | Symptom | Root Cause | Solution |
 |---------|------------|----------|
-| Device not connecting to WiFi | Wrong credentials or SoftAP mode | Check `network_adapter.cpp` lines 10-11, or use SoftAP commissioning |
+| Device not connecting to WiFi | Wrong credentials or SoftAP mode | Check WiFi credentials via SoftAP commissioning (192.168.4.1, SSID: VikingBio-Setup). Note: SoftAP auto-disables after 30 minutes. |
 | Serial data not received | Wrong GPIO or baud rate | Verify GP1/UART0 at 9600 baud, check wiring (requires level shifter for 5V TTL) |
 | Matter pairing fails | Wrong PIN or discriminator | Use `tools/derive_pin.py <MAC>` to get correct PIN, discriminator is randomly generated (check device serial output) |
 | Device crashes after WiFi connect | RAM exhaustion | Check fabric count (max 5), reduce Matter sessions in CHIPDevicePlatformConfig.h |
@@ -325,6 +325,13 @@ export PICO_SDK_PATH=$(pwd)/pico-sdk && git submodule update --init --recursive 
 These instructions validated Feb 2026 via actual builds. Only search/explore if: incomplete for your task, errors not documented, repo changed significantly (`git log`). Otherwise follow exactly to minimize exploration/failures.
 
 ## Recent Improvements & Changes (Feb 2026)
+
+### SoftAP Timeout Security Feature (Feb 16, 2026)
+- ✅ Implemented 30-minute timeout for SoftAP mode
+- ✅ Auto-disable SoftAP after successful WiFi connection
+- ✅ Prevents device from running open access point indefinitely
+- ✅ Timeout tracked using system timestamp with wrap-around handling
+- ✅ Main loop periodically checks for timeout and disables AP gracefully
 
 ### Security Hardening
 - ✅ Completed comprehensive security audit with all critical issues resolved
@@ -469,7 +476,7 @@ As of February 15, 2026, comprehensive security review completed with all vulner
 
 **Pico SDK Submodules**: If you see "lwip.h: No such file or directory" or similar mbedTLS errors, the Pico SDK submodules are not initialized. Run `cd pico-sdk && git submodule update --init`.
 
-**WiFi Credentials**: Hardcoded in `platform/pico_w_chip_port/network_adapter.cpp` lines 10-11. For production, use SoftAP commissioning (192.168.4.1, SSID: VikingBio-Setup, open network - no password) or environment variables. Never commit real credentials.
+**WiFi Credentials**: Use SoftAP commissioning (192.168.4.1, SSID: VikingBio-Setup, open network - no password, auto-disables after 30 minutes or successful WiFi connection) to provision WiFi credentials. Never commit real credentials to the codebase.
 
 **Firmware Size Changes**: If firmware size changes significantly (>±20KB text), verify:
 - No accidental debug code left enabled

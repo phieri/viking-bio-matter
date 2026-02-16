@@ -23,6 +23,7 @@ extern "C" {
 // SoftAP configuration
 #define SOFTAP_SSID "VikingBio-Setup"
 #define SOFTAP_CHANNEL 1
+#define SOFTAP_TIMEOUT_MS 1800000  // 30 minutes in milliseconds
 
 // Network mode
 typedef enum {
@@ -34,6 +35,7 @@ typedef enum {
 static bool wifi_connected = false;
 static bool wifi_initialized = false;
 static network_mode_t current_mode = NETWORK_MODE_NONE;
+static uint32_t softap_start_time = 0;  // Timestamp when SoftAP was started
 
 extern "C" {
 
@@ -89,6 +91,7 @@ int network_adapter_start_softap(void) {
 
     current_mode = NETWORK_MODE_AP;
     wifi_connected = true;  // Consider AP mode as "connected"
+    softap_start_time = to_ms_since_boot(get_absolute_time());  // Record start time
 
     printf("SoftAP started successfully\n");
     printf("  AP IP: %s\n", ip4addr_ntoa(&ap_ip));
@@ -116,6 +119,7 @@ int network_adapter_stop_softap(void) {
 
     current_mode = NETWORK_MODE_NONE;
     wifi_connected = false;
+    softap_start_time = 0;  // Clear start time
     printf("SoftAP stopped\n");
 
     return 0;
@@ -189,6 +193,14 @@ int network_adapter_connect(const char *ssid, const char *password) {
 
     current_mode = NETWORK_MODE_STA;
     wifi_connected = true;
+    
+    // Safety measure: Clear SoftAP timestamp if it was somehow still set
+    // This should not normally happen since network_adapter_stop_softap()
+    // is called before connecting, but we handle it defensively.
+    if (softap_start_time != 0) {
+        softap_start_time = 0;
+    }
+    
     return 0;
 }
 
@@ -267,7 +279,26 @@ void network_adapter_deinit(void) {
     wifi_initialized = false;
     wifi_connected = false;
     current_mode = NETWORK_MODE_NONE;
+    softap_start_time = 0;
     printf("WiFi adapter deinitialized\n");
+}
+
+bool network_adapter_softap_timeout_expired(void) {
+    // Check if SoftAP is running and timeout has expired
+    if (current_mode != NETWORK_MODE_AP || softap_start_time == 0) {
+        return false;  // Not in SoftAP mode
+    }
+    
+    uint32_t current_time = to_ms_since_boot(get_absolute_time());
+    uint32_t elapsed_time = current_time - softap_start_time;
+    
+    // Handle timestamp wrap-around correctly for timeouts up to 30 minutes
+    // Unsigned arithmetic naturally handles wrap-around correctly for
+    // elapsed time calculations. The 30-minute timeout (1,800,000 ms) is
+    // well within the safe range for wrap-around handling.
+    // Note: This works correctly even if current_time wraps around to 0,
+    // as long as the timeout period is less than 2^31 ms (~24.8 days).
+    return elapsed_time >= SOFTAP_TIMEOUT_MS;
 }
 
 } // extern "C"
