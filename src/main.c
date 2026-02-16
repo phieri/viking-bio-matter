@@ -10,6 +10,7 @@
 #include "viking_bio_protocol.h"
 #include "matter_bridge.h"
 #include "network_adapter.h"
+#include "platform_manager.h"
 #include "matter_minimal/matter_protocol.h"
 #include "multicore_coordinator.h"
 
@@ -229,7 +230,6 @@ int main() {
                 printf("Stopping BLE commissioning mode...\n");
                 
                 // Stop BLE commissioning after WiFi is connected and device is commissioned
-                extern int platform_manager_stop_commissioning_mode(void);
                 if (platform_manager_stop_commissioning_mode() == 0) {
                     printf("✓ BLE commissioning stopped successfully\n");
                     printf("Device will continue operating over WiFi\n");
