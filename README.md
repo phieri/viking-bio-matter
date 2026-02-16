@@ -85,9 +85,9 @@ F:1,S:50,T:75\n
 
 ### Prerequisites
 
-1. Install the Pico SDK:
+1. Install the Pico SDK (v2.2.0 or later):
    ```bash
-   git clone https://github.com/raspberrypi/pico-sdk.git
+   git clone --branch 2.2.0 https://github.com/raspberrypi/pico-sdk.git
    cd pico-sdk
    git submodule update --init
    export PICO_SDK_PATH=$(pwd)
@@ -101,6 +101,8 @@ F:1,S:50,T:75\n
    # macOS
    brew install cmake arm-none-eabi-gcc
    ```
+
+**Note**: This project requires Pico SDK 2.2.0 or later for full compatibility with mbedTLS 3.6.2 and latest platform features.
 
 ### Build Steps
 

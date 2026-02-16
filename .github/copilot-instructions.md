@@ -11,10 +11,11 @@
 | Category | Key Information | Reference |
 |----------|-----------------|-----------|
 | **Build Time** | ~32s total (SDK init once, then 26s builds) | Line 61 |
-| **Firmware Size** | 544KB text, 72KB bss (±20KB variance OK) | Line 63 |
+| **Firmware Size** | 590KB text, 75KB bss (±20KB variance OK) | Line 63 |
 | **CRITICAL Requirement** | Initialize submodules: `git submodule update --init --recursive` | Lines 16, 46, 54 |
 | **Environment Variable** | `PICO_SDK_PATH` MUST be absolute path | Lines 10, 41, 57 |
 | **Target Board** | Pico W ONLY (not standard Pico) - WiFi required | Lines 18, 69 |
+| **Pico SDK Version** | 2.2.0 (mbedTLS 3.6.2) - requires compatibility flags | Lines 8-10, 33 |
 | **Security Status** | ✅ All critical issues fixed (Feb 15, 2026) | Lines 8-10, 163-173, 295-345 |
 | **Known Limitations** | DRBG/RNG stubbed (SDK bug), max 5 fabrics | Lines 170-171, 397-403 |
 | **Validation Command** | See line 274 for one-liner build verification | Line 274-276 |
@@ -62,7 +63,7 @@
 
 **Purpose**: Matter (CHIP) bridge firmware for Viking Bio 20 burner on Raspberry Pi Pico W. Reads TTL serial (9600 baud) and exposes flame/fan/temp via Matter over WiFi.
 
-**Size**: ~532KB binary, 544KB text, 72KB bss | **Languages**: C (firmware), C++ (Matter port), Python (tools) | **Target**: RP2040/Pico W | **Framework**: Pico SDK 1.5.1, minimal Matter implementation (src/matter_minimal/, no external SDK)
+**Size**: ~532KB binary, 590KB text, 75KB bss | **Languages**: C (firmware), C++ (Matter port), Python (tools) | **Target**: RP2040/Pico W | **Framework**: Pico SDK 2.2.0, minimal Matter implementation (src/matter_minimal/, no external SDK)
 
 **Key Features**: Matter protocol (no external SDK), LittleFS storage with wear leveling (last 256KB flash), SoftAP WiFi commissioning with 30-minute timeout, interrupt-driven serial with circular buffer, SHA256-based Matter PIN generation
 
@@ -73,7 +74,7 @@
 sudo apt-get update && sudo apt-get install -y cmake gcc-arm-none-eabi libnewlib-arm-none-eabi build-essential
 
 # Clone Pico SDK (use exact version for compatibility)
-git clone --depth 1 --branch 1.5.1 https://github.com/raspberrypi/pico-sdk.git
+git clone --depth 1 --branch 2.2.0 https://github.com/raspberrypi/pico-sdk.git
 cd pico-sdk && git submodule update --init && cd ..  # ~30s
 
 # Set PICO_SDK_PATH (CRITICAL: Must be absolute path)
@@ -85,7 +86,7 @@ cd viking-bio-matter
 git submodule update --init --recursive  # CRITICAL: Initializes libs/pico-lfs
 ```
 
-**Verified Versions**: CMake 3.13+, ARM GCC 13.2.1, Pico SDK 1.5.1 (exact)
+**Verified Versions**: CMake 3.17+, ARM GCC 13.2.1, Pico SDK 2.2.0
 
 ### Build (Matter Always Enabled - No Flag)
 ```bash
@@ -176,7 +177,7 @@ cmake .. && make -j$(nproc)
 **Config**: 
 - Build: CMakeLists.txt (lines 3-9: pico_w enforcement, lines 31-37: optimizations, line 23: pico-lfs submodule)
 - Matter creds: platform/pico_w_chip_port/platform_manager.cpp (discriminator random 0xF00-0xFFF from storage, PIN from MAC)
-- CI: .github/workflows/build-firmware.yml (Ubuntu, ARM GCC, Pico SDK 1.5.1)
+- CI: .github/workflows/build-firmware.yml (Ubuntu, ARM GCC, Pico SDK 2.2.0)
 - No linting config (follow existing style)
 
 ## GPIO & Protocols
@@ -190,7 +191,7 @@ cmake .. && make -j$(nproc)
 ## CI/CD
 
 **Workflow**: `.github/workflows/build-firmware.yml`  
-**Jobs**: build-matter (Ubuntu, installs toolchain, clones SDK 1.5.1 w/submodules cached, cmake in build-matter/, make ~26s, uploads artifacts)  
+**Jobs**: build-matter (Ubuntu, installs toolchain, clones SDK 2.2.0 w/submodules cached, cmake in build-matter/, make ~26s, uploads artifacts)  
 **Triggers**: push main/develop, PR to main, manual  
 **Artifacts**: Actions tab → run → "viking-bio-matter-firmware-matter"  
 **CI Always Succeeds** if: PICO_SDK_PATH set (line 54), toolchain installed (lines 32-35), SDK submodules init (line 51), **repository submodules init** (line 30: `submodules: recursive`)
@@ -293,14 +294,14 @@ Before committing:
 |---------|------------|----------|
 | CI fails with "CMakeLists.txt not found" | Submodules not checked out | Add `submodules: recursive` to `actions/checkout@v6` |
 | CI skips on code changes | paths-ignore too broad | Check `.github/workflows/build-firmware.yml` lines 6-13, only **.md and docs/** ignored |
-| SDK cache miss every run | Cache key doesn't match | Verify `PICO_SDK_VERSION` env var matches SDK tag (1.5.1) |
+| SDK cache miss every run | Cache key doesn't match | Verify `PICO_SDK_VERSION` env var matches SDK tag (2.2.0) |
 | Build timeout in CI | Build too slow or hanging | Check for infinite loops in code, increase timeout, verify -j$(nproc) used |
 
 ## Pre-Commit Validation (ALL MUST PASS)
 
 1. ✅ `export PICO_SDK_PATH=/absolute/path/to/pico-sdk` → `echo $PICO_SDK_PATH` non-empty
 2. ✅ `rm -rf build && mkdir build && cd build && cmake .. && make -j$(nproc)` → ~26s, artifacts exist
-3. ✅ `arm-none-eabi-size viking_bio_matter.elf` → text ~544KB, bss ~72KB (±20KB OK due to LittleFS)
+3. ✅ `arm-none-eabi-size viking_bio_matter.elf` → text ~590KB, bss ~75KB (±20KB OK due to LittleFS)
 4. ✅ `git diff | grep -i -E "password|ssid|secret|key" || echo "OK"` → must output "OK"
 5. ✅ `git diff | grep -E "TODO|HACK|FIXME"` → only OK: crypto_adapter.cpp DRBG/RNG (known)
 6. ✅ .gitignore excludes build/, pico-sdk/, *.uf2
@@ -325,6 +326,15 @@ export PICO_SDK_PATH=$(pwd)/pico-sdk && git submodule update --init --recursive 
 These instructions validated Feb 2026 via actual builds. Only search/explore if: incomplete for your task, errors not documented, repo changed significantly (`git log`). Otherwise follow exactly to minimize exploration/failures.
 
 ## Recent Improvements & Changes (Feb 2026)
+
+### Pico SDK Upgrade to 2.2.0 (Feb 16, 2026)
+- ✅ Upgraded from Pico SDK 1.5.1 to 2.2.0 (latest stable release)
+- ✅ Updated mbedTLS from 2.x to 3.6.2 with compatibility fixes
+- ✅ Added MBEDTLS_ALLOW_PRIVATE_ACCESS for ECP structure access
+- ✅ Added MBEDTLS_PKCS1_V15 and MBEDTLS_PKCS1_V21 for RSA support
+- ✅ Updated firmware size: 590KB text, 75KB bss (within expected range)
+- ✅ CI/CD updated to use SDK 2.2.0 with cached submodules
+- ✅ All documentation updated with new SDK version requirements
 
 ### SoftAP Timeout Security Feature (Feb 16, 2026)
 - ✅ Implemented 30-minute timeout for SoftAP mode
