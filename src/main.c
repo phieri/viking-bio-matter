@@ -11,6 +11,7 @@
 #include "matter_bridge.h"
 #include "network_adapter.h"
 #include "matter_minimal/matter_protocol.h"
+#include "multicore_coordinator.h"
 
 // LED control for Pico W (CYW43 chip controls the LED)
 // LED is now enabled using CYW43 architecture functions
@@ -87,6 +88,21 @@ int main() {
     
     printf("Initialization complete. Reading serial data...\n");
     
+    // Initialize multicore coordination
+    printf("\nInitializing multicore support...\n");
+    if (multicore_coordinator_init() != 0) {
+        printf("ERROR: Failed to initialize multicore coordinator\n");
+        printf("Device will continue in single-core mode\n");
+    } else {
+        // Launch core 1 for Matter/network processing
+        if (multicore_coordinator_launch_core1() == 0) {
+            printf("✓ Multicore enabled: Core 0 (serial/LED), Core 1 (Matter/network)\n");
+        } else {
+            printf("WARNING: Failed to launch core 1\n");
+            printf("         Device will continue in single-core mode\n");
+        }
+    }
+    
     // Enable watchdog with 8 second timeout for system reliability
     // The watchdog must be updated at least once every 8 seconds
     watchdog_enable(8000, false);
@@ -142,8 +158,17 @@ int main() {
                         timeout_triggered = false;
                     }
                     
-                    // Update Matter attributes
-                    matter_bridge_update_attributes(&viking_data);
+                    // Send Viking Bio data to core 1 for Matter attribute updates
+                    // Falls back to direct call if multicore not running
+                    if (multicore_coordinator_is_core1_running()) {
+                        if (multicore_coordinator_send_data(&viking_data) != 0) {
+                            // Queue full - log warning but data will arrive again soon
+                            printf("Warning: Viking Bio data queue full\n");
+                        }
+                    } else {
+                        // Fallback: update attributes directly on core 0
+                        matter_bridge_update_attributes(&viking_data);
+                    }
                     
                     // Log data to USB serial
                     printf("Flame: %s, Fan Speed: %d%%, Temp: %d°C\n",
@@ -156,8 +181,8 @@ int main() {
         }
         
         // Process Matter messages
-        // Always check Matter bridge since network activity may arrive anytime
-        if (matter_bridge_task()) {
+        // Only run on core 0 if multicore is not active (fallback mode)
+        if (!multicore_coordinator_is_core1_running() && matter_bridge_task()) {
             work_done = true;
         }
         
@@ -180,7 +205,12 @@ int main() {
                 };
                 
                 // Update Matter attributes with cleared state
-                matter_bridge_update_attributes(&cleared_data);
+                // Send to core 1 if multicore is running, otherwise update directly
+                if (multicore_coordinator_is_core1_running()) {
+                    multicore_coordinator_send_data(&cleared_data);
+                } else {
+                    matter_bridge_update_attributes(&cleared_data);
+                }
             }
             
             // Check for SoftAP timeout (auto-disable after 30 minutes)
