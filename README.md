@@ -132,6 +132,7 @@ When no WiFi credentials are stored, the device automatically starts a WiFi acce
 - SSID: `VikingBio-Setup`
 - Security: Open (no password required)
 - Device IP: `192.168.4.1`
+- **Auto-Disable**: SoftAP automatically disables after 30 minutes or when successfully connecting to WiFi for improved security
 
 Use Matter NetworkCommissioning commands to provision WiFi credentials. See commissioning examples below.
 
@@ -292,12 +293,13 @@ For complete DNS-SD implementation details, see [docs/DNS_SD_IMPLEMENTATION.md](
 ### WiFi Commissioning Issues
 
 **Problem: Device stuck in SoftAP mode**
-- **Cause**: WiFi credentials not saved or connection failed
+- **Cause**: WiFi credentials not saved or connection failed, or SoftAP timeout hasn't expired yet (30 minutes)
 - **Solution**:
   1. Verify credentials are correct (case-sensitive)
   2. Check WiFi signal strength
   3. Try clearing stored credentials: Power cycle device, it will restart in SoftAP mode
   4. Check serial output for error messages
+  5. Note: SoftAP auto-disables after 30 minutes for security. Device will continue operating without network connectivity after timeout.
 
 **Problem: Cannot connect to SoftAP**
 - **Cause**: Static IP not configured correctly
