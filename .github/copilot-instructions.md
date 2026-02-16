@@ -17,7 +17,7 @@
 | **Target Board** | Pico W ONLY (not standard Pico) - WiFi required | Lines 18, 69 |
 | **Pico SDK Version** | 2.2.0 (mbedTLS 3.6.2) - requires compatibility flags | Lines 8-10, 33 |
 | **Security Status** | ✅ All critical issues fixed (Feb 15, 2026) | Lines 8-10, 163-173, 295-345 |
-| **Known Limitations** | DRBG/RNG stubbed (SDK bug), max 5 fabrics | Lines 170-171, 397-403 |
+| **Known Limitations** | CTR_DRBG wrapper stubbed (hw RNG works), max 5 fabrics | Lines 170-171, 397-403 |
 | **Validation Command** | See line 274 for one-liner build verification | Line 274-276 |
 
 ### Common Errors → Quick Fix
@@ -147,7 +147,7 @@ cmake .. && make -j$(nproc)
 **Platform** (`platform/pico_w_chip_port/`):
 - `network_adapter.cpp` - WiFi/lwIP, SoftAP support (192.168.4.1) with 30-min timeout
 - `storage_adapter.cpp` - LittleFS storage (last 256KB flash), key-value pairs, wear leveling
-- `crypto_adapter.cpp` - mbedTLS wrapper (DRBG/RNG stubbed due to SDK bug, SHA256/AES work)
+- `crypto_adapter.cpp` - mbedTLS wrapper (CTR_DRBG wrapper stubbed, hw RNG works, SHA256/AES work)
 - `platform_manager.cpp` - Platform initialization coordinator, discriminator management
 - `config/` - lwipopts.h (lwIP config, IPv6 enabled), mbedtls_config.h (crypto config)
 - `CHIPDevicePlatformConfig.h` - Matter device config (PIN from MAC, discriminator from storage)
@@ -207,10 +207,10 @@ cmake .. && make -j$(nproc)
 3. **PIN per device**: SHA256(MAC||"VIKINGBIO-2026")%100000000, `tools/derive_pin.py`
 4. **No OTA**: Physical USB only (BOOTSEL + copy .uf2)
 5. **Flash**: Last 256KB for Matter fabrics, LittleFS with wear leveling (pico-lfs submodule)
-6. **RAM limits**: 264KB → max 5 fabrics. mbedTLS DRBG/RNG stubbed (SDK 1.5.1 bugs), SHA256/AES work.
+6. **RAM limits**: 264KB → max 5 fabrics. Hardware RNG (get_rand_32) works correctly; mbedTLS CTR_DRBG wrapper stubbed but not needed.
 7. **Optimizations**: `-O3 -ffast-math -fno-signed-zeros -fno-trapping-math -funroll-loops`, LTO off (SDK wrapper issues), `serial_handler_data_available()` inlined, `viking_bio_parse_data()` `__attribute__((hot))`
 8. **Security Status**: ✅ All 11 critical, 5 high-priority, and 6 medium-priority security issues fixed (Feb 15, 2026). Production-ready for dev/test environments.
-9. **Known TODOs**: crypto_adapter.cpp DRBG/RNG (documented SDK 1.5.1 bug workaround) - do NOT remove, this is acceptable
+9. **Known TODOs**: crypto_adapter.cpp CTR_DRBG wrapper (not critical - hardware RNG works) - do NOT remove, this is acceptable
 10. **Discriminator**: Randomly generated on first boot from testing range 0xF00-0xFFF (3840-4095), persisted to flash
 
 ## Common Code Changes
@@ -258,7 +258,7 @@ Before committing:
 1. ✅ Build succeeds: `rm -rf build && mkdir build && cd build && cmake .. && make -j$(nproc)`
 2. ✅ Firmware size reasonable: `arm-none-eabi-size viking_bio_matter.elf` (text ~544KB ±20KB, bss ~72KB ±10KB)
 3. ✅ No credential leaks: `git diff | grep -i -E "password|ssid|secret|key" || echo "OK"` → must output "OK"
-4. ✅ Only acceptable TODOs: `git diff | grep -E "TODO|HACK|FIXME"` → only crypto_adapter.cpp DRBG/RNG (known SDK bug)
+4. ✅ Only acceptable TODOs: `git diff | grep -E "TODO|HACK|FIXME"` → only crypto_adapter.cpp CTR_DRBG wrapper (non-critical)
 5. ✅ Submodules committed if changed: `git status libs/`
 6. ✅ Update relevant docs (README.md, this file, platform docs)
 
@@ -303,7 +303,7 @@ Before committing:
 2. ✅ `rm -rf build && mkdir build && cd build && cmake .. && make -j$(nproc)` → ~26s, artifacts exist
 3. ✅ `arm-none-eabi-size viking_bio_matter.elf` → text ~590KB, bss ~75KB (±20KB OK due to LittleFS)
 4. ✅ `git diff | grep -i -E "password|ssid|secret|key" || echo "OK"` → must output "OK"
-5. ✅ `git diff | grep -E "TODO|HACK|FIXME"` → only OK: crypto_adapter.cpp DRBG/RNG (known)
+5. ✅ `git diff | grep -E "TODO|HACK|FIXME"` → only OK: crypto_adapter.cpp CTR_DRBG wrapper (non-critical)
 6. ✅ .gitignore excludes build/, pico-sdk/, *.uf2
 7. ✅ Update docs: Build→README.md+this, APIs→code comments, Matter→platform/pico_w_chip_port/README.md
 8. ✅ Repository submodules: `git submodule status` shows all initialized (especially libs/pico-lfs)
@@ -319,7 +319,7 @@ export PICO_SDK_PATH=$(pwd)/pico-sdk && git submodule update --init --recursive 
 
 **Components**: serial_handler.c (interrupt RX, hardware_sync), viking_bio_protocol.c (binary/text parser with fallback), matter_bridge.cpp (3 clusters + NetworkCommissioning), main.c (coordinator), platform port (network/storage/crypto/manager), matter_minimal stack (7 phases complete)
 
-**Limitations**: No OTA, WiFi only (no Thread/Ethernet), LittleFS storage (last 256KB, wear leveling), max 5 fabrics (RAM 264KB), discriminator randomized on first boot (0xF00-0xFFF testing range), DRBG/RNG stubbed (documented SDK 1.5.1 bug, SHA256/AES work), requires 5V→3.3V level shifter for serial input
+**Limitations**: No OTA, WiFi only (no Thread/Ethernet), LittleFS storage (last 256KB, wear leveling), max 5 fabrics (RAM 264KB), discriminator randomized on first boot (0xF00-0xFFF testing range), CTR_DRBG wrapper stubbed (hardware RNG works via get_rand_32), requires 5V→3.3V level shifter for serial input
 
 ## Trust & Verify
 
@@ -494,10 +494,10 @@ As of February 15, 2026, comprehensive security review completed with all vulner
 - No unnecessary libraries linked
 - LittleFS included (adds ~100KB but required for storage)
 
-**Crypto RNG Limitation** (KNOWN SDK BUG - DO NOT FIX):
+**Crypto RNG Status** (CLARIFIED WITH SDK 2.2.0):
 - **File**: `platform/pico_w_chip_port/crypto_adapter.cpp` lines 14-49
-- **Issue**: DRBG/RNG functions stubbed due to Pico SDK 1.5.1 mbedTLS bugs
-- **Impact**: SHA256/AES work correctly; RNG returns -1 (error code)
-- **Workaround**: Matter PIN uses MAC-based generation (SHA256 hash), not RNG
-- **Status**: Documented limitation; monitor Pico SDK updates for fix
-- **Action Required**: DO NOT remove TODO comment about RNG - it's an acceptable known limitation
+- **Status**: mbedTLS CTR_DRBG wrapper stubbed (not critical)
+- **Hardware RNG**: RP2040 hardware RNG (`get_rand_32()`) works correctly and is used by PASE
+- **Impact**: SHA256/AES work correctly; crypto_adapter_random() wrapper returns -1 but is not needed
+- **Security**: PASE uses hardware RNG correctly for secure random generation
+- **Action Required**: No fix needed - hardware RNG is sufficient for current implementation

@@ -541,7 +541,7 @@ Matter: LevelControl cluster updated - Fan speed 80%
 1. **No OTA support**: Firmware updates require physical USB access (hold BOOTSEL button and copy .uf2 file)
 2. **WiFi only**: No Thread or Ethernet support currently
 3. **Limited fabrics**: Maximum 5 Matter fabrics due to memory constraints (264KB RAM on RP2040)
-4. **Crypto limitations**: DRBG and RNG functions are stubbed due to Pico SDK 1.5.1 mbedTLS bugs (SHA256 and AES work correctly)
+4. **Crypto limitations**: mbedTLS CTR_DRBG wrapper (`crypto_adapter_random()`) is stubbed due to entropy source configuration complexity. However, the RP2040 hardware RNG (`get_rand_32()`) is fully functional and used by PASE for secure random number generation (SHA256 and AES also work correctly)
 
 ## Security Considerations
 
