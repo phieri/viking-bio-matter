@@ -74,10 +74,13 @@ int main() {
             if (bytes_read > 0) {
                 // Parse Viking Bio data
                 if (viking_bio_parse_data(buffer, bytes_read, &viking_data)) {
+                    uint32_t now = to_ms_since_boot(get_absolute_time());
                     // Turn on LED for 200ms to indicate serial message received
                     LED_SET(1);
                     led_tick_active = true;
-                    led_tick_off_time = to_ms_since_boot(get_absolute_time()) + 200;
+                    led_tick_off_time = now + 200;
+                    // Reset heartbeat timer to prevent immediate turn-on after tick
+                    last_blink = now;
                     
                     // Check if data resumed after timeout
                     if (timeout_triggered) {
