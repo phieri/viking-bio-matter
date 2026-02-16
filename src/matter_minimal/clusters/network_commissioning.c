@@ -11,7 +11,6 @@
 // Forward declarations for platform network functions
 extern int storage_adapter_save_wifi_credentials(const char *ssid, const char *password);
 extern int network_adapter_save_and_connect(const char *ssid, const char *password);
-extern int network_adapter_stop_softap(void);
 extern bool network_adapter_is_connected(void);
 
 // Network commissioning state
@@ -122,9 +121,6 @@ int network_commissioning_connect_network(
     
     printf("NetworkCommissioning: ConnectNetwork\n");
     printf("  Network ID: %s\n", network_id_str);
-    
-    // Stop SoftAP if running
-    network_adapter_stop_softap();
     
     // Connect to the network using stored credentials
     // The network_adapter will load credentials from storage

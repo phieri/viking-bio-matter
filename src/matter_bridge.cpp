@@ -71,7 +71,7 @@ void matter_bridge_init(void) {
             platform_manager_start_commissioning_mode();
         }
     } else {
-        // No credentials - start commissioning mode
+        // No credentials - start commissioning mode (BLE)
         printf("No WiFi credentials found in storage\n");
         printf("Starting commissioning mode for WiFi setup...\n");
         if (platform_manager_start_commissioning_mode() != 0) {
@@ -81,10 +81,10 @@ void matter_bridge_init(void) {
             return;
         }
         
-        // In SoftAP mode, also advertise on the AP network
-        printf("\nStarting DNS-SD device discovery (SoftAP)...\n");
+        // Start DNS-SD advertisement for device discovery
+        printf("\nStarting DNS-SD device discovery...\n");
         if (platform_manager_start_dns_sd_advertisement() != 0) {
-            printf("WARNING: DNS-SD advertisement failed in SoftAP mode\n");
+            printf("WARNING: DNS-SD advertisement failed\n");
             printf("         Device may not be discoverable via mDNS\n");
         }
     }
