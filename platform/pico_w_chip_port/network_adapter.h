@@ -47,6 +47,14 @@ int network_adapter_start_softap(void);
 int network_adapter_stop_softap(void);
 
 /**
+ * Check if SoftAP timeout has expired
+ * SoftAP is automatically disabled after 30 minutes to improve security
+ * 
+ * @return true if SoftAP has been running for more than 30 minutes
+ */
+bool network_adapter_softap_timeout_expired(void);
+
+/**
  * Connect to WiFi network in station mode
  * If ssid/password are NULL, tries to load from flash storage
  * 

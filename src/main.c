@@ -8,6 +8,10 @@
 #include "viking_bio_protocol.h"
 #include "matter_bridge.h"
 
+// Forward declaration for network adapter functions
+bool network_adapter_softap_timeout_expired(void);
+int network_adapter_stop_softap(void);
+
 // LED control for Pico W (CYW43 chip controls the LED, but requires complex setup)
 // LED is disabled for Matter builds to avoid lwIP dependency issues in main
 #define LED_ENABLED 0
@@ -54,6 +58,7 @@ int main() {
     uint32_t last_blink = 0;
     bool led_state = false;
     bool timeout_triggered = false;  // Track if timeout has been triggered
+    bool softap_timeout_logged = false;  // Track if SoftAP timeout message was logged
     
     while (true) {
         // Update watchdog to prevent system reset
@@ -107,6 +112,23 @@ int main() {
         
         // Update Matter bridge
         matter_bridge_task();
+        
+        // Check for SoftAP timeout (auto-disable after 30 minutes)
+        if (!softap_timeout_logged && network_adapter_softap_timeout_expired()) {
+            softap_timeout_logged = true;
+            printf("\n===========================================\n");
+            printf("SoftAP TIMEOUT: 30 minutes have elapsed\n");
+            printf("Automatically disabling SoftAP for security\n");
+            printf("===========================================\n\n");
+            
+            if (network_adapter_stop_softap() == 0) {
+                printf("✓ SoftAP disabled successfully\n");
+                printf("  Device will continue operating without SoftAP\n");
+                printf("  To re-enable commissioning mode, restart device\n\n");
+            } else {
+                printf("ERROR: Failed to disable SoftAP\n\n");
+            }
+        }
         
         // Blink LED every second to show activity
         uint32_t now = to_ms_since_boot(get_absolute_time());
