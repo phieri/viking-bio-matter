@@ -44,7 +44,7 @@ void matter_bridge_init(void) {
     // Initialize Matter platform
     printf("Initializing Matter platform for Pico W...\n");
     if (platform_manager_init() != 0) {
-        printf("ERROR: Failed to initialize Matter platform\n");
+        printf("[Matter] ERROR: Failed to initialize Matter platform\n");
         printf("Device will continue in degraded mode (no Matter support)\n");
         initialized = false;
         return;
@@ -75,7 +75,7 @@ void matter_bridge_init(void) {
         printf("No WiFi credentials found in storage\n");
         printf("Starting commissioning mode for WiFi setup...\n");
         if (platform_manager_start_commissioning_mode() != 0) {
-            printf("ERROR: Failed to start commissioning mode\n");
+            printf("[Matter] ERROR: Failed to start commissioning mode\n");
             printf("Device will continue without network connectivity\n");
             initialized = false;
             return;
@@ -125,7 +125,7 @@ void matter_bridge_init(void) {
     // Initialize Matter protocol stack
     printf("Initializing Matter protocol stack...\n");
     if (matter_protocol_init() != 0) {
-        printf("ERROR: Failed to initialize Matter protocol stack\n");
+        printf("[Matter] ERROR: Failed to initialize Matter protocol stack\n");
         initialized = false;
         return;
     }
@@ -138,7 +138,7 @@ void matter_bridge_init(void) {
     // Derive setup PIN from MAC
     char setup_pin[9];
     if (platform_manager_derive_setup_pin(mac, setup_pin) != 0) {
-        printf("ERROR: Failed to derive setup PIN\n");
+        printf("[Matter] ERROR: Failed to derive setup PIN\n");
         initialized = false;
         return;
     }
@@ -149,7 +149,7 @@ void matter_bridge_init(void) {
     
     // Start commissioning with derived PIN and discriminator
     if (matter_protocol_start_commissioning(setup_pin, discriminator) != 0) {
-        printf("ERROR: Failed to start commissioning\n");
+        printf("[Matter] ERROR: Failed to start commissioning\n");
         initialized = false;
         return;
     }
@@ -183,7 +183,7 @@ void matter_bridge_update_flame(bool flame_on) {
         value.bool_val = flame_on;
         int ret = matter_attributes_update(1, MATTER_CLUSTER_ON_OFF, MATTER_ATTR_ON_OFF, &value);
         if (ret != 0) {
-            printf("ERROR: Failed to update OnOff attribute (ret=%d)\n", ret);
+            printf("[Matter] ERROR: Failed to update OnOff attribute (ret=%d)\n", ret);
         } else {
             // Notify platform of attribute change
             platform_manager_report_onoff_change(1);
@@ -212,7 +212,7 @@ void matter_bridge_update_fan_speed(uint8_t speed) {
         value.uint8_val = speed;
         int ret = matter_attributes_update(1, MATTER_CLUSTER_LEVEL_CONTROL, MATTER_ATTR_CURRENT_LEVEL, &value);
         if (ret != 0) {
-            printf("ERROR: Failed to update LevelControl attribute (ret=%d)\n", ret);
+            printf("[Matter] ERROR: Failed to update LevelControl attribute (ret=%d)\n", ret);
         } else {
             // Notify platform of attribute change
             platform_manager_report_level_change(1);
@@ -241,7 +241,7 @@ void matter_bridge_update_temperature(uint16_t temp) {
         value.int16_val = (int16_t)(temp * 100); // Convert to centidegrees
         int ret = matter_attributes_update(1, MATTER_CLUSTER_TEMPERATURE_MEASUREMENT, MATTER_ATTR_MEASURED_VALUE, &value);
         if (ret != 0) {
-            printf("ERROR: Failed to update Temperature attribute (ret=%d)\n", ret);
+            printf("[Matter] ERROR: Failed to update Temperature attribute (ret=%d)\n", ret);
         } else {
             // Notify platform of attribute change
             platform_manager_report_temperature_change(1);
