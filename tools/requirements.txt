@@ -1,0 +1,2 @@
+# Python requirements for Viking Bio Matter development tools
+pyserial>=3.5
