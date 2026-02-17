@@ -175,24 +175,19 @@ matter_attributes_process_reports()
 
 ## Future Enhancements
 
-### Network Transport Layer
-Add a subscriber that sends attribute reports over WiFi:
-```cpp
-void network_reporter(uint8_t endpoint, uint32_t cluster_id,
-                     uint32_t attribute_id, const matter_attr_value_t *value) {
-    // Build Matter report message
-    // Send via UDP/TCP to subscribed controllers
-}
-```
+### Implemented ✅
+- ✅ **Network Transport Layer**: Implemented in `matter_network_subscriber.cpp` and `matter_network_transport.cpp`
+  - Sends attribute reports over WiFi to Matter controllers
+  - UDP-based transport with JSON encoding
+  - Controller registration and management
 
-### Planned Enhancements
-- Add more standard Matter clusters
-- Implement persistent storage for attributes
-- Enhance Matter protocol features
-- Support additional device types
+### Remaining Enhancements
+- Add more standard Matter clusters beyond the current 3 (OnOff, LevelControl, TemperatureMeasurement)
+- Implement persistent storage for attributes in flash
+- Support additional device types beyond burner control
 
 ### Persistent Storage
-Store attribute values in flash:
+Store attribute values in flash for persistence across reboots:
 ```cpp
 // On attribute change
 storage_adapter_write("attr_1_6_0", &value, sizeof(value));

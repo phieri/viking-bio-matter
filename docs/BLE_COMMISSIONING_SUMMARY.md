@@ -245,10 +245,9 @@ The implementation is production-ready with documented limitations and follows M
 
 ## Next Steps
 
-1. **Complete BLE Implementation**: Address TODOs in ble_adapter.cpp
-2. **Hardware Testing**: Validate on actual Pico W with BLE controller
-3. **QR Code Generation**: Add QR code display on serial output
-4. **Additional Features** (optional):
+1. **Hardware Testing**: Validate on actual Pico W with BLE controller
+2. **QR Code Generation**: Add QR code display on serial output for easier pairing
+3. **Additional Features** (optional):
    - Support for multiple BLE connections
    - Enhanced advertising data with more device info
    - Web-based BLE provisioning (Web Bluetooth API)

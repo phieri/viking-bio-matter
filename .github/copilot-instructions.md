@@ -371,10 +371,9 @@ These instructions validated Feb 2026 via actual builds. Only search/explore if:
 
 ### Documentation
 - ✅ Security documentation consolidated in SECURITY_NOTES.md
-- ✅ Codebase review findings streamlined in CODEBASE_REVIEW_FINDINGS.md
 - ✅ Matter architecture documented in docs/MINIMAL_MATTER_ARCHITECTURE.md
-- ✅ WiFi commissioning guide in docs/WIFI_COMMISSIONING_SUMMARY.md
-- ✅ All outdated documentation removed (596 lines cleaned)
+- ✅ BLE commissioning guide in docs/BLE_COMMISSIONING_SUMMARY.md
+- ✅ All outdated/completed review documentation removed
 
 ### CI/CD
 - ✅ Fixed submodule initialization in GitHub Actions workflow
@@ -439,8 +438,7 @@ As of February 15, 2026, comprehensive security review completed with all vulner
 - **6 Medium-priority issues**: Input validation, test discriminator, crypto limitations - ALL ADDRESSED
 
 **Documentation**: 
-- Full audit results: `CODEBASE_REVIEW_FINDINGS.md` (207 lines, streamlined from 1062 lines)
-- Security considerations: `SECURITY_NOTES.md` (269 lines)
+- Security considerations: `SECURITY_NOTES.md` (273 lines)
 - All fixes verified in code with line number references
 
 **Key Fix Examples**:
@@ -483,11 +481,11 @@ As of February 15, 2026, comprehensive security review completed with all vulner
 
 **Changes**:
 - Removed 3 outdated files: `docs/PR_ROADMAP.md`, `docs/REFERENCE_IMPLEMENTATIONS.md`, `SECURITY_FIXES_SUMMARY.md` (596 lines total)
+- Removed 5 completed review files: `REVIEW_SUMMARY.md`, `CODE_QUALITY_FINDINGS.md`, `CODEBASE_REVIEW_FINDINGS.md`, `FUTURE_IMPROVEMENTS_IMPLEMENTATION_SUMMARY.md`, `docs/WIFI_COMMISSIONING_SUMMARY.md.deprecated` (Feb 17, 2026)
 - Streamlined `README.md` by 60 lines (WiFi commissioning section)
 - Fixed `CONTRIBUTING.md` license reference to CC BY-NC-SA 4.0
-- Updated `CODEBASE_REVIEW_FINDINGS.md` and this file to remove references
 
-**Commits**: 8112f4b and 9808b81 (Feb 15, 2026)
+**Commits**: 8112f4b and 9808b81 (Feb 15, 2026), current cleanup (Feb 17, 2026)
 
 ### Other Known Issues
 
