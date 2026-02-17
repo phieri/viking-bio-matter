@@ -146,14 +146,14 @@ int platform_manager_init(void) {
     // Initialize crypto first (needed for other components)
     printf("Step 1/4: Initializing cryptography...\n");
     if (crypto_adapter_init() != 0) {
-        printf("ERROR: Failed to initialize crypto adapter\n");
+        printf("[PlatformManager] ERROR: Failed to initialize crypto adapter\n");
         return -1;
     }
 
     // Initialize storage
     printf("\nStep 2/4: Initializing storage...\n");
     if (storage_adapter_init() != 0) {
-        printf("ERROR: Failed to initialize storage adapter\n");
+        printf("[PlatformManager] ERROR: Failed to initialize storage adapter\n");
         return -1;
     }
     
@@ -165,7 +165,7 @@ int platform_manager_init(void) {
             printf("✓ Loaded discriminator from storage: %u (0x%03X)\n", 
                    device_discriminator, device_discriminator);
         } else {
-            printf("ERROR: Failed to load discriminator from storage\n");
+            printf("[PlatformManager] ERROR: Failed to load discriminator from storage\n");
             return -1;
         }
     } else {
@@ -175,7 +175,7 @@ int platform_manager_init(void) {
         // Generate random value in testing range (0xF00-0xFFF)
         uint8_t random_byte;
         if (crypto_adapter_random(&random_byte, 1) != 0) {
-            printf("ERROR: Failed to generate random discriminator\n");
+            printf("[PlatformManager] ERROR: Failed to generate random discriminator\n");
             return -1;
         }
         
@@ -188,7 +188,7 @@ int platform_manager_init(void) {
         
         // Save to storage
         if (storage_adapter_save_discriminator(device_discriminator) != 0) {
-            printf("ERROR: Failed to save discriminator to storage\n");
+            printf("[PlatformManager] ERROR: Failed to save discriminator to storage\n");
             return -1;
         }
         
@@ -198,14 +198,14 @@ int platform_manager_init(void) {
     // Initialize network
     printf("\nStep 3/4: Initializing network...\n");
     if (network_adapter_init() != 0) {
-        printf("ERROR: Failed to initialize network adapter\n");
+        printf("[PlatformManager] ERROR: Failed to initialize network adapter\n");
         return -1;
     }
     
     // Initialize BLE for Matter commissioning
     printf("\nInitializing BLE for commissioning...\n");
     if (ble_adapter_init() != 0) {
-        printf("ERROR: Failed to initialize BLE adapter\n");
+        printf("[PlatformManager] ERROR: Failed to initialize BLE adapter\n");
         return -1;
     }
     printf("✓ BLE initialized\n");
@@ -213,7 +213,7 @@ int platform_manager_init(void) {
     // Initialize DNS-SD for Matter device discovery
     printf("\nInitializing DNS-SD...\n");
     if (dns_sd_init() != 0) {
-        printf("ERROR: Failed to initialize DNS-SD\n");
+        printf("[PlatformManager] ERROR: Failed to initialize DNS-SD\n");
         return -1;
     }
     printf("✓ DNS-SD initialized\n");
@@ -221,7 +221,7 @@ int platform_manager_init(void) {
     // Initialize Matter attribute system
     printf("\nStep 4/4: Initializing Matter attributes...\n");
     if (matter_attributes_init() != 0) {
-        printf("ERROR: Failed to initialize Matter attributes\n");
+        printf("[PlatformManager] ERROR: Failed to initialize Matter attributes\n");
         return -1;
     }
     
@@ -251,7 +251,7 @@ int platform_manager_init(void) {
 
 int platform_manager_connect_wifi(const char *ssid, const char *password) {
     if (!platform_initialized) {
-        printf("ERROR: Platform not initialized\n");
+        printf("[PlatformManager] ERROR: Platform not initialized\n");
         return -1;
     }
 
@@ -266,7 +266,7 @@ int platform_manager_connect_wifi(const char *ssid, const char *password) {
 
 int platform_manager_start_commissioning_mode(void) {
     if (!platform_initialized) {
-        printf("ERROR: Platform not initialized\n");
+        printf("[PlatformManager] ERROR: Platform not initialized\n");
         return -1;
     }
     
@@ -281,7 +281,7 @@ int platform_manager_start_commissioning_mode(void) {
     
     // Start BLE advertising for Matter commissioning
     if (ble_adapter_start_advertising(device_discriminator, vendor_id, product_id) != 0) {
-        printf("ERROR: Failed to start BLE advertising\n");
+        printf("[PlatformManager] ERROR: Failed to start BLE advertising\n");
         return -1;
     }
     
@@ -295,7 +295,7 @@ int platform_manager_start_commissioning_mode(void) {
 
 int platform_manager_stop_commissioning_mode(void) {
     if (!platform_initialized) {
-        printf("ERROR: Platform not initialized\n");
+        printf("[PlatformManager] ERROR: Platform not initialized\n");
         return -1;
     }
     
@@ -306,7 +306,7 @@ int platform_manager_stop_commissioning_mode(void) {
     
     // Stop BLE advertising
     if (ble_adapter_stop_advertising() != 0) {
-        printf("ERROR: Failed to stop BLE advertising\n");
+        printf("[PlatformManager] ERROR: Failed to stop BLE advertising\n");
         return -1;
     }
     
@@ -467,7 +467,7 @@ void platform_manager_report_temperature_change(uint8_t endpoint) {
 
 int platform_manager_start_dns_sd_advertisement(void) {
     if (!platform_initialized) {
-        printf("ERROR: Platform not initialized\n");
+        printf("[PlatformManager] ERROR: Platform not initialized\n");
         return -1;
     }
     
@@ -502,7 +502,7 @@ int platform_manager_start_dns_sd_advertisement(void) {
         printf("  Use 'dns-sd -B _matterc._udp' to verify\n");
         printf("====================================\n\n");
     } else {
-        printf("ERROR: Failed to start DNS-SD advertisement\n");
+        printf("[PlatformManager] ERROR: Failed to start DNS-SD advertisement\n");
     }
     
     return result;

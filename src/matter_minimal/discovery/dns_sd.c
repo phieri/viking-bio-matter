@@ -102,7 +102,7 @@ int dns_sd_advertise_commissionable_node(
     // Get the network interface (station mode)
     netif = &cyw43_state.netif[CYW43_ITF_STA];
     if (!netif_is_up(netif)) {
-        printf("ERROR: Network interface not up, cannot advertise DNS-SD\n");
+        printf("[DNS-SD] ERROR: Network interface not up, cannot advertise DNS-SD\n");
         return -1;
     }
     

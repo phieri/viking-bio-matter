@@ -160,14 +160,14 @@ int matter_transport_init(void) {
     // Create UDP PCB for operational messages (port 5540)
     transport_state.operational_pcb = udp_new();
     if (transport_state.operational_pcb == NULL) {
-        printf("ERROR: Failed to create operational UDP PCB\n");
+        printf("[UDPTransport] ERROR: Failed to create operational UDP PCB\n");
         return MATTER_TRANSPORT_ERROR_INIT;
     }
     
     // Bind operational PCB to port 5540
     err_t err = udp_bind(transport_state.operational_pcb, IP_ANY_TYPE, MATTER_PORT_OPERATIONAL);
     if (err != ERR_OK) {
-        printf("ERROR: Failed to bind operational UDP PCB to port %d (err=%d)\n", 
+        printf("[UDPTransport] ERROR: Failed to bind operational UDP PCB to port %d (err=%d)\n", 
                MATTER_PORT_OPERATIONAL, err);
         udp_remove(transport_state.operational_pcb);
         transport_state.operational_pcb = NULL;
@@ -181,7 +181,7 @@ int matter_transport_init(void) {
     // Create UDP PCB for commissioning messages (port 5550)
     transport_state.commissioning_pcb = udp_new();
     if (transport_state.commissioning_pcb == NULL) {
-        printf("ERROR: Failed to create commissioning UDP PCB\n");
+        printf("[UDPTransport] ERROR: Failed to create commissioning UDP PCB\n");
         udp_remove(transport_state.operational_pcb);
         transport_state.operational_pcb = NULL;
         return MATTER_TRANSPORT_ERROR_INIT;
@@ -190,7 +190,7 @@ int matter_transport_init(void) {
     // Bind commissioning PCB to port 5550
     err = udp_bind(transport_state.commissioning_pcb, IP_ANY_TYPE, MATTER_PORT_COMMISSIONING);
     if (err != ERR_OK) {
-        printf("ERROR: Failed to bind commissioning UDP PCB to port %d (err=%d)\n", 
+        printf("[UDPTransport] ERROR: Failed to bind commissioning UDP PCB to port %d (err=%d)\n", 
                MATTER_PORT_COMMISSIONING, err);
         udp_remove(transport_state.operational_pcb);
         udp_remove(transport_state.commissioning_pcb);
@@ -251,7 +251,7 @@ int matter_transport_send(const uint8_t *data, size_t length,
     }
     
     if (length > MATTER_TRANSPORT_MAX_PACKET) {
-        printf("ERROR: Packet too large (%zu bytes, max %d)\n", 
+        printf("[UDPTransport] ERROR: Packet too large (%zu bytes, max %d)\n", 
                length, MATTER_TRANSPORT_MAX_PACKET);
         return MATTER_TRANSPORT_ERROR_INVALID_PARAM;
     }
@@ -263,7 +263,7 @@ int matter_transport_send(const uint8_t *data, size_t length,
     // Allocate pbuf
     struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, length, PBUF_RAM);
     if (p == NULL) {
-        printf("ERROR: Failed to allocate pbuf for send\n");
+        printf("[UDPTransport] ERROR: Failed to allocate pbuf for send\n");
         return MATTER_TRANSPORT_ERROR_NO_MEMORY;
     }
     
@@ -277,7 +277,7 @@ int matter_transport_send(const uint8_t *data, size_t length,
     pbuf_free(p);
     
     if (err != ERR_OK) {
-        printf("ERROR: UDP send failed (err=%d)\n", err);
+        printf("[UDPTransport] ERROR: UDP send failed (err=%d)\n", err);
         return MATTER_TRANSPORT_ERROR_SEND_FAILED;
     }
     
@@ -329,7 +329,7 @@ int matter_transport_receive(uint8_t *buffer, size_t buffer_size,
     // Check buffer size
     if (entry->length > buffer_size) {
         critical_section_exit(&transport_state.queue_lock);
-        printf("ERROR: Buffer too small for received packet (%zu bytes needed, %zu available)\n",
+        printf("[UDPTransport] ERROR: Buffer too small for received packet (%zu bytes needed, %zu available)\n",
                entry->length, buffer_size);
         return MATTER_TRANSPORT_ERROR_INVALID_PARAM;
     }

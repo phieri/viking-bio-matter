@@ -41,7 +41,7 @@ int network_adapter_init(void) {
 
     // Initialize CYW43 with background LWIP
     if (cyw43_arch_init_with_country(CYW43_COUNTRY_USA)) {
-        printf("ERROR: Failed to initialize CYW43 WiFi chip\n");
+        printf("[NetworkAdapter] ERROR: Failed to initialize CYW43 WiFi chip\n");
         return -1;
     }
 
@@ -52,7 +52,7 @@ int network_adapter_init(void) {
 
 int network_adapter_connect(const char *ssid, const char *password) {
     if (!wifi_initialized) {
-        printf("ERROR: WiFi not initialized. Call network_adapter_init() first\n");
+        printf("[NetworkAdapter] ERROR: WiFi not initialized. Call network_adapter_init() first\n");
         return -1;
     }
 
@@ -69,7 +69,7 @@ int network_adapter_connect(const char *ssid, const char *password) {
                 password = stored_password;
                 printf("Using WiFi credentials from flash\n");
             } else {
-                printf("ERROR: Failed to load WiFi credentials from flash\n");
+                printf("[NetworkAdapter] ERROR: Failed to load WiFi credentials from flash\n");
                 return -1;
             }
         } else {
@@ -79,7 +79,7 @@ int network_adapter_connect(const char *ssid, const char *password) {
     }
 
     if (!ssid || strlen(ssid) == 0) {
-        printf("ERROR: No SSID provided\n");
+        printf("[NetworkAdapter] ERROR: No SSID provided\n");
         return -1;
     }
 
@@ -96,7 +96,7 @@ int network_adapter_connect(const char *ssid, const char *password) {
     );
 
     if (result != 0) {
-        printf("ERROR: Failed to connect to WiFi (error %d)\n", result);
+        printf("[NetworkAdapter] ERROR: Failed to connect to WiFi (error %d)\n", result);
         wifi_connected = false;
         current_mode = NETWORK_MODE_NONE;
         return result;
@@ -119,14 +119,14 @@ int network_adapter_connect(const char *ssid, const char *password) {
 
 int network_adapter_save_and_connect(const char *ssid, const char *password) {
     if (!ssid || !password) {
-        printf("ERROR: Invalid SSID or password\n");
+        printf("[NetworkAdapter] ERROR: Invalid SSID or password\n");
         return -1;
     }
 
     // Save credentials to flash
     printf("Saving WiFi credentials to flash...\n");
     if (storage_adapter_save_wifi_credentials(ssid, password) != 0) {
-        printf("ERROR: Failed to save WiFi credentials\n");
+        printf("[NetworkAdapter] ERROR: Failed to save WiFi credentials\n");
         return -1;
     }
 
