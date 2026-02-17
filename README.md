@@ -20,9 +20,7 @@ A Matter bridge for the [Viking Bio 20](https://varmebaronen.se/produkter/single
 
 ✅ **All Critical Security Issues Resolved** (as of February 15, 2026)
 
-This firmware has undergone comprehensive security review and all critical vulnerabilities have been addressed. For details, see:
-- [CODEBASE_REVIEW_FINDINGS.md](CODEBASE_REVIEW_FINDINGS.md) - Security audit results
-- [SECURITY_NOTES.md](SECURITY_NOTES.md) - Security considerations and best practices
+This firmware has undergone comprehensive security review and all critical vulnerabilities have been addressed. For security considerations and best practices, see [SECURITY_NOTES.md](SECURITY_NOTES.md).
 
 ## Hardware Requirements
 
