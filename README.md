@@ -105,7 +105,39 @@ F:1,S:50,T:75\n
 
 **Note**: This project requires Pico SDK 2.2.0 or later for full compatibility with mbedTLS 3.6.2 and latest platform features.
 
-### Build Steps
+### Development Container (Recommended)
+
+For the easiest development experience, use the included VS Code devcontainer that sets up all dependencies automatically:
+
+1. **Prerequisites:**
+   - [Visual Studio Code](https://code.visualstudio.com/)
+   - [Docker Desktop](https://www.docker.com/products/docker-desktop) or compatible container runtime
+   - [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) for VS Code
+
+2. **Open in Container:**
+   - Clone this repository
+   - Open the repository folder in VS Code
+   - When prompted, click "Reopen in Container" (or use Command Palette → "Dev Containers: Reopen in Container")
+   - Wait for the container to build and initialize (first time takes 5-10 minutes)
+
+3. **Build with CMake Presets:**
+   ```bash
+   # Configure and build using the preset
+   cmake --preset pico-default
+   cmake --build build
+   ```
+
+The devcontainer automatically:
+- Installs ARM toolchain (gcc-arm-none-eabi) and build tools (CMake, Ninja)
+- Downloads and initializes Pico SDK 2.2.0 with all submodules
+- Installs debugging tools (gdb-multiarch, openocd)
+- Installs Python tools (pyserial, pre-commit)
+- Mounts USB devices for hardware debugging (/dev/bus/usb)
+- Configures VS Code with recommended extensions for embedded development
+
+**USB Device Access:** On Linux hosts, you may need to add udev rules or run Docker with `--privileged` to access USB devices. On Windows/macOS, Docker Desktop handles USB passthrough automatically for most devices.
+
+### Build Steps (Manual Setup)
 
 1. **Build the firmware:**
    ```bash
