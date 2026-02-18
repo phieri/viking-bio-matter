@@ -458,4 +458,43 @@ int storage_adapter_clear_discriminator(void) {
     return storage_adapter_delete(DISCRIMINATOR_KEY);
 }
 
+int storage_adapter_save_operational_hours(uint32_t hours) {
+    if (!storage_initialized) {
+        return -1;
+    }
+    
+    // Write operational hours to storage as 32-bit value
+    int result = storage_adapter_write("/operational_hours", 
+                                      (const uint8_t *)&hours, 
+                                      sizeof(uint32_t));
+    
+    if (result != 0) {
+        printf("[Storage] ERROR: Failed to save operational hours\n");
+    }
+    
+    return result;
+}
+
+int storage_adapter_load_operational_hours(uint32_t *hours) {
+    if (!storage_initialized || !hours) {
+        return -1;
+    }
+    
+    uint32_t stored_value = 0;
+    size_t actual_len = 0;
+    
+    // Read from storage
+    int result = storage_adapter_read("/operational_hours",
+                                     (uint8_t *)&stored_value,
+                                     sizeof(uint32_t),
+                                     &actual_len);
+    
+    if (result != 0 || actual_len < sizeof(uint32_t)) {
+        return -1;  // No hours stored or read failed
+    }
+    
+    *hours = stored_value;
+    return 0;
+}
+
 } // extern "C"

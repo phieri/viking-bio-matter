@@ -25,7 +25,8 @@ static const uint32_t ep0_server_clusters[] = {
 static const uint32_t ep1_server_clusters[] = {
     0x0006,  // OnOff
     0x0008,  // LevelControl
-    0x0402   // TemperatureMeasurement
+    0x0402,  // TemperatureMeasurement
+    0x0033   // GeneralDiagnostics
 };
 
 static const uint8_t ep0_parts_list[] = {

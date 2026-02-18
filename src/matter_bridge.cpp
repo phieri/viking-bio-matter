@@ -11,9 +11,11 @@
 #include "matter_minimal/interaction/subscription_bridge.h"
 #include "matter_minimal/matter_protocol.h"
 
-// Forward declare storage function
+// Forward declare storage functions
 extern "C" {
     int storage_adapter_has_wifi_credentials(void);
+    int storage_adapter_load_operational_hours(uint32_t *hours);
+    int storage_adapter_save_operational_hours(uint32_t hours);
 }
 
 // Matter attributes storage
@@ -21,8 +23,16 @@ static matter_attributes_t attributes = {
     .flame_state = false,
     .fan_speed = 0,
     .temperature = 0,
-    .last_update_time = 0
+    .last_update_time = 0,
+    .total_operational_hours = 0,
+    .device_enabled_state = 1,  // 1 = enabled (no errors)
+    .number_of_active_faults = 0,
+    .error_code = 0
 };
+
+// Tracking for operational hours calculation
+static bool last_flame_state = false;
+static uint32_t flame_on_timestamp = 0;  // Timestamp when flame turned on (milliseconds)
 
 // Matter bridge state
 static bool initialized = false;
@@ -40,6 +50,17 @@ void matter_bridge_init(void) {
     
     // Initialize critical section for thread safety
     critical_section_init(&bridge_lock);
+    
+    // Load operational hours from flash storage
+    uint32_t stored_hours = 0;
+    if (storage_adapter_load_operational_hours(&stored_hours) == 0) {
+        attributes.total_operational_hours = stored_hours;
+        printf("Loaded operational hours from flash: %lu hours\n", 
+               (unsigned long)stored_hours);
+    } else {
+        printf("No operational hours in storage, starting from 0\n");
+        attributes.total_operational_hours = 0;
+    }
     
     // Initialize Matter platform
     printf("Initializing Matter platform for Pico W...\n");
@@ -167,11 +188,36 @@ void matter_bridge_update_flame(bool flame_on) {
         return;
     }
     
+    uint32_t current_time = to_ms_since_boot(get_absolute_time());
+    
     critical_section_enter_blocking(&bridge_lock);
     bool changed = (attributes.flame_state != flame_on);
     if (changed) {
+        // Track operational hours when flame state changes
+        if (last_flame_state && !flame_on) {
+            // Flame turned OFF - accumulate hours
+            if (flame_on_timestamp > 0) {
+                uint32_t elapsed_ms = current_time - flame_on_timestamp;
+                uint32_t elapsed_hours = elapsed_ms / (1000 * 60 * 60);  // Convert ms to hours
+                attributes.total_operational_hours += elapsed_hours;
+                
+                // Save to flash every hour change (avoids excessive flash writes)
+                if (elapsed_hours > 0) {
+                    storage_adapter_save_operational_hours(attributes.total_operational_hours);
+                    printf("Operational hours updated: %lu hours (added %lu)\n",
+                           (unsigned long)attributes.total_operational_hours,
+                           (unsigned long)elapsed_hours);
+                }
+            }
+            flame_on_timestamp = 0;
+        } else if (!last_flame_state && flame_on) {
+            // Flame turned ON - start tracking
+            flame_on_timestamp = current_time;
+        }
+        
         attributes.flame_state = flame_on;
-        attributes.last_update_time = to_ms_since_boot(get_absolute_time());
+        last_flame_state = flame_on;
+        attributes.last_update_time = current_time;
     }
     critical_section_exit(&bridge_lock);
     
@@ -188,6 +234,12 @@ void matter_bridge_update_flame(bool flame_on) {
             // Notify platform of attribute change
             platform_manager_report_onoff_change(1);
         }
+        
+        // Update operational hours attribute in Matter system
+        matter_attr_value_t hours_value;
+        hours_value.uint32_val = attributes.total_operational_hours;
+        matter_attributes_update(1, MATTER_CLUSTER_DIAGNOSTICS, 
+                               MATTER_ATTR_TOTAL_OPERATIONAL_HOURS, &hours_value);
     }
 }
 
@@ -258,6 +310,62 @@ void matter_bridge_update_attributes(const viking_bio_data_t *data) {
     matter_bridge_update_flame(data->flame_detected);
     matter_bridge_update_fan_speed(data->fan_speed);
     matter_bridge_update_temperature(data->temperature);
+    matter_bridge_update_diagnostics(data->error_code);
+}
+
+void matter_bridge_update_diagnostics(uint8_t error_code) {
+    if (!initialized) {
+        return;
+    }
+    
+    critical_section_enter_blocking(&bridge_lock);
+    bool changed = (attributes.error_code != error_code);
+    if (changed) {
+        attributes.error_code = error_code;
+        
+        // Map error code to DeviceEnabledState
+        // 0 = no error (enabled), any other value = disabled
+        attributes.device_enabled_state = (error_code == 0) ? 1 : 0;
+        
+        // Map error code to NumberOfActiveFaults
+        // If error_code is non-zero, we have 1 fault
+        attributes.number_of_active_faults = (error_code == 0) ? 0 : 1;
+        
+        attributes.last_update_time = to_ms_since_boot(get_absolute_time());
+    }
+    critical_section_exit(&bridge_lock);
+    
+    if (changed) {
+        printf("Matter: Diagnostics cluster updated - Error code: 0x%02X, State: %s, Faults: %d\n",
+               error_code,
+               attributes.device_enabled_state ? "Enabled" : "Disabled",
+               attributes.number_of_active_faults);
+        
+        // Update Matter attributes
+        matter_attr_value_t value;
+        
+        // Update DeviceEnabledState
+        value.uint8_val = attributes.device_enabled_state;
+        int ret = matter_attributes_update(1, MATTER_CLUSTER_DIAGNOSTICS, 
+                                          MATTER_ATTR_DEVICE_ENABLED_STATE, &value);
+        if (ret != 0) {
+            printf("[Matter] ERROR: Failed to update DeviceEnabledState (ret=%d)\n", ret);
+        }
+        
+        // Update NumberOfActiveFaults
+        value.uint8_val = attributes.number_of_active_faults;
+        ret = matter_attributes_update(1, MATTER_CLUSTER_DIAGNOSTICS,
+                                      MATTER_ATTR_NUMBER_OF_ACTIVE_FAULTS, &value);
+        if (ret != 0) {
+            printf("[Matter] ERROR: Failed to update NumberOfActiveFaults (ret=%d)\n", ret);
+        }
+        
+        // Notify platform of attribute changes
+        platform_manager_report_attribute_change(MATTER_CLUSTER_DIAGNOSTICS,
+                                                MATTER_ATTR_DEVICE_ENABLED_STATE, 1);
+        platform_manager_report_attribute_change(MATTER_CLUSTER_DIAGNOSTICS,
+                                                MATTER_ATTR_NUMBER_OF_ACTIVE_FAULTS, 1);
+    }
 }
 
 bool matter_bridge_task(void) {

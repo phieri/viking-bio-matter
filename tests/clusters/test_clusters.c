@@ -11,6 +11,7 @@
 #include "../../src/matter_minimal/clusters/onoff.h"
 #include "../../src/matter_minimal/clusters/level_control.h"
 #include "../../src/matter_minimal/clusters/temperature.h"
+#include "../../src/matter_minimal/clusters/diagnostics.h"
 
 // Test counter
 static int tests_passed = 0;
@@ -37,6 +38,18 @@ int matter_attributes_get(uint8_t endpoint, uint32_t cluster_id,
         case 0x0402: // Temperature
             if (attribute_id == 0x0000) {
                 *(int16_t*)value = 2500;  // 25.00°C
+                return 0;
+            }
+            break;
+        case 0x0033: // Diagnostics
+            if (attribute_id == 0x0003) {  // TotalOperationalHours
+                *(uint32_t*)value = 123;
+                return 0;
+            } else if (attribute_id == 0x0005) {  // DeviceEnabledState
+                *(uint8_t*)value = 1;  // Enabled
+                return 0;
+            } else if (attribute_id == 0x0001) {  // NumberOfActiveFaults
+                *(uint8_t*)value = 0;  // No faults
                 return 0;
             }
             break;
@@ -89,11 +102,12 @@ void test_descriptor_server_list(void) {
         tests_failed++;
     }
     
-    // Test endpoint 1 (OnOff, LevelControl, Temperature)
+    // Test endpoint 1 (OnOff, LevelControl, Temperature, Diagnostics)
     result = cluster_descriptor_get_server_list(1, clusters, 8, &count);
-    if (result == 0 && count == 3 && 
-        clusters[0] == 0x0006 && clusters[1] == 0x0008 && clusters[2] == 0x0402) {
-        printf("  ✓ Endpoint 1 server list correct (3 clusters)\n");
+    if (result == 0 && count == 4 && 
+        clusters[0] == 0x0006 && clusters[1] == 0x0008 && 
+        clusters[2] == 0x0402 && clusters[3] == 0x0033) {
+        printf("  ✓ Endpoint 1 server list correct (4 clusters)\n");
         tests_passed++;
     } else {
         printf("  ✗ Endpoint 1 server list failed (count=%zu)\n", count);
@@ -253,6 +267,64 @@ void test_unsupported_attribute_handling(void) {
     }
 }
 
+// Test: Diagnostics cluster read attributes
+void test_diagnostics_read_attributes(void) {
+    printf("Test: Diagnostics cluster read attributes...\n");
+    
+    attribute_value_t value;
+    attribute_type_t type;
+    
+    // Test TotalOperationalHours
+    int result = cluster_diagnostics_read(1, ATTR_TOTAL_OPERATIONAL_HOURS, &value, &type);
+    if (result == 0 && type == ATTR_TYPE_UINT32 && value.uint32_val == 123) {
+        printf("  ✓ TotalOperationalHours read succeeded (123 hours)\n");
+        tests_passed++;
+    } else {
+        printf("  ✗ TotalOperationalHours read failed\n");
+        tests_failed++;
+    }
+    
+    // Test DeviceEnabledState
+    result = cluster_diagnostics_read(1, ATTR_DEVICE_ENABLED_STATE, &value, &type);
+    if (result == 0 && type == ATTR_TYPE_UINT8 && value.uint8_val == 1) {
+        printf("  ✓ DeviceEnabledState read succeeded (enabled)\n");
+        tests_passed++;
+    } else {
+        printf("  ✗ DeviceEnabledState read failed\n");
+        tests_failed++;
+    }
+    
+    // Test NumberOfActiveFaults
+    result = cluster_diagnostics_read(1, ATTR_NUMBER_OF_ACTIVE_FAULTS, &value, &type);
+    if (result == 0 && type == ATTR_TYPE_UINT8 && value.uint8_val == 0) {
+        printf("  ✓ NumberOfActiveFaults read succeeded (0 faults)\n");
+        tests_passed++;
+    } else {
+        printf("  ✗ NumberOfActiveFaults read failed\n");
+        tests_failed++;
+    }
+    
+    // Test unsupported endpoint
+    result = cluster_diagnostics_read(0, ATTR_TOTAL_OPERATIONAL_HOURS, &value, &type);
+    if (result < 0) {
+        printf("  ✓ Diagnostics correctly rejects endpoint 0\n");
+        tests_passed++;
+    } else {
+        printf("  ✗ Diagnostics should reject endpoint 0\n");
+        tests_failed++;
+    }
+    
+    // Test unsupported attribute
+    result = cluster_diagnostics_read(1, 0x9999, &value, &type);
+    if (result < 0) {
+        printf("  ✓ Diagnostics correctly rejects unsupported attribute\n");
+        tests_passed++;
+    } else {
+        printf("  ✗ Diagnostics should reject unsupported attribute\n");
+        tests_failed++;
+    }
+}
+
 int main(void) {
     printf("\n========================================\n");
     printf("  Matter Cluster Tests\n");
@@ -262,7 +334,8 @@ int main(void) {
     if (cluster_descriptor_init() < 0 ||
         cluster_onoff_init() < 0 ||
         cluster_level_control_init() < 0 ||
-        cluster_temperature_init() < 0) {
+        cluster_temperature_init() < 0 ||
+        cluster_diagnostics_init() < 0) {
         printf("ERROR: Failed to initialize clusters\n");
         return 1;
     }
@@ -273,6 +346,7 @@ int main(void) {
     test_onoff_read_flame_state();
     test_level_control_read_fan_speed();
     test_temperature_read_value();
+    test_diagnostics_read_attributes();
     test_unsupported_attribute_handling();
     
     // Print results

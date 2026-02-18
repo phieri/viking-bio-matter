@@ -242,6 +242,21 @@ int platform_manager_init(void) {
     initial_value.int16_val = 0;
     matter_attributes_register(1, MATTER_CLUSTER_TEMPERATURE_MEASUREMENT, MATTER_ATTR_MEASURED_VALUE,
                               MATTER_TYPE_INT16, &initial_value);
+    
+    // Diagnostics cluster - TotalOperationalHours
+    initial_value.uint32_val = 0;
+    matter_attributes_register(1, MATTER_CLUSTER_DIAGNOSTICS, MATTER_ATTR_TOTAL_OPERATIONAL_HOURS,
+                              MATTER_TYPE_UINT32, &initial_value);
+    
+    // Diagnostics cluster - DeviceEnabledState (1 = enabled)
+    initial_value.uint8_val = 1;
+    matter_attributes_register(1, MATTER_CLUSTER_DIAGNOSTICS, MATTER_ATTR_DEVICE_ENABLED_STATE,
+                              MATTER_TYPE_UINT8, &initial_value);
+    
+    // Diagnostics cluster - NumberOfActiveFaults
+    initial_value.uint8_val = 0;
+    matter_attributes_register(1, MATTER_CLUSTER_DIAGNOSTICS, MATTER_ATTR_NUMBER_OF_ACTIVE_FAULTS,
+                              MATTER_TYPE_UINT8, &initial_value);
 
     platform_initialized = true;
     printf("\n✓ Platform initialization complete\n");

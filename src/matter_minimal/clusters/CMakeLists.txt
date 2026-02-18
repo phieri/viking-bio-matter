@@ -7,6 +7,7 @@ add_library(matter_clusters STATIC
     level_control.c
     temperature.c
     network_commissioning.c
+    diagnostics.c
 )
 
 # Set include directories

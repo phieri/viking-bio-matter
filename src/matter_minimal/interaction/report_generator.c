@@ -18,6 +18,8 @@ extern int cluster_level_control_read(uint8_t endpoint, uint32_t attr_id,
                                       attribute_value_t *value, attribute_type_t *type);
 extern int cluster_temperature_read(uint8_t endpoint, uint32_t attr_id,
                                    attribute_value_t *value, attribute_type_t *type);
+extern int cluster_diagnostics_read(uint8_t endpoint, uint32_t attr_id,
+                                   attribute_value_t *value, attribute_type_t *type);
 
 static bool initialized = false;
 
@@ -58,6 +60,10 @@ static int route_attribute_read(const attribute_path_t *path,
             
         case 0x0402: // TemperatureMeasurement
             result = cluster_temperature_read(path->endpoint, path->attribute_id, value, type);
+            break;
+            
+        case 0x0033: // GeneralDiagnostics
+            result = cluster_diagnostics_read(path->endpoint, path->attribute_id, value, type);
             break;
             
         default:
