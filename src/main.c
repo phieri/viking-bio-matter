@@ -94,7 +94,7 @@ int main() {
     } else {
         // Launch core 1 for Matter/network processing
         if (multicore_coordinator_launch_core1() == 0) {
-            printf("✓ Multicore enabled: Core 0 (serial/LED), Core 1 (Matter/network)\n");
+            printf("[OK] Multicore enabled: Core 0 (serial/LED), Core 1 (Matter/network)\n");
         } else {
             printf("WARNING: Failed to launch core 1\n");
             printf("         Device will continue in single-core mode\n");
@@ -236,7 +236,7 @@ int main() {
                 
                 // Stop BLE commissioning after WiFi is connected and device is commissioned
                 if (platform_manager_stop_commissioning_mode() == 0) {
-                    printf("✓ BLE commissioning stopped successfully\n");
+                    printf("[OK] BLE commissioning stopped successfully\n");
                     printf("Device will continue operating over WiFi\n");
                 } else {
                     printf("WARNING: Failed to stop BLE commissioning\n");

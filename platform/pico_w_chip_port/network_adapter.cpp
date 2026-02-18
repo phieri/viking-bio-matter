@@ -20,6 +20,9 @@ extern "C" {
     int storage_adapter_save_wifi_credentials(const char *ssid, const char *password);
 }
 
+// WiFi regulatory country setting - change this to match your region
+#define WIFI_COUNTRY CYW43_COUNTRY_SWEDEN
+
 // Network mode
 typedef enum {
     NETWORK_MODE_NONE = 0,
@@ -40,13 +43,17 @@ int network_adapter_init(void) {
     printf("Initializing CYW43439 WiFi adapter...\n");
 
     // Initialize CYW43 with background LWIP
-    if (cyw43_arch_init_with_country(CYW43_COUNTRY_SWEDEN)) {
+    if (cyw43_arch_init_with_country(WIFI_COUNTRY)) {
         printf("[NetworkAdapter] ERROR: Failed to initialize CYW43 WiFi chip\n");
         return -1;
     }
 
     wifi_initialized = true;
     printf("WiFi adapter initialized\n");
+    // Extract and display the 2-letter ISO country code from the WIFI_COUNTRY macro
+    // CYW43_COUNTRY(A, B, REV) encodes: A in bits 0-7, B in bits 8-15
+    char country_code[3] = { (char)(WIFI_COUNTRY & 0xFF), (char)((WIFI_COUNTRY >> 8) & 0xFF), '\0' };
+    printf("WiFi regulatory country: %s\n", country_code);
     return 0;
 }
 
