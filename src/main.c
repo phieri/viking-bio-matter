@@ -84,12 +84,12 @@ int main() {
     // Initialize LED for status indication (after Matter init for Pico W)
     LED_INIT();
     
-    // Blink LED to indicate startup complete
-    for (int i = 0; i < 3; i++) {
+    // Fast blink LED to indicate initialization will continue
+    for (int i = 0; i < 5; i++) {
         LED_SET(1);
-        sleep_ms(200);
+        sleep_ms(100);
         LED_SET(0);
-        sleep_ms(200);
+        sleep_ms(100);
     }
     
     printf("Initialization complete. Reading serial data...\n");
@@ -107,6 +107,14 @@ int main() {
             printf("WARNING: Failed to launch core 1\n");
             printf("         Device will continue in single-core mode\n");
         }
+    }
+    
+    // Slower blink LED to indicate startup complete
+    for (int i = 0; i < 3; i++) {
+        LED_SET(1);
+        sleep_ms(200);
+        LED_SET(0);
+        sleep_ms(200);
     }
     
     // Enable watchdog with 8 second timeout for system reliability
