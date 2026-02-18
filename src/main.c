@@ -84,14 +84,6 @@ int main() {
     // Initialize LED for status indication (after Matter init for Pico W)
     LED_INIT();
     
-    // Fast blink LED to indicate initialization will continue
-    for (int i = 0; i < 5; i++) {
-        LED_SET(1);
-        sleep_ms(100);
-        LED_SET(0);
-        sleep_ms(100);
-    }
-    
     printf("Initialization complete. Reading serial data...\n");
     
     // Initialize multicore coordination

@@ -7,6 +7,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include "pico/stdlib.h"
+#include "pico/cyw43_arch.h"
 #include "mbedtls/sha256.h"
 #include "matter_attributes.h"
 #include "network_adapter.h"
@@ -200,6 +201,15 @@ int platform_manager_init(void) {
     if (network_adapter_init() != 0) {
         printf("[PlatformManager] ERROR: Failed to initialize network adapter\n");
         return -1;
+    }
+    
+    // Fast blink LED to indicate initialization in progress
+    // This is the earliest point where LED is available (right after CYW43 chip init)
+    for (int i = 0; i < 5; i++) {
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+        sleep_ms(100);
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+        sleep_ms(100);
     }
     
     // Initialize BLE for Matter commissioning
