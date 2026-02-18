@@ -15,6 +15,10 @@ typedef struct {
     uint8_t fan_speed;          // LevelControl cluster: fan speed 0-100%
     uint16_t temperature;       // TemperatureMeasurement cluster: temperature in °C
     uint32_t last_update_time;  // Timestamp of last attribute update (milliseconds)
+    uint32_t total_operational_hours;  // Diagnostics cluster: total hours flame has been on
+    uint8_t device_enabled_state;      // Diagnostics cluster: 0=disabled, 1=enabled
+    uint8_t number_of_active_faults;   // Diagnostics cluster: count of active faults
+    uint8_t error_code;                // Current error code from serial data
 } matter_attributes_t;
 
 /**
@@ -67,6 +71,13 @@ void matter_bridge_update_fan_speed(uint8_t speed);
  * @param temp Temperature in degrees Celsius
  */
 void matter_bridge_update_temperature(uint16_t temp);
+
+/**
+ * Update Diagnostics cluster with error code
+ * Maps error code to DeviceEnabledState and NumberOfActiveFaults
+ * @param error_code Error code from Viking Bio serial data (0 = no error)
+ */
+void matter_bridge_update_diagnostics(uint8_t error_code);
 
 /**
  * Add a Matter controller to receive attribute reports over WiFi
