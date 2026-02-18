@@ -40,7 +40,7 @@ int network_adapter_init(void) {
     printf("Initializing CYW43439 WiFi adapter...\n");
 
     // Initialize CYW43 with background LWIP
-    if (cyw43_arch_init_with_country(CYW43_COUNTRY_USA)) {
+    if (cyw43_arch_init_with_country(CYW43_COUNTRY_SWEDEN)) {
         printf("[NetworkAdapter] ERROR: Failed to initialize CYW43 WiFi chip\n");
         return -1;
     }
