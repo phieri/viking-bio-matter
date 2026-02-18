@@ -163,7 +163,7 @@ int platform_manager_init(void) {
     if (storage_adapter_has_discriminator()) {
         // Load from storage
         if (storage_adapter_load_discriminator(&device_discriminator) == 0) {
-            printf("✓ Loaded discriminator from storage: %u (0x%03X)\n", 
+            printf("[OK] Loaded discriminator from storage: %u (0x%03X)\n", 
                    device_discriminator, device_discriminator);
         } else {
             printf("[PlatformManager] ERROR: Failed to load discriminator from storage\n");
@@ -193,7 +193,7 @@ int platform_manager_init(void) {
             return -1;
         }
         
-        printf("✓ Discriminator saved to flash\n");
+        printf("[OK] Discriminator saved to flash\n");
     }
 
     // Initialize network
@@ -218,7 +218,7 @@ int platform_manager_init(void) {
         printf("[PlatformManager] ERROR: Failed to initialize BLE adapter\n");
         return -1;
     }
-    printf("✓ BLE initialized\n");
+    printf("[OK] BLE initialized\n");
     
     // Initialize DNS-SD for Matter device discovery
     printf("\nInitializing DNS-SD...\n");
@@ -226,7 +226,7 @@ int platform_manager_init(void) {
         printf("[PlatformManager] ERROR: Failed to initialize DNS-SD\n");
         return -1;
     }
-    printf("✓ DNS-SD initialized\n");
+    printf("[OK] DNS-SD initialized\n");
 
     // Initialize Matter attribute system
     printf("\nStep 4/4: Initializing Matter attributes...\n");
@@ -269,8 +269,8 @@ int platform_manager_init(void) {
                               MATTER_TYPE_UINT8, &initial_value);
 
     platform_initialized = true;
-    printf("\n✓ Platform initialization complete\n");
-    printf("✓ %zu Matter attributes registered\n\n", matter_attributes_count());
+    printf("\n[OK] Platform initialization complete\n");
+    printf("[OK] %zu Matter attributes registered\n\n", matter_attributes_count());
     return 0;
 }
 
@@ -523,7 +523,7 @@ int platform_manager_start_dns_sd_advertisement(void) {
     );
     
     if (result == 0) {
-        printf("\n✓ Device is now discoverable via DNS-SD\n");
+        printf("\n[OK] Device is now discoverable via DNS-SD\n");
         printf("  Use 'dns-sd -B _matterc._udp' to verify\n");
         printf("====================================\n\n");
     } else {

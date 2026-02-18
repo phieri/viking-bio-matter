@@ -47,6 +47,7 @@ int network_adapter_init(void) {
 
     wifi_initialized = true;
     printf("WiFi adapter initialized\n");
+    printf("WiFi regulatory country: Sweden (SE)\n");
     return 0;
 }
 

@@ -177,10 +177,10 @@ void matter_bridge_init(void) {
     
     initialized = true;
     
-    printf("✓ Matter Bridge fully initialized\n");
-    printf("✓ Matter protocol stack running\n");
-    printf("✓ Device is ready for commissioning\n");
-    printf("✓ Monitoring Viking Bio serial data...\n\n");
+    printf("[OK] Matter Bridge fully initialized\n");
+    printf("[OK] Matter protocol stack running\n");
+    printf("[OK] Device is ready for commissioning\n");
+    printf("[OK] Monitoring Viking Bio serial data...\n\n");
 }
 
 void matter_bridge_update_flame(bool flame_on) {
