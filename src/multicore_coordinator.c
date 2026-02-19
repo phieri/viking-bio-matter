@@ -14,6 +14,10 @@
 #include "pico/util/queue.h"
 #include "hardware/sync.h"
 
+// Forward declaration: re-enables pico-lfs multicore lockout after Core 1 registers
+// as a lockout victim (via multicore_lockout_victim_init in core1_entry).
+extern void storage_adapter_enable_multicore_lockout(void);
+
 // Inter-core queue for Viking Bio data
 static queue_t viking_data_queue;
 
@@ -34,6 +38,12 @@ static volatile uint32_t core1_data_updates_processed = 0;
  * Runs Matter protocol processing and network tasks
  */
 static void core1_entry(void) {
+    // Register as multicore lockout victim FIRST before doing anything else.
+    // This allows Core 0 to safely perform flash erase/program operations
+    // (via pico-lfs) while Core 1 is running. Without this, any flash write
+    // from Core 0 after Core 1 starts would hang waiting for Core 1 to respond.
+    multicore_lockout_victim_init();
+
     printf("Core 1: Started\n");
     core1_running = true;
     
@@ -99,6 +109,10 @@ int multicore_coordinator_launch_core1(void) {
         printf("Multicore: Core 1 started successfully\n");
         printf("  - Core 0: Serial input, LED control, coordination\n");
         printf("  - Core 1: Matter protocol, network tasks, reporting\n");
+        // Core 1 has called multicore_lockout_victim_init() as its first action.
+        // Re-enable pico-lfs multicore lockout so flash writes are now safe
+        // with Core 1 running (it will pause in RAM during erase/program).
+        storage_adapter_enable_multicore_lockout();
         return 0;
     } else {
         printf("[Multicore] ERROR: Core 1 failed to start\n");
