@@ -12,7 +12,9 @@
 
 // BTstack headers
 #include "btstack.h"
+#include "btstack_memory.h"
 #include "ble/gatt-service/battery_service_server.h"
+#include "pico/btstack_hci_transport_cyw43.h"
 
 #include "ble_adapter.h"
 
@@ -187,7 +189,11 @@ int ble_adapter_init(void) {
     async_context_t *async_context = cyw43_arch_async_context();
     
     // Initialize BTstack run loop
+    btstack_memory_init();
     btstack_run_loop_init(btstack_run_loop_async_context_get_instance(async_context));
+    
+    // Initialize HCI transport for CYW43 (must be called before hci_power_control)
+    hci_init(hci_transport_cyw43_instance(), NULL);
     
     // Initialize L2CAP
     l2cap_init();
@@ -198,8 +204,8 @@ int ble_adapter_init(void) {
     // Setup ATT server
     att_server_init(NULL, att_read_callback, att_write_callback);
     
-    // Register packet handler
-    btstack_packet_callback_registration_t hci_event_callback;
+    // Register packet handler (must be static - BTstack retains pointer after function returns)
+    static btstack_packet_callback_registration_t hci_event_callback;
     hci_event_callback.callback = &packet_handler;
     hci_add_event_handler(&hci_event_callback);
     

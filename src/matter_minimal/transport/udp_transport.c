@@ -157,9 +157,13 @@ int matter_transport_init(void) {
     transport_state.rx_queue_tail = 0;
     transport_state.rx_queue_count = 0;
     
+    // Create UDP PCBs inside lwIP lock (required for threadsafe_background arch)
+    cyw43_arch_lwip_begin();
+    
     // Create UDP PCB for operational messages (port 5540)
     transport_state.operational_pcb = udp_new();
     if (transport_state.operational_pcb == NULL) {
+        cyw43_arch_lwip_end();
         printf("[UDPTransport] ERROR: Failed to create operational UDP PCB\n");
         return MATTER_TRANSPORT_ERROR_INIT;
     }
@@ -167,41 +171,44 @@ int matter_transport_init(void) {
     // Bind operational PCB to port 5540
     err_t err = udp_bind(transport_state.operational_pcb, IP_ANY_TYPE, MATTER_PORT_OPERATIONAL);
     if (err != ERR_OK) {
-        printf("[UDPTransport] ERROR: Failed to bind operational UDP PCB to port %d (err=%d)\n", 
-               MATTER_PORT_OPERATIONAL, err);
         udp_remove(transport_state.operational_pcb);
         transport_state.operational_pcb = NULL;
+        cyw43_arch_lwip_end();
+        printf("[UDPTransport] ERROR: Failed to bind operational UDP PCB to port %d (err=%d)\n", 
+               MATTER_PORT_OPERATIONAL, err);
         return MATTER_TRANSPORT_ERROR_INIT;
     }
     
     // Set receive callback for operational PCB
     udp_recv(transport_state.operational_pcb, udp_recv_callback, NULL);
-    printf("Operational UDP socket bound to port %d\n", MATTER_PORT_OPERATIONAL);
     
     // Create UDP PCB for commissioning messages (port 5550)
     transport_state.commissioning_pcb = udp_new();
     if (transport_state.commissioning_pcb == NULL) {
-        printf("[UDPTransport] ERROR: Failed to create commissioning UDP PCB\n");
         udp_remove(transport_state.operational_pcb);
         transport_state.operational_pcb = NULL;
+        cyw43_arch_lwip_end();
+        printf("[UDPTransport] ERROR: Failed to create commissioning UDP PCB\n");
         return MATTER_TRANSPORT_ERROR_INIT;
     }
     
     // Bind commissioning PCB to port 5550
     err = udp_bind(transport_state.commissioning_pcb, IP_ANY_TYPE, MATTER_PORT_COMMISSIONING);
     if (err != ERR_OK) {
-        printf("[UDPTransport] ERROR: Failed to bind commissioning UDP PCB to port %d (err=%d)\n", 
-               MATTER_PORT_COMMISSIONING, err);
         udp_remove(transport_state.operational_pcb);
         udp_remove(transport_state.commissioning_pcb);
         transport_state.operational_pcb = NULL;
         transport_state.commissioning_pcb = NULL;
+        cyw43_arch_lwip_end();
+        printf("[UDPTransport] ERROR: Failed to bind commissioning UDP PCB to port %d (err=%d)\n", 
+               MATTER_PORT_COMMISSIONING, err);
         return MATTER_TRANSPORT_ERROR_INIT;
     }
     
     // Set receive callback for commissioning PCB
     udp_recv(transport_state.commissioning_pcb, udp_recv_callback, NULL);
-    printf("Commissioning UDP socket bound to port %d\n", MATTER_PORT_COMMISSIONING);
+    
+    cyw43_arch_lwip_end();
     
     transport_state.initialized = true;
     printf("Matter UDP transport initialized\n");
@@ -216,7 +223,8 @@ void matter_transport_deinit(void) {
     
     printf("Deinitializing Matter UDP transport...\n");
     
-    // Remove UDP PCBs
+    // Remove UDP PCBs inside lwIP lock
+    cyw43_arch_lwip_begin();
     if (transport_state.operational_pcb != NULL) {
         udp_remove(transport_state.operational_pcb);
         transport_state.operational_pcb = NULL;
@@ -226,6 +234,7 @@ void matter_transport_deinit(void) {
         udp_remove(transport_state.commissioning_pcb);
         transport_state.commissioning_pcb = NULL;
     }
+    cyw43_arch_lwip_end();
     
     // Clear receive queue
     for (size_t i = 0; i < MATTER_TRANSPORT_RX_QUEUE_SIZE; i++) {
@@ -260,9 +269,13 @@ int matter_transport_send(const uint8_t *data, size_t length,
     ip_addr_t dest_ip;
     transport_addr_to_lwip_addr(dest_addr, &dest_ip);
     
+    // Allocate and send pbuf inside lwIP lock
+    cyw43_arch_lwip_begin();
+    
     // Allocate pbuf
     struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, length, PBUF_RAM);
     if (p == NULL) {
+        cyw43_arch_lwip_end();
         printf("[UDPTransport] ERROR: Failed to allocate pbuf for send\n");
         return MATTER_TRANSPORT_ERROR_NO_MEMORY;
     }
@@ -275,6 +288,8 @@ int matter_transport_send(const uint8_t *data, size_t length,
     
     // Free pbuf
     pbuf_free(p);
+    
+    cyw43_arch_lwip_end();
     
     if (err != ERR_OK) {
         printf("[UDPTransport] ERROR: UDP send failed (err=%d)\n", err);

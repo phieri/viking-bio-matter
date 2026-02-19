@@ -11,10 +11,8 @@
 // mbedTLS headers
 #include "mbedtls/sha256.h"
 #include "mbedtls/aes.h"
-// Note: CTR_DRBG wrapper not implemented - use pico/rand.h get_rand_32() directly
-// The RP2040 hardware RNG works correctly for cryptographic purposes
-// #include "mbedtls/ctr_drbg.h"
-// #include "mbedtls/entropy.h"
+// RP2040 hardware RNG
+#include "pico/rand.h"
 
 static bool crypto_initialized = false;
 
@@ -27,9 +25,7 @@ int crypto_adapter_init(void) {
 
     printf("Initializing crypto adapter (mbedTLS)...\n");
 
-    // Note: CTR_DRBG wrapper not implemented due to entropy source config complexity
-    // Hardware RNG (get_rand_32) is available and used by PASE for secure random generation
-    // For now, mark as initialized
+    // Hardware RNG (get_rand_32) is available and used for random byte generation
     crypto_initialized = true;
 
     printf("Crypto adapter initialized\n");
@@ -41,11 +37,18 @@ int crypto_adapter_random(uint8_t *buffer, size_t length) {
         return -1;
     }
 
-    // Note: This wrapper is not implemented
-    // For RNG, use get_rand_32() from pico/rand.h directly
-    // PASE implementation already uses hardware RNG correctly
-    // This function is not used by current Matter commissioning flow
-    return -1;
+    // Fill buffer using RP2040 hardware RNG (get_rand_32)
+    size_t offset = 0;
+    while (offset < length) {
+        uint32_t word = get_rand_32();
+        size_t chunk = length - offset;
+        if (chunk > sizeof(uint32_t)) {
+            chunk = sizeof(uint32_t);
+        }
+        memcpy(buffer + offset, &word, chunk);
+        offset += chunk;
+    }
+    return 0;
 }
 
 int crypto_adapter_sha256(const uint8_t *input, size_t input_len, uint8_t *output) {
