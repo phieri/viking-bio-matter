@@ -14,10 +14,6 @@
 #include "pico/util/queue.h"
 #include "hardware/sync.h"
 
-// Forward declaration: re-enables pico-lfs multicore lockout after Core 1 registers
-// as a lockout victim (via multicore_lockout_victim_init in core1_entry).
-extern void storage_adapter_enable_multicore_lockout(void);
-
 // Inter-core queue for Viking Bio data
 static queue_t viking_data_queue;
 

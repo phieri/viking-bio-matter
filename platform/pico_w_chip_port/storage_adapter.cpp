@@ -80,6 +80,10 @@ int storage_adapter_init(void) {
     // which hangs indefinitely waiting for Core 1 to respond as a lockout victim.
     // Disable multicore lockout until Core 1 registers via
     // storage_adapter_enable_multicore_lockout() (called after multicore_launch_core1).
+    //
+    // Note: We access pico_lfs_context.multicore_lockout_enabled directly because
+    // pico-lfs (pico-lfs commit 8cddb68) exposes this field in the public header
+    // (pico_lfs.h) but provides no API function to change it at runtime.
 #ifdef LIB_PICO_MULTICORE
     {
         struct pico_lfs_context *pico_ctx = (struct pico_lfs_context *)lfs_cfg->context;
@@ -123,7 +127,10 @@ int storage_adapter_init(void) {
 void storage_adapter_enable_multicore_lockout(void) {
     // Re-enable multicore lockout after Core 1 has called multicore_lockout_victim_init().
     // This must be called only after Core 1 is running and registered as a lockout victim.
-    if (!lfs_cfg) return;
+    if (!lfs_cfg) {
+        printf("[Storage] WARNING: storage_adapter_enable_multicore_lockout called before storage_adapter_init\n");
+        return;
+    }
 #ifdef LIB_PICO_MULTICORE
     struct pico_lfs_context *pico_ctx = (struct pico_lfs_context *)lfs_cfg->context;
     pico_ctx->multicore_lockout_enabled = true;

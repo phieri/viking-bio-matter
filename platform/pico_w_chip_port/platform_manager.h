@@ -160,6 +160,14 @@ void platform_manager_stop_dns_sd_advertisement(void);
  */
 bool platform_manager_is_dns_sd_advertising(void);
 
+/**
+ * Enable multicore-safe flash access after Core 1 registers as lockout victim.
+ * Must be called after multicore_launch_core1() once Core 1 has run
+ * multicore_lockout_victim_init(). Until this is called, pico-lfs flash
+ * operations do not use multicore lockout (safe only while Core 1 is not running).
+ */
+void storage_adapter_enable_multicore_lockout(void);
+
 #ifdef __cplusplus
 }
 #endif
