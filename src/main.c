@@ -65,6 +65,15 @@ int main() {
     // Initialize standard I/O
     stdio_init_all();
     
+    // Initialize CYW43 chip early so the LED is available for diagnostic blinks
+    // throughout the rest of the startup sequence
+    if (network_adapter_early_init() != 0) {
+        printf("[Main] ERROR: Failed to initialize CYW43 chip - LED unavailable\n");
+    } else {
+        // 1 quick blink: CYW43 chip up, LED confirmed working
+        LED_SET(1); sleep_ms(100); LED_SET(0); sleep_ms(100);
+    }
+
     // Print version information
     printf("\n");
     version_print_info();
@@ -77,7 +86,11 @@ int main() {
     
     printf("Initializing serial handler...\n");
     serial_handler_init();
-    
+    // 2 quick blinks: serial handler ready
+    for (int i = 0; i < 2; i++) {
+        LED_SET(1); sleep_ms(100); LED_SET(0); sleep_ms(100);
+    }
+
     printf("Initializing Matter bridge...\n");
     matter_bridge_init();
     
