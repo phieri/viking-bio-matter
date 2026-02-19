@@ -24,6 +24,16 @@ typedef enum {
 } network_mode_t;
 
 /**
+ * Early initialization of the CYW43 chip only, making the LED available
+ * before the full network stack is set up. Safe to call before
+ * network_adapter_init(); subsequent network_adapter_init() call will skip
+ * the chip init step.
+ *
+ * @return 0 on success, -1 on error
+ */
+int network_adapter_early_init(void);
+
+/**
  * Initialize network adapter
  * 
  * @return 0 on success, -1 on error

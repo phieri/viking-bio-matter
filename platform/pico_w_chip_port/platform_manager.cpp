@@ -150,6 +150,11 @@ int platform_manager_init(void) {
         printf("[PlatformManager] ERROR: Failed to initialize crypto adapter\n");
         return -1;
     }
+    // 1 quick blink: crypto ready
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+    sleep_ms(100);
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+    sleep_ms(100);
 
     // Initialize storage
     printf("\nStep 2/4: Initializing storage...\n");
@@ -195,6 +200,13 @@ int platform_manager_init(void) {
         
         printf("[OK] Discriminator saved to flash\n");
     }
+    // 2 quick blinks: storage and discriminator ready
+    for (int i = 0; i < 2; i++) {
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+        sleep_ms(100);
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+        sleep_ms(100);
+    }
 
     // Initialize network
     printf("\nStep 3/4: Initializing network...\n");
@@ -203,8 +215,7 @@ int platform_manager_init(void) {
         return -1;
     }
     
-    // Fast blink LED to indicate initialization in progress
-    // This is the earliest point where LED is available (right after CYW43 chip init)
+    // Fast blink LED to indicate network initialization complete
     for (int i = 0; i < 5; i++) {
         cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
         sleep_ms(100);
@@ -219,6 +230,13 @@ int platform_manager_init(void) {
         return -1;
     }
     printf("[OK] BLE initialized\n");
+    // 3 quick blinks: BLE ready
+    for (int i = 0; i < 3; i++) {
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+        sleep_ms(100);
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+        sleep_ms(100);
+    }
     
     // Initialize DNS-SD for Matter device discovery
     printf("\nInitializing DNS-SD...\n");
