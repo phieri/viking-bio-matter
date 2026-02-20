@@ -190,10 +190,9 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
         ip_addr_set_ip4_u32(&dest_addr, controllers[i].ip_address);
 
         // Allocate buffer for UDP packet (use msg_len for efficiency)
-        err_t err = ERR_OK;
+        err_t err;
         struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, msg_len, PBUF_RAM);
         if (!p) {
-            err = ERR_MEM;
             cyw43_arch_lwip_end();
             printf("[Matter Transport] ERROR: Failed to allocate pbuf\n");
             continue;
