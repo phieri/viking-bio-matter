@@ -18,8 +18,9 @@
 // LED control for Pico W (CYW43 chip controls the LED)
 // LED is now enabled using CYW43 architecture functions
 #define LED_ENABLED 1
+static bool led_available = false;
 #define LED_INIT() do { /* LED initialized as part of cyw43_arch_init */ } while(0)
-#define LED_SET(state) cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, (state))
+#define LED_SET(state) do { if (led_available) cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, (state)); } while(0)
 
 // Event system for efficient interrupt-driven architecture
 // Volatile since modified from interrupt context
@@ -70,6 +71,7 @@ int main() {
     if (network_adapter_early_init() != 0) {
         printf("[Main] ERROR: Failed to initialize CYW43 chip - LED unavailable\n");
     } else {
+        led_available = true;
         // 1 quick blink: CYW43 chip up, LED confirmed working
         LED_SET(1); sleep_ms(100); LED_SET(0); sleep_ms(100);
     }
