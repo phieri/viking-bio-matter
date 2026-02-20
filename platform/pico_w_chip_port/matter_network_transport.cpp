@@ -206,7 +206,6 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
         
         // Free buffer
         pbuf_free(p);
-        cyw43_arch_lwip_end();
         
         if (err == ERR_OK) {
             controllers[i].last_report_time = now;
@@ -214,6 +213,7 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
         } else {
             printf("[Matter Transport] ERROR: Failed to send to controller [%d], error %d\n", i, err);
         }
+        cyw43_arch_lwip_end();
     }
     
     if (sent_count > 0) {
