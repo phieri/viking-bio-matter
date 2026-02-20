@@ -146,6 +146,8 @@ int platform_manager_init(void) {
     printf("===================================\n\n");
 
     // LED feedback depends on CYW43 being initialized.
+    // network_adapter_early_init() is idempotent, so this is safe even if main()
+    // already performed early init.
     // Attempt early init here as a safety net in case main() early init failed.
     bool led_available = (network_adapter_early_init() == 0);
 
