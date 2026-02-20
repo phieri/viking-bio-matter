@@ -196,17 +196,17 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
             cyw43_arch_lwip_end();
             printf("[Matter Transport] ERROR: Failed to allocate pbuf\n");
             continue;
-        } else {
-            // Copy message to buffer (use msg_len to avoid redundant strlen)
-            memcpy(p->payload, message, msg_len);
-            
-            // Send UDP packet
-            err = udp_sendto(udp_pcb, p, &dest_addr, controllers[i].port);
-            
-            // Free buffer
-            pbuf_free(p);
-            cyw43_arch_lwip_end();
         }
+
+        // Copy message to buffer (use msg_len to avoid redundant strlen)
+        memcpy(p->payload, message, msg_len);
+        
+        // Send UDP packet
+        err_t err = udp_sendto(udp_pcb, p, &dest_addr, controllers[i].port);
+        
+        // Free buffer
+        pbuf_free(p);
+        cyw43_arch_lwip_end();
         
         if (err == ERR_OK) {
             controllers[i].last_report_time = now;
