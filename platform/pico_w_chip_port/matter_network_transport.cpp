@@ -190,12 +190,12 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
         ip_addr_set_ip4_u32(&dest_addr, controllers[i].ip_address);
 
         // Allocate buffer for UDP packet (use msg_len for efficiency)
-        err_t err;
+        err_t err = ERR_OK;
         struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, msg_len, PBUF_RAM);
         if (!p) {
             printf("[Matter Transport] ERROR: Failed to allocate pbuf\n");
             err = ERR_MEM;
-            goto cleanup_and_unlock;
+            goto unlock_and_check_error;
         }
         
         // Copy message to buffer (use msg_len to avoid redundant strlen)
@@ -206,7 +206,7 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
         
         // Free buffer
         pbuf_free(p);
-cleanup_and_unlock:
+unlock_and_check_error:
         cyw43_arch_lwip_end();
         
         if (err == ERR_OK) {
