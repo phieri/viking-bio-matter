@@ -193,8 +193,9 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
         err_t err;
         struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, msg_len, PBUF_RAM);
         if (!p) {
+            printf("[Matter Transport] ERROR: Failed to allocate pbuf\n");
             err = ERR_MEM;
-            goto unlock_send;
+            goto cleanup_and_unlock;
         }
         
         // Copy message to buffer (use msg_len to avoid redundant strlen)
@@ -205,7 +206,7 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
         
         // Free buffer
         pbuf_free(p);
-unlock_send:
+cleanup_and_unlock:
         cyw43_arch_lwip_end();
         
         if (err == ERR_OK) {
