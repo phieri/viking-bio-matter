@@ -32,11 +32,12 @@ int matter_network_transport_init(void) {
     // Create UDP socket for sending reports (must be inside lwIP lock)
     cyw43_arch_lwip_begin();
     udp_pcb = udp_new();
-    cyw43_arch_lwip_end();
     if (!udp_pcb) {
+        cyw43_arch_lwip_end();
         printf("[Matter Transport] ERROR: Failed to create UDP socket\n");
         return -1;
     }
+    cyw43_arch_lwip_end();
     
     transport_initialized = true;
     printf("Matter Transport: Network transport initialized\n");
@@ -189,21 +190,22 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
         ip_addr_set_ip4_u32(&dest_addr, controllers[i].ip_address);
 
         // Allocate buffer for UDP packet (use msg_len for efficiency)
+        err_t err;
         struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, msg_len, PBUF_RAM);
         if (!p) {
-            cyw43_arch_lwip_end();
-            printf("[Matter Transport] ERROR: Failed to allocate pbuf\n");
-            continue;
+            err = ERR_MEM;
+            goto unlock_send;
         }
         
         // Copy message to buffer (use msg_len to avoid redundant strlen)
         memcpy(p->payload, message, msg_len);
         
         // Send UDP packet
-        err_t err = udp_sendto(udp_pcb, p, &dest_addr, controllers[i].port);
+        err = udp_sendto(udp_pcb, p, &dest_addr, controllers[i].port);
         
         // Free buffer
         pbuf_free(p);
+unlock_send:
         cyw43_arch_lwip_end();
         
         if (err == ERR_OK) {
