@@ -196,6 +196,7 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
             err = ERR_MEM;
             cyw43_arch_lwip_end();
             printf("[Matter Transport] ERROR: Failed to allocate pbuf\n");
+            continue;
         } else {
             // Copy message to buffer (use msg_len to avoid redundant strlen)
             memcpy(p->payload, message, msg_len);
