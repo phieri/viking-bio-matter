@@ -57,13 +57,6 @@ uint32_t calculate_next_wakeup(uint32_t led_tick_off_time, bool led_tick_active)
 int main() {
     // Initialize standard I/O
     stdio_init_all();
-    sleep_ms(10000);  // 10s delay for hardware troubleshooting (USB serial attach)
-
-    // Print version information
-    printf("\n");
-    version_print_info();
-    
-    printf("Viking Bio Matter Bridge starting...\n");
 
     // Initialize CYW43 WiFi chip first, before any other hardware.
     // cyw43_arch_init() (via network_adapter_init) must run before:
@@ -75,6 +68,13 @@ int main() {
     if (network_adapter_init() != 0) {
         printf("[Main] WARNING: CYW43 pre-init failed - will retry in platform_manager_init\n");
     }
+    sleep_ms(10000);  // 10s delay for hardware troubleshooting (USB serial attach)
+
+    // Print version information
+    printf("\n");
+    version_print_info();
+    
+    printf("Viking Bio Matter Bridge starting...\n");
 
     // Initialize components in order
     printf("Initializing Viking Bio protocol parser...\n");
