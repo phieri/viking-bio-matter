@@ -126,7 +126,8 @@ void storage_adapter_enable_multicore_lockout(void) {
     // Re-enable multicore lockout after Core 1 has called multicore_lockout_victim_init().
     // This must be called only after Core 1 is running and registered as a lockout victim.
     if (!lfs_cfg) {
-        // Safe no-op if storage not initialized yet (multicore is now started earlier).
+        // Safe no-op if storage not initialized yet. Multicore now starts earlier,
+        // so this helper may be invoked before storage_adapter_init completes.
         return;
     }
 #ifdef LIB_PICO_MULTICORE
