@@ -48,6 +48,7 @@ static void core1_entry(void) {
     while (!core1_ready_for_work && !core1_should_exit) {
         __wfe();
     }
+    __dsb();
     
     viking_bio_data_t data;
     

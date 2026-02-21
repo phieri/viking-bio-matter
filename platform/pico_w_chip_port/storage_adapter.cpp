@@ -79,7 +79,8 @@ int storage_adapter_init(void) {
 
     // If Core 1 is not yet running, disable multicore lockout to avoid hangs
     // while pico-lfs performs flash erase/program before multicore_lockout_victim_init().
-    // Once Core 1 is running, leave lockout enabled for flash safety.
+    // Once Core 1 is running (and has registered as a lockout victim in core1_entry),
+    // leave lockout enabled for flash safety.
 #ifdef LIB_PICO_MULTICORE
     {
         struct pico_lfs_context *pico_ctx = (struct pico_lfs_context *)lfs_cfg->context;
