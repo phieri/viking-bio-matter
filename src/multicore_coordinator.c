@@ -44,6 +44,7 @@ static void core1_entry(void) {
     printf("Core 1: Started\n");
     core1_running = true;
     // Wait until main thread signals that initialization is complete
+    __dsb();
     while (!core1_ready_for_work && !core1_should_exit) {
         __wfe();
     }
@@ -150,7 +151,7 @@ void multicore_coordinator_get_stats(uint32_t *messages_processed, uint32_t *dat
 }
 
 void multicore_coordinator_signal_ready(void) {
-    core1_ready_for_work = true;
     __dsb();
+    core1_ready_for_work = true;
     __sev();
 }
