@@ -182,18 +182,11 @@ int ble_adapter_init(void) {
     
     printf("BLE: Initializing BTstack for Matter commissioning...\n");
     
-    // Initialize BTstack with async context
-    // Note: CYW43 arch should already be initialized by network_adapter_init()
-    
-    // Get the async context from CYW43
-    async_context_t *async_context = cyw43_arch_async_context();
-    
-    // Initialize BTstack run loop
-    btstack_memory_init();
-    btstack_run_loop_init(btstack_run_loop_async_context_get_instance(async_context));
-    
-    // Initialize HCI transport for CYW43 (must be called before hci_power_control)
-    hci_init(hci_transport_cyw43_instance(), NULL);
+    // Note: btstack_memory_init(), btstack_run_loop_init(), and hci_init() are
+    // already performed by cyw43_arch_init() → btstack_cyw43_init() when
+    // CYW43_ENABLE_BLUETOOTH is set. Calling them again would reset BTstack
+    // memory pools and invalidate the TLV flash bank pointers set up during
+    // cyw43_arch_init(), causing memory corruption in the async context.
     
     // Initialize L2CAP
     l2cap_init();

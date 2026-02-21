@@ -288,14 +288,16 @@ int main() {
         
         // LED behavior: Constantly ON when connected to WiFi + Matter fabric but not receiving serial data
         // When receiving serial data, show 200ms tick instead
+        // When not connected/commissioned, slow blink to show device is alive
         if (!led_tick_active && now >= led_grace_period_end) {
             // Check if connected to WiFi and commissioned to Matter fabric
             if (network_adapter_is_connected() && matter_protocol_is_commissioned()) {
                 // Keep LED constantly on to indicate ready state
                 LED_SET(1);
             } else {
-                // Not fully connected/commissioned, keep LED off
-                LED_SET(0);
+                // Not fully connected/commissioned - slow blink to indicate
+                // the device is alive and waiting for commissioning
+                LED_SET((now / 500) % 2 == 0);
             }
         }
         
