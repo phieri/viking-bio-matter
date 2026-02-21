@@ -45,7 +45,8 @@ static void core1_entry(void) {
     core1_running = true;
     // Wait until main thread signals that initialization is complete
     while (!core1_ready_for_work && !core1_should_exit) {
-        tight_loop_contents();
+        __sev();
+        __wfe();
     }
     
     viking_bio_data_t data;
@@ -99,7 +100,6 @@ int multicore_coordinator_launch_core1(void) {
     }
     
     printf("Multicore: Launching core 1 for Matter/network processing...\n");
-    core1_ready_for_work = false;
     
     // Launch core 1
     multicore_launch_core1(core1_entry);
@@ -151,5 +151,7 @@ void multicore_coordinator_get_stats(uint32_t *messages_processed, uint32_t *dat
 }
 
 void multicore_coordinator_signal_ready(void) {
+    __dmb();
     core1_ready_for_work = true;
+    __sev();
 }
