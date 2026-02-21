@@ -33,16 +33,29 @@ static network_mode_t current_mode = NETWORK_MODE_NONE;
 extern "C" {
 
 int network_adapter_init(void) {
+    printf("[NetworkAdapter] network_adapter_init() called (initialized=%d, connected=%d, mode=%d)\n",
+           wifi_initialized ? 1 : 0, wifi_connected ? 1 : 0, (int) current_mode);
+
     if (wifi_initialized) {
+        printf("[NetworkAdapter] CYW43 already initialized, skipping init\n");
         return 0;
     }
 
     printf("Initializing CYW43439 WiFi adapter...\n");
+    const uint32_t init_start_ms = to_ms_since_boot(get_absolute_time());
+    printf("[NetworkAdapter] About to call cyw43_arch_init() at %lu ms since boot\n",
+           (unsigned long) init_start_ms);
+    fflush(stdout);
 
-    if (cyw43_arch_init() != 0) {
-        printf("[NetworkAdapter] ERROR: Failed to initialize CYW43 WiFi chip\n");
+    const int cyw43_result = cyw43_arch_init();
+    const uint32_t init_end_ms = to_ms_since_boot(get_absolute_time());
+    if (cyw43_result != 0) {
+        printf("[NetworkAdapter] ERROR: cyw43_arch_init() failed with %d after %lu ms\n",
+               cyw43_result, (unsigned long) (init_end_ms - init_start_ms));
         return -1;
     }
+    printf("[NetworkAdapter] cyw43_arch_init() succeeded after %lu ms\n",
+           (unsigned long) (init_end_ms - init_start_ms));
 
     wifi_initialized = true;
     printf("WiFi adapter initialized\n");
