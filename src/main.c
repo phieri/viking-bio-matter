@@ -131,8 +131,11 @@ int main() {
         // Update watchdog to prevent system reset (must be done every loop iteration)
         watchdog_update();
         
+        // Poll CYW43 WiFi chip and drive lwIP timers.
+        // Required when using pico_cyw43_arch_lwip_poll (cooperative polling, no background IRQ).
+        cyw43_arch_poll();
+        
         // Process serial data events
-        // Note: serial_handler_task() polls hardware but is lightweight
         serial_handler_task();
         
         if ((event_flags & EVENT_SERIAL_DATA) || serial_handler_data_available()) {

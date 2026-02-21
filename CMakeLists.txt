@@ -145,7 +145,15 @@ target_link_libraries(viking_bio_matter
     # that has been observed to hang indefinitely on this hardware during startup.
     # All Matter/network tasks run on Core 0 via the existing single-core fallback path.
     pico_unique_id
-    pico_cyw43_arch_lwip_threadsafe_background
+    # Use the poll-based CYW43 architecture instead of threadsafe_background.
+    # pico_cyw43_arch_lwip_threadsafe_background claims a hardware alarm and a user IRQ
+    # in its async-context setup; this has been observed to hang indefinitely in
+    # cyw43_arch_init() on this hardware regardless of init ordering.
+    # pico_cyw43_arch_lwip_poll uses a simple cooperative polling context (no hardware
+    # alarm, no background IRQ) and is the variant used by all basic Pico W SDK examples
+    # with a polling main loop.  cyw43_arch_poll() is called from the main loop to drive
+    # all CYW43 and lwIP processing.
+    pico_cyw43_arch_lwip_poll
     pico_mbedtls
     hardware_flash
     pico-lfs
