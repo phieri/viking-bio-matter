@@ -45,6 +45,7 @@ static void core1_entry(void) {
     core1_running = true;
     // Wait until main thread signals that initialization is complete
     __dsb();
+    __sev();
     while (!core1_ready_for_work && !core1_should_exit) {
         __wfe();
     }
