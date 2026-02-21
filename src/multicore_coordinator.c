@@ -45,7 +45,7 @@ static void core1_entry(void) {
     // Storage adapter relies on this ordering: we mark Core 1 running only
     // after the lockout victim registration above has completed.
     core1_running = true;
-    // Wait in a ready state (core1_entry registers as a lockout victim before this point)
+    // Wait in a ready state (multicore_lockout_victim_init() above has already completed)
     // until Core 0 finishes platform initialization so Core 1 does not run
     // network/Matter tasks while flash/storage setup is still in progress.
     __dsb();
