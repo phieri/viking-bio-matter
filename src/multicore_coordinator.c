@@ -49,9 +49,12 @@ static void core1_entry(void) {
     // Wait in a ready state (multicore_lockout_victim_init() above has already completed)
     // until Core 0 finishes platform initialization so Core 1 does not run
     // network/Matter tasks while flash/storage setup is still in progress.
-    while (!__atomic_load_n(&core1_ready_for_work, __ATOMIC_ACQUIRE) &&
-           !__atomic_load_n(&core1_should_exit, __ATOMIC_ACQUIRE)) {
+    while (true) {
         __wfe();
+        if (__atomic_load_n(&core1_ready_for_work, __ATOMIC_ACQUIRE) ||
+            __atomic_load_n(&core1_should_exit, __ATOMIC_ACQUIRE)) {
+            break;
+        }
     }
     
     viking_bio_data_t data;
