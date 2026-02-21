@@ -29,15 +29,11 @@ int matter_network_transport_init(void) {
     // Clear controllers
     memset(controllers, 0, sizeof(controllers));
     
-    // Create UDP socket for sending reports (must be inside lwIP lock)
-    cyw43_arch_lwip_begin();
     udp_pcb = udp_new();
     if (!udp_pcb) {
-        cyw43_arch_lwip_end();
         printf("[Matter Transport] ERROR: Failed to create UDP socket\n");
         return -1;
     }
-    cyw43_arch_lwip_end();
     
     transport_initialized = true;
     printf("Matter Transport: Network transport initialized\n");
@@ -55,9 +51,7 @@ int matter_network_transport_add_controller(const char *ip_address, uint16_t por
         if (!controllers[i].active) {
             // Parse IP address
             ip_addr_t ipaddr;
-            cyw43_arch_lwip_begin();
             bool ip_ok = ipaddr_aton(ip_address, &ipaddr);
-            cyw43_arch_lwip_end();
             if (!ip_ok) {
                 printf("[Matter Transport] ERROR: Invalid IP address: %s\n", ip_address);
                 return -1;
@@ -184,15 +178,12 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
             }
         }
         
-        // Prepare destination address and send inside lwIP lock
-        cyw43_arch_lwip_begin();
         ip_addr_t dest_addr;
         ip_addr_set_ip4_u32(&dest_addr, controllers[i].ip_address);
 
         // Allocate buffer for UDP packet (use msg_len for efficiency)
         struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, msg_len, PBUF_RAM);
         if (!p) {
-            cyw43_arch_lwip_end();
             printf("[Matter Transport] ERROR: Failed to allocate pbuf\n");
             continue;
         }
@@ -212,7 +203,6 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
         } else {
             printf("[Matter Transport] ERROR: Failed to send to controller [%d], error %d\n", i, err);
         }
-        cyw43_arch_lwip_end();
     }
     
     if (sent_count > 0) {

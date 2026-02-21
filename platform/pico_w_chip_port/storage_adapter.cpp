@@ -10,9 +10,6 @@
 #include "hardware/flash.h"
 #include "hardware/sync.h"
 
-// Include mutex header for LittleFS thread safety
-#include "pico/mutex.h"
-
 #include "pico_lfs.h"
 
 // Storage configuration

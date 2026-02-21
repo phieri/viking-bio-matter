@@ -13,7 +13,6 @@
 #include "lwip/ip_addr.h"
 #include "lwip/netif.h"
 #include "pico/cyw43_arch.h"
-#include "pico/critical_section.h"
 
 /**
  * Receive Queue Entry
@@ -36,7 +35,6 @@ static struct {
     size_t rx_queue_tail;               // Next entry to read
     size_t rx_queue_count;              // Number of entries in queue
     bool initialized;
-    critical_section_t queue_lock;      // Protect queue from concurrent access
 } transport_state = {
     .operational_pcb = NULL,
     .commissioning_pcb = NULL,
@@ -97,12 +95,8 @@ static void udp_recv_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p,
         return;
     }
     
-    // Lock queue for thread-safe access
-    critical_section_enter_blocking(&transport_state.queue_lock);
-    
     // Check if we have space in the queue
     if (transport_state.rx_queue_count >= MATTER_TRANSPORT_RX_QUEUE_SIZE) {
-        critical_section_exit(&transport_state.queue_lock);
         printf("UDP transport: RX queue full, dropping packet\n");
         pbuf_free(p);
         return;
@@ -113,7 +107,6 @@ static void udp_recv_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p,
     
     // Check packet size
     if (p->tot_len > MATTER_TRANSPORT_MAX_PACKET) {
-        critical_section_exit(&transport_state.queue_lock);
         printf("UDP transport: Packet too large (%u bytes), dropping\n", p->tot_len);
         pbuf_free(p);
         return;
@@ -131,10 +124,8 @@ static void udp_recv_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p,
     // Update queue
     transport_state.rx_queue_head = (transport_state.rx_queue_head + 1) % MATTER_TRANSPORT_RX_QUEUE_SIZE;
     transport_state.rx_queue_count++;
-    
-    critical_section_exit(&transport_state.queue_lock);
-    
-    // Free pbuf (outside critical section)
+
+    // Free pbuf
     pbuf_free(p);
 }
 
@@ -145,9 +136,6 @@ int matter_transport_init(void) {
     
     printf("Initializing Matter UDP transport...\n");
     
-    // Initialize critical section for queue thread safety
-    critical_section_init(&transport_state.queue_lock);
-    
     // Initialize receive queue
     for (size_t i = 0; i < MATTER_TRANSPORT_RX_QUEUE_SIZE; i++) {
         transport_state.rx_queue[i].in_use = false;
@@ -157,13 +145,9 @@ int matter_transport_init(void) {
     transport_state.rx_queue_tail = 0;
     transport_state.rx_queue_count = 0;
     
-    // Create UDP PCBs inside lwIP lock (required for threadsafe_background arch)
-    cyw43_arch_lwip_begin();
-    
     // Create UDP PCB for operational messages (port 5540)
     transport_state.operational_pcb = udp_new();
     if (transport_state.operational_pcb == NULL) {
-        cyw43_arch_lwip_end();
         printf("[UDPTransport] ERROR: Failed to create operational UDP PCB\n");
         return MATTER_TRANSPORT_ERROR_INIT;
     }
@@ -173,7 +157,6 @@ int matter_transport_init(void) {
     if (err != ERR_OK) {
         udp_remove(transport_state.operational_pcb);
         transport_state.operational_pcb = NULL;
-        cyw43_arch_lwip_end();
         printf("[UDPTransport] ERROR: Failed to bind operational UDP PCB to port %d (err=%d)\n", 
                MATTER_PORT_OPERATIONAL, err);
         return MATTER_TRANSPORT_ERROR_INIT;
@@ -187,7 +170,6 @@ int matter_transport_init(void) {
     if (transport_state.commissioning_pcb == NULL) {
         udp_remove(transport_state.operational_pcb);
         transport_state.operational_pcb = NULL;
-        cyw43_arch_lwip_end();
         printf("[UDPTransport] ERROR: Failed to create commissioning UDP PCB\n");
         return MATTER_TRANSPORT_ERROR_INIT;
     }
@@ -199,7 +181,6 @@ int matter_transport_init(void) {
         udp_remove(transport_state.commissioning_pcb);
         transport_state.operational_pcb = NULL;
         transport_state.commissioning_pcb = NULL;
-        cyw43_arch_lwip_end();
         printf("[UDPTransport] ERROR: Failed to bind commissioning UDP PCB to port %d (err=%d)\n", 
                MATTER_PORT_COMMISSIONING, err);
         return MATTER_TRANSPORT_ERROR_INIT;
@@ -207,8 +188,6 @@ int matter_transport_init(void) {
     
     // Set receive callback for commissioning PCB
     udp_recv(transport_state.commissioning_pcb, udp_recv_callback, NULL);
-    
-    cyw43_arch_lwip_end();
     
     transport_state.initialized = true;
     printf("Matter UDP transport initialized\n");
@@ -223,8 +202,6 @@ void matter_transport_deinit(void) {
     
     printf("Deinitializing Matter UDP transport...\n");
     
-    // Remove UDP PCBs inside lwIP lock
-    cyw43_arch_lwip_begin();
     if (transport_state.operational_pcb != NULL) {
         udp_remove(transport_state.operational_pcb);
         transport_state.operational_pcb = NULL;
@@ -234,7 +211,6 @@ void matter_transport_deinit(void) {
         udp_remove(transport_state.commissioning_pcb);
         transport_state.commissioning_pcb = NULL;
     }
-    cyw43_arch_lwip_end();
     
     // Clear receive queue
     for (size_t i = 0; i < MATTER_TRANSPORT_RX_QUEUE_SIZE; i++) {
@@ -269,13 +245,9 @@ int matter_transport_send(const uint8_t *data, size_t length,
     ip_addr_t dest_ip;
     transport_addr_to_lwip_addr(dest_addr, &dest_ip);
     
-    // Allocate and send pbuf inside lwIP lock
-    cyw43_arch_lwip_begin();
-    
     // Allocate pbuf
     struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, length, PBUF_RAM);
     if (p == NULL) {
-        cyw43_arch_lwip_end();
         printf("[UDPTransport] ERROR: Failed to allocate pbuf for send\n");
         return MATTER_TRANSPORT_ERROR_NO_MEMORY;
     }
@@ -288,8 +260,6 @@ int matter_transport_send(const uint8_t *data, size_t length,
     
     // Free pbuf
     pbuf_free(p);
-    
-    cyw43_arch_lwip_end();
     
     if (err != ERR_OK) {
         printf("[UDPTransport] ERROR: UDP send failed (err=%d)\n", err);
@@ -315,20 +285,13 @@ int matter_transport_receive(uint8_t *buffer, size_t buffer_size,
     // Full timeout support would require integration with FreeRTOS or polling loop
     (void)timeout_ms;
     
-    // Lock queue for thread-safe access
-    critical_section_enter_blocking(&transport_state.queue_lock);
-    
     // Check if we have data in queue
     if (transport_state.rx_queue_count == 0) {
-        critical_section_exit(&transport_state.queue_lock);
-        
         // Process lwIP (allow callbacks to run)
         cyw43_arch_poll();
-        
-        critical_section_enter_blocking(&transport_state.queue_lock);
+
         // Check again
         if (transport_state.rx_queue_count == 0) {
-            critical_section_exit(&transport_state.queue_lock);
             return MATTER_TRANSPORT_ERROR_WOULD_BLOCK;
         }
     }
@@ -337,13 +300,11 @@ int matter_transport_receive(uint8_t *buffer, size_t buffer_size,
     rx_queue_entry_t *entry = &transport_state.rx_queue[transport_state.rx_queue_tail];
     
     if (!entry->in_use) {
-        critical_section_exit(&transport_state.queue_lock);
         return MATTER_TRANSPORT_ERROR_WOULD_BLOCK;
     }
     
     // Check buffer size
     if (entry->length > buffer_size) {
-        critical_section_exit(&transport_state.queue_lock);
         printf("[UDPTransport] ERROR: Buffer too small for received packet (%zu bytes needed, %zu available)\n",
                entry->length, buffer_size);
         return MATTER_TRANSPORT_ERROR_INVALID_PARAM;
@@ -364,8 +325,6 @@ int matter_transport_receive(uint8_t *buffer, size_t buffer_size,
     // Update queue
     transport_state.rx_queue_tail = (transport_state.rx_queue_tail + 1) % MATTER_TRANSPORT_RX_QUEUE_SIZE;
     transport_state.rx_queue_count--;
-    
-    critical_section_exit(&transport_state.queue_lock);
     
     return MATTER_TRANSPORT_SUCCESS;
 }

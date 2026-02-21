@@ -131,8 +131,6 @@ int dns_sd_advertise_commissionable_node(
     snprintf(hostname, sizeof(hostname), "matter-%04X", current_discriminator);
     
     // Add network interface to mDNS responder if not already added
-    cyw43_arch_lwip_begin();
-    
     if (!mdns_resp_netif_active(netif)) {
         printf("  Registering mDNS netif with hostname: %s\n", hostname);
         mdns_resp_add_netif(netif, hostname);
@@ -156,8 +154,6 @@ int dns_sd_advertise_commissionable_node(
     
     // Announce the service immediately
     mdns_resp_announce(netif);
-    
-    cyw43_arch_lwip_end();
     
     is_advertising = true;
     
@@ -186,14 +182,10 @@ void dns_sd_stop(void) {
     
     netif = &cyw43_state.netif[CYW43_ITF_STA];
     
-    cyw43_arch_lwip_begin();
-    
     // Remove network interface from mDNS responder
     if (mdns_resp_netif_active(netif)) {
         mdns_resp_remove_netif(netif);
     }
-    
-    cyw43_arch_lwip_end();
     
     is_advertising = false;
     
