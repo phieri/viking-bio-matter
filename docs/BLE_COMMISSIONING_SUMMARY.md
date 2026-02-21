@@ -75,7 +75,6 @@ Successfully implemented Matter-compliant WiFi commissioning via Bluetooth LE (B
 ### Phase 5: Documentation ✅
 **Files Modified:**
 - `README.md` - BLE commissioning documentation
-- `docs/MULTICORE_ARCHITECTURE.md` - Updated for BLE
 - This file - BLE implementation summary
 
 **Added Sections:**

@@ -174,7 +174,6 @@ cmake .. && make -j$(nproc)
 - `MINIMAL_MATTER_ARCHITECTURE.md` - Matter stack architecture
 - `BLE_COMMISSIONING_SUMMARY.md` - BLE commissioning implementation
 - `SUBSCRIPTIONS_TESTING.md` - Matter subscriptions testing
-- `MULTICORE_ARCHITECTURE.md` - Dual-core architecture details
 - `DNS_SD_IMPLEMENTATION.md` - mDNS/DNS-SD implementation
 
 **Config**: 

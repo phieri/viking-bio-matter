@@ -463,22 +463,6 @@ The firmware uses **LittleFS** for persistent storage, providing:
 **Testing:**
 See `tests/storage/README.md` for test procedures including basic read/write, overwrite/delete, power cycle persistence, and wear leveling stress tests.
 
-### Multicore Architecture
-
-The firmware utilizes both RP2040 cores for optimal performance:
-
-- **Core 0**: Serial input (UART interrupt), Viking Bio parsing, LED control, watchdog management
-- **Core 1**: Matter protocol processing, network tasks, DNS-SD, attribute reporting
-
-**Benefits:**
-- Parallel processing of serial data and network tasks
-- Improved responsiveness (LED/watchdog never block on network)
-- Better CPU utilization across both cores
-- Automatic fallback to single-core mode if initialization fails
-
-**Documentation:**
-See [docs/MULTICORE_ARCHITECTURE.md](docs/MULTICORE_ARCHITECTURE.md) for detailed architecture, API reference, and performance analysis.
-
 ## Testing
 
 ### Serial Simulator

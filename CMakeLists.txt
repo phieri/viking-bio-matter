@@ -138,11 +138,6 @@ target_link_libraries(viking_bio_matter
     hardware_uart
     hardware_gpio
     hardware_sync
-    # pico_multicore intentionally removed: linking it sets LIB_PICO_MULTICORE=1 which
-    # enables ASYNC_CONTEXT_THREADSAFE_BACKGROUND_MULTI_CORE=1 in the CYW43 SDK library.
-    # That changes cyw43_arch_init() to use a more complex cross-core alarm wake-up path
-    # that has been observed to hang indefinitely on this hardware during startup.
-    # All Matter/network tasks run on Core 0 via the existing single-core fallback path.
     pico_unique_id
     # Use the poll-based CYW43 architecture instead of threadsafe_background.
     # pico_cyw43_arch_lwip_threadsafe_background claims a hardware alarm and a user IRQ

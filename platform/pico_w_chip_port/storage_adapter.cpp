@@ -104,20 +104,6 @@ int storage_adapter_init(void) {
     return 0;
 }
 
-void storage_adapter_enable_multicore_lockout(void) {
-    // Re-enable multicore lockout after Core 1 has called multicore_lockout_victim_init().
-    // This must be called only after Core 1 is running and registered as a lockout victim.
-    if (!lfs_cfg) {
-        // Safe no-op if storage not initialized yet. Multicore now starts earlier,
-        // so this helper may be invoked before storage_adapter_init completes.
-        return;
-    }
-#ifdef LIB_PICO_MULTICORE
-    struct pico_lfs_context *pico_ctx = (struct pico_lfs_context *)lfs_cfg->context;
-    pico_ctx->multicore_lockout_enabled = true;
-#endif
-}
-
 int storage_adapter_write(const char *key, const uint8_t *value, size_t value_len) {
     if (!storage_initialized || !key || !value || value_len == 0) {
         return -1;
