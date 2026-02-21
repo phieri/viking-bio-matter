@@ -33,9 +33,12 @@ static char current_instance_name[17] = {0}; // 16 hex chars + null
 static void generate_instance_name(void) {
     uint32_t r1 = get_rand_32();
     uint32_t r2 = get_rand_32();
-    uint8_t random_bytes[8];
-    memcpy(random_bytes, &r1, sizeof(r1));
-    memcpy(random_bytes + 4, &r2, sizeof(r2));
+    uint8_t random_bytes[8] = {
+        (uint8_t)(r1 & 0xFF), (uint8_t)((r1 >> 8) & 0xFF),
+        (uint8_t)((r1 >> 16) & 0xFF), (uint8_t)((r1 >> 24) & 0xFF),
+        (uint8_t)(r2 & 0xFF), (uint8_t)((r2 >> 8) & 0xFF),
+        (uint8_t)((r2 >> 16) & 0xFF), (uint8_t)((r2 >> 24) & 0xFF)
+    };
 
     // Uppercase hex string, zero-terminated
     snprintf(current_instance_name, sizeof(current_instance_name),
