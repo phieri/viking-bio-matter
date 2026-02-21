@@ -43,33 +43,20 @@ bool periodic_timer_callback(struct repeating_timer *t) {
 uint32_t calculate_next_wakeup(uint32_t led_tick_off_time, bool led_tick_active) {
     uint32_t now = to_ms_since_boot(get_absolute_time());
     uint32_t next_wakeup = UINT32_MAX;
-    
+
     // LED tick timeout
     if (led_tick_active && led_tick_off_time > now) {
         uint32_t led_delta = led_tick_off_time - now;
         next_wakeup = (led_delta < next_wakeup) ? led_delta : next_wakeup;
     }
-    
+
     // Default to 100ms if nothing scheduled soon (cap for responsiveness)
     return (next_wakeup == UINT32_MAX) ? 100 : next_wakeup;
 }
 
 int main() {
-    // Initialize standard I/O
     stdio_init_all();
     sleep_ms(10000);  // 10s delay for hardware troubleshooting (USB serial attach)
-
-    // Initialize CYW43 WiFi chip first, before any other hardware.
-    // cyw43_arch_init() (via network_adapter_init) must run before:
-    //   - serial_handler_init() (UART0 IRQ)
-    //   - storage_adapter_init() (flash operations with save_and_disable_interrupts)
-    // The subsequent call from platform_manager_init() (Step 3/4) will see
-    // wifi_initialized==true and return 0 immediately (no-op).
-    printf("Pre-initializing CYW43439 WiFi chip...\n");
-    if (network_adapter_init() != 0) {
-        printf("[Main] WARNING: CYW43 pre-init failed - will retry in platform_manager_init\n");
-    }
-
 
     // Print version information
     printf("\n");
