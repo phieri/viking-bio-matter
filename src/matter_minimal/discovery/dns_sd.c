@@ -10,6 +10,7 @@
 #include "lwip/apps/mdns.h"
 #include "lwip/netif.h"
 #include "pico/cyw43_arch.h"
+#include "pico/rand.h"
 
 // Matter service constants
 #define MATTER_SERVICE_NAME "_matterc"
@@ -26,6 +27,23 @@ static uint16_t current_vendor_id = 0;
 static uint16_t current_product_id = 0;
 static uint16_t current_device_type = 0;
 static uint8_t current_commissioning_mode = 0;
+static char current_instance_name[17] = {0}; // 16 hex chars + null
+
+// Generate a fresh 64-bit random instance name per Matter spec (16 upper-hex chars)
+static void generate_instance_name(void) {
+    uint8_t random_bytes[8];
+    for (int i = 0; i < 8; i++) {
+        // get_rand_32() is hardware-backed; use one byte at a time to avoid bias
+        random_bytes[i] = (uint8_t)(get_rand_32() & 0xFF);
+    }
+
+    // Uppercase hex string, zero-terminated
+    snprintf(current_instance_name, sizeof(current_instance_name),
+             "%02X%02X%02X%02X%02X%02X%02X%02X",
+             random_bytes[0], random_bytes[1], random_bytes[2], random_bytes[3],
+             random_bytes[4], random_bytes[5], random_bytes[6], random_bytes[7]);
+    current_instance_name[16] = '\0';
+}
 
 // TXT record callback - adds Matter-specific TXT records
 static void matter_txt_callback(struct mdns_service *service, void *txt_userdata) {
@@ -98,6 +116,7 @@ int dns_sd_advertise_commissionable_node(
     current_product_id = product_id;
     current_device_type = device_type;
     current_commissioning_mode = commissioning_mode ? 1 : 0;
+    generate_instance_name();
     
     // Get the network interface (station mode)
     netif = &cyw43_state.netif[CYW43_ITF_STA];
@@ -117,16 +136,15 @@ int dns_sd_advertise_commissionable_node(
         mdns_resp_add_netif(netif, hostname);
     }
     
-    // Add Matter commissioning service
-    // Service name will be: <hostname>._matterc._udp.local
-    printf("  Registering Matter service: %s.%s.%s.local\n", 
-           hostname, MATTER_SERVICE_NAME, MATTER_PROTOCOL);
+    // Add Matter commissioning service with randomized instance name (Matter 1.5)
+    printf("  Registering Matter service: %s.%s.%s.local (instance: %s)\n",
+           hostname, MATTER_SERVICE_NAME, MATTER_PROTOCOL, current_instance_name);
     printf("  Port: %d\n", MATTER_PORT);
     printf("  TXT Records:\n");
     
     mdns_resp_add_service(
         netif,
-        hostname,
+        current_instance_name,
         MATTER_SERVICE_NAME,
         DNSSD_PROTO_UDP,
         MATTER_PORT,
@@ -146,6 +164,7 @@ int dns_sd_advertise_commissionable_node(
     printf("  Discriminator: %u (0x%03X)\n", current_discriminator, current_discriminator);
     printf("  Vendor ID: %u (0x%04X)\n", current_vendor_id, current_vendor_id);
     printf("  Product ID: %u (0x%04X)\n", current_product_id, current_product_id);
+    printf("  Service Instance: %s\n", current_instance_name);
     if (current_device_type != 0) {
         printf("  Device Type: 0x%04X\n", current_device_type);
     }

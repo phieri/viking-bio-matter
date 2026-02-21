@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the DNS-SD (DNS Service Discovery) implementation for Matter commissioning in the Viking Bio Matter Bridge. The implementation follows the Matter 1.0 specification for device discovery using mDNS.
+This document describes the DNS-SD (DNS Service Discovery) implementation for Matter commissioning in the Viking Bio Matter Bridge. The implementation follows the Matter 1.5 specification for device discovery using mDNS.
 
 ## Background
 
@@ -122,7 +122,7 @@ The device automatically:
   Starting DNS-SD Advertisement
 ====================================
   Registering mDNS netif with hostname: matter-0F84
-  Registering Matter service: matter-0F84._matterc._udp.local
+  Registering Matter service: matter-0F84._matterc._udp.local (instance: 23D863A3A4B89C73)
   Port: 5540
   TXT Records:
   DNS-SD: Added TXT record: D=3972
@@ -147,16 +147,16 @@ dns-sd -B _matterc._udp
 # DATE: ---Tue 15 Feb 2026---
 # 22:30:00.000  ...STARTING...
 # Timestamp     A/R    Flags  if Domain               Service Type         Instance Name
-# 22:30:00.123  Add        2  en0    local.          _matterc._udp.       matter-0F84
+# 22:30:00.123  Add        2  en0    local.          _matterc._udp.       23D863A3A4B89C73
 ```
 
 #### Detailed record lookup:
 ```bash
 # Get detailed TXT records
-dns-sd -L matter-0F84 _matterc._udp
+dns-sd -L 23D863A3A4B89C73 _matterc._udp
 
 # Sample output:
-# Lookup matter-0F84._matterc._udp.local
+# Lookup 23D863A3A4B89C73._matterc._udp.local
 # DATE: ---Tue 15 Feb 2026---
 # 22:30:05.000  matter-0F84._matterc._udp.local. can be reached at 
 #               pico.local:5540 (interface 4)
@@ -208,6 +208,12 @@ Standard Matter device types:
 - 0x0103: Dimmable Light  
 - 0x0302: Temperature Sensor (current)
 - 0x0850: Control Bridge
+
+### Service Instance Name (Matter 1.5)
+
+- Each time commissioning starts, a new 64-bit random value is generated and encoded as a 16-character uppercase hex string (e.g., `23D863A3A4B89C73`).
+- The random string is used as the DNS-SD instance name for `_matterc._udp` to satisfy Matter 1.5 anti-tracking requirements.
+- The mDNS hostname remains `matter-<DISCRIMINATOR_HEX>` for the network interface.
 
 ### Hostname
 
