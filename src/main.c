@@ -66,7 +66,8 @@ uint32_t calculate_next_wakeup(uint32_t led_tick_off_time, bool led_tick_active)
 int main() {
     // Initialize standard I/O
     stdio_init_all();
-    
+    sleep_ms(10000);  // 10s delay for hardware troubleshooting (USB serial attach)
+
     // Initialize CYW43 chip early so the LED is available for diagnostic blinks
     // throughout the rest of the startup sequence
     if (network_adapter_early_init() != 0) {
