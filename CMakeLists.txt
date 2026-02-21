@@ -139,14 +139,33 @@ target_link_libraries(viking_bio_matter
     hardware_uart
     hardware_gpio
     hardware_sync
-    pico_multicore
+    # pico_multicore intentionally removed: linking it sets LIB_PICO_MULTICORE=1 which
+    # enables ASYNC_CONTEXT_THREADSAFE_BACKGROUND_MULTI_CORE=1 in the CYW43 SDK library.
+    # That changes cyw43_arch_init() to use a more complex cross-core alarm wake-up path
+    # that has been observed to hang indefinitely on this hardware during startup.
+    # All Matter/network tasks run on Core 0 via the existing single-core fallback path.
     pico_unique_id
-    pico_cyw43_arch_lwip_threadsafe_background
+    # Use the poll-based CYW43 architecture instead of threadsafe_background.
+    # pico_cyw43_arch_lwip_threadsafe_background claims a hardware alarm and a user IRQ
+    # in its async-context setup; this has been observed to hang indefinitely in
+    # cyw43_arch_init() on this hardware regardless of init ordering.
+    # pico_cyw43_arch_lwip_poll uses a simple cooperative polling context (no hardware
+    # alarm, no background IRQ) and is the variant used by all basic Pico W SDK examples
+    # with a polling main loop.  cyw43_arch_poll() is called from the main loop to drive
+    # all CYW43 and lwIP processing.
+    pico_cyw43_arch_lwip_poll
     pico_mbedtls
     hardware_flash
     pico-lfs
-    pico_btstack_ble
-    pico_btstack_cyw43
+    # pico_btstack_ble and pico_btstack_cyw43 intentionally removed:
+    # Linking them sets CYW43_ENABLE_BLUETOOTH=1, which causes cyw43_arch_init()
+    # to call btstack_cyw43_init() -> setup_tlv() -> btstack_tlv_flash_bank_init_instance().
+    # The TLV scanner reads the BTstack flash bank area. On a device that has run
+    # prior firmware, this area may contain LittleFS page data with a `len` field
+    # of 0xFFFFFFF8 that causes uint32 overflow (offset += 8 + 0xFFFFFFF8 = 0)
+    # resulting in an infinite scan loop — the startup hang seen at
+    # "Initializing CYW43439 WiFi adapter...".  BLE commissioning is handled by
+    # the ble_adapter stub; WiFi provisioning uses the dedicated provisioning flow.
     -Wl,--start-group
     matter_protocol
     matter_tlv
@@ -163,14 +182,6 @@ target_link_libraries(viking_bio_matter
 target_compile_definitions(viking_bio_matter PRIVATE
     LFS_THREADSAFE=1
     LFS_NO_DEBUG=1
-)
-
-# Place BTstack flash bank (8KB) immediately before the LittleFS storage area
-# (last 256KB of flash) to prevent overlap.  Without this, BTstack defaults to
-# the very end of flash which falls inside the LittleFS region, corrupting both
-# BTstack bonding data and LittleFS metadata.
-target_compile_definitions(viking_bio_matter PRIVATE
-    "PICO_FLASH_BANK_STORAGE_OFFSET=(PICO_FLASH_SIZE_BYTES - (256 * 1024) - (FLASH_SECTOR_SIZE * 2))"
 )
 
 # Enable USB output, disable UART output

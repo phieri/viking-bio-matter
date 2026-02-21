@@ -65,7 +65,18 @@ int main() {
     version_print_info();
     
     printf("Viking Bio Matter Bridge starting...\n");
-    
+
+    // Initialize CYW43 WiFi chip first, before any other hardware.
+    // cyw43_arch_init() (via network_adapter_init) must run before:
+    //   - serial_handler_init() (UART0 IRQ)
+    //   - storage_adapter_init() (flash operations with save_and_disable_interrupts)
+    // The subsequent call from platform_manager_init() (Step 3/4) will see
+    // wifi_initialized==true and return 0 immediately (no-op).
+    printf("Pre-initializing CYW43439 WiFi chip...\n");
+    if (network_adapter_init() != 0) {
+        printf("[Main] WARNING: CYW43 pre-init failed - will retry in platform_manager_init\n");
+    }
+
     // Initialize components in order
     printf("Initializing Viking Bio protocol parser...\n");
     viking_bio_init();
@@ -73,23 +84,18 @@ int main() {
     printf("Initializing serial handler...\n");
     serial_handler_init();
 
-    // Initialize multicore coordination
-    printf("\nInitializing multicore support...\n");
+    // Initialize multicore coordination (inter-core queue)
+    printf("\nInitializing coordinator...\n");
     if (multicore_coordinator_init() != 0) {
-        printf("[Main] ERROR: Failed to initialize multicore coordinator\n");
-        printf("[Main] Device will continue in single-core mode\n");
-    } else {
-        // Launch core 1 for Matter/network processing
-        if (multicore_coordinator_launch_core1() == 0) {
-            printf("[OK] Multicore enabled: Core 0 (serial/LED), Core 1 (Matter/network)\n");
-        } else {
-            printf("WARNING: Failed to launch core 1\n");
-            printf("         Device will continue in single-core mode\n");
-        }
+        printf("[Main] ERROR: Failed to initialize coordinator\n");
     }
 
+    // Initialize Matter bridge (platform, storage, network, BLE, DNS-SD, attributes)
     printf("Initializing Matter bridge...\n");
     matter_bridge_init();
+
+    // Attempt to launch Core 1 (no-op when pico_multicore not linked)
+    multicore_coordinator_launch_core1();
     multicore_coordinator_signal_ready();
 
     printf("Initialization complete. Reading serial data...\n");
@@ -125,8 +131,11 @@ int main() {
         // Update watchdog to prevent system reset (must be done every loop iteration)
         watchdog_update();
         
+        // Poll CYW43 WiFi chip and drive lwIP timers.
+        // Required when using pico_cyw43_arch_lwip_poll (cooperative polling, no background IRQ).
+        cyw43_arch_poll();
+        
         // Process serial data events
-        // Note: serial_handler_task() polls hardware but is lightweight
         serial_handler_task();
         
         if ((event_flags & EVENT_SERIAL_DATA) || serial_handler_data_available()) {

@@ -11,5 +11,5 @@ target_include_directories(matter_discovery INTERFACE
 
 target_link_libraries(matter_discovery INTERFACE
     pico_stdlib
-    pico_cyw43_arch_lwip_threadsafe_background
+    pico_cyw43_arch_lwip_poll
 )

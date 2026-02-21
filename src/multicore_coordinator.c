@@ -11,7 +11,9 @@
 #include <string.h>
 #include <stdatomic.h>
 #include "pico/stdlib.h"
+#ifdef LIB_PICO_MULTICORE
 #include "pico/multicore.h"
+#endif
 #include "pico/util/queue.h"
 #include "hardware/sync.h"
 
@@ -31,6 +33,7 @@ static volatile uint32_t core1_data_updates_processed = 0;
 // Core 1 idle sleep duration when no work is available (microseconds)
 #define CORE1_IDLE_SLEEP_US 100
 
+#ifdef LIB_PICO_MULTICORE
 /**
  * Core 1 entry point
  * Runs Matter protocol processing and network tasks
@@ -90,6 +93,7 @@ static void core1_entry(void) {
     printf("Core 1: Exiting\n");
     core1_running = false;
 }
+#endif /* LIB_PICO_MULTICORE */
 
 int multicore_coordinator_init(void) {
     printf("Multicore: Initializing inter-core communication...\n");
@@ -102,6 +106,7 @@ int multicore_coordinator_init(void) {
 }
 
 int multicore_coordinator_launch_core1(void) {
+#ifdef LIB_PICO_MULTICORE
     if (core1_running) {
         printf("Multicore: Core 1 already running\n");
         return 0;
@@ -128,6 +133,14 @@ int multicore_coordinator_launch_core1(void) {
         printf("[Multicore] ERROR: Core 1 failed to start\n");
         return -1;
     }
+#else
+    // pico_multicore not linked: run all tasks on Core 0 via main-loop fallback.
+    // Matter protocol, platform tasks and attribute updates are handled by the
+    // existing single-core fallback paths in main().
+    printf("Multicore: disabled (single-core mode)\n");
+    printf("  - Core 0: serial input, LED control, Matter/network tasks\n");
+    return 0;
+#endif
 }
 
 int multicore_coordinator_send_data(const viking_bio_data_t *data) {

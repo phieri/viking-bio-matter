@@ -51,7 +51,7 @@
 // mDNS options for Matter device discovery
 #define LWIP_MDNS_RESPONDER         1
 #define LWIP_IGMP                   1
-#define LWIP_NUM_NETIF_CLIENT_DATA  1
+#define LWIP_NUM_NETIF_CLIENT_DATA  2
 
 // Threading
 #define TCPIP_THREAD_STACKSIZE      1024
