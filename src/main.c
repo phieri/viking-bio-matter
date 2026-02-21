@@ -19,7 +19,8 @@
 // LED is now enabled using CYW43 architecture functions
 #define LED_ENABLED 1
 static bool main_led_available = false;
-#define LED_INIT() do { /* LED initialized as part of cyw43_arch_init */ } while(0)
+// Mirror the Pico SDK blink example: explicitly initialise the LED GPIO via CYW43
+#define LED_INIT() do { if (!main_led_available && network_adapter_early_init() == 0) main_led_available = true; } while(0)
 #define LED_SET(state) do { if (main_led_available) cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, (state)); } while(0)
 
 // Event system for efficient interrupt-driven architecture

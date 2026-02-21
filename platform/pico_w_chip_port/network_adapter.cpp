@@ -41,8 +41,16 @@ int network_adapter_early_init(void) {
         return 0;
     }
     // Initialize CYW43 chip only - makes LED available before full network setup
-    if (cyw43_arch_init_with_country(WIFI_COUNTRY)) {
-        return -1;
+    int rc = cyw43_arch_init_with_country(WIFI_COUNTRY);
+    if (rc != 0) {
+        printf("[NetworkAdapter] ERROR: CYW43 init failed (country=%d, rc=%d)\n",
+               WIFI_COUNTRY, rc);
+        // Fallback to default init (mirrors pico-examples blink)
+        rc = cyw43_arch_init();
+        if (rc != 0) {
+            printf("[NetworkAdapter] ERROR: CYW43 default init failed (rc=%d)\n", rc);
+            return -1;
+        }
     }
     cyw43_chip_initialized = true;
     return 0;
