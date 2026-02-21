@@ -65,7 +65,22 @@ int main() {
     version_print_info();
     
     printf("Viking Bio Matter Bridge starting...\n");
-    
+
+    // CYW43 / WiFi chip must be initialized FIRST, before any other hardware.
+    // pico_cyw43_arch_lwip_threadsafe_background claims a hardware alarm and a
+    // software IRQ during its async-context setup. Calling it after
+    // storage_adapter_init() (which disables IRQs for flash erase/program) or
+    // after serial_handler_init() (UART0 IRQ) has been observed to leave the
+    // async context in a state where the CYW43 IRQ never fires, causing
+    // cyw43_arch_init_with_country() to hang indefinitely on hardware.
+    // All Pico W SDK examples initialize CYW43 immediately after stdio_init_all().
+    // The network_adapter_init() call in platform_manager_init() (Step 3/4) will
+    // see wifi_initialized==true and return 0 immediately (no-op).
+    printf("Initializing CYW43439 WiFi chip (early)...\n");
+    if (network_adapter_init() != 0) {
+        printf("[Main] WARNING: Early CYW43 init failed - WiFi will be unavailable\n");
+    }
+
     // Initialize components in order
     printf("Initializing Viking Bio protocol parser...\n");
     viking_bio_init();
