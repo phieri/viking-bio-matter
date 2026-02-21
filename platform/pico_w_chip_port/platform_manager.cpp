@@ -22,7 +22,6 @@ extern "C" {
 // Forward declarations of adapter functions
 extern "C" {
 int network_adapter_init(void);
-int network_adapter_early_init(void);
 int network_adapter_connect(const char *ssid, const char *password);
 int network_adapter_save_and_connect(const char *ssid, const char *password);
 bool network_adapter_is_connected(void);
@@ -145,24 +144,11 @@ int platform_manager_init(void) {
     printf("Matter Platform Manager for Pico W\n");
     printf("===================================\n\n");
 
-    // LED feedback depends on CYW43 being initialized.
-    // network_adapter_early_init() is idempotent, so this is safe even if main()
-    // already performed early init.
-    // Attempt early init here as a safety net in case main() early init failed.
-    bool led_available = (network_adapter_early_init() == 0);
-
     // Initialize crypto first (needed for other components)
     printf("Step 1/4: Initializing cryptography...\n");
     if (crypto_adapter_init() != 0) {
         printf("[PlatformManager] ERROR: Failed to initialize crypto adapter\n");
         return -1;
-    }
-    // 1 quick blink: crypto ready
-    if (led_available) {
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-        sleep_ms(100);
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-        sleep_ms(100);
     }
 
     // Initialize storage
@@ -209,31 +195,12 @@ int platform_manager_init(void) {
         
         printf("[OK] Discriminator saved to flash\n");
     }
-    // 2 quick blinks: storage and discriminator ready
-    if (led_available) {
-        for (int i = 0; i < 2; i++) {
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-            sleep_ms(100);
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-            sleep_ms(100);
-        }
-    }
 
     // Initialize network
     printf("\nStep 3/4: Initializing network...\n");
     if (network_adapter_init() != 0) {
         printf("[PlatformManager] ERROR: Failed to initialize network adapter\n");
         return -1;
-    }
-    
-    // Fast blink LED to indicate network initialization complete
-    if (led_available) {
-        for (int i = 0; i < 5; i++) {
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-            sleep_ms(100);
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-            sleep_ms(100);
-        }
     }
     
     // Initialize BLE for Matter commissioning
@@ -243,15 +210,6 @@ int platform_manager_init(void) {
         return -1;
     }
     printf("[OK] BLE initialized\n");
-    // 3 quick blinks: BLE ready
-    if (led_available) {
-        for (int i = 0; i < 3; i++) {
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-            sleep_ms(100);
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-            sleep_ms(100);
-        }
-    }
     
     // Initialize DNS-SD for Matter device discovery
     printf("\nInitializing DNS-SD...\n");
