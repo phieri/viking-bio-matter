@@ -73,23 +73,27 @@ int main() {
     printf("Initializing serial handler...\n");
     serial_handler_init();
 
-    // Initialize multicore coordination
+    // Initialize multicore coordination (queue only - Core 1 launched after CYW43 init)
     printf("\nInitializing multicore support...\n");
     if (multicore_coordinator_init() != 0) {
         printf("[Main] ERROR: Failed to initialize multicore coordinator\n");
         printf("[Main] Device will continue in single-core mode\n");
-    } else {
-        // Launch core 1 for Matter/network processing
-        if (multicore_coordinator_launch_core1() == 0) {
-            printf("[OK] Multicore enabled: Core 0 (serial/LED), Core 1 (Matter/network)\n");
-        } else {
-            printf("WARNING: Failed to launch core 1\n");
-            printf("         Device will continue in single-core mode\n");
-        }
     }
 
+    // Initialize Matter bridge BEFORE launching Core 1.
+    // cyw43_arch_init_with_country() (called via platform_manager_init inside
+    // matter_bridge_init) must complete before multicore_launch_core1(), otherwise
+    // the lwIP threadsafe-background async-context setup deadlocks with Core 1 running.
     printf("Initializing Matter bridge...\n");
     matter_bridge_init();
+
+    // Launch Core 1 for Matter/network processing now that CYW43 is initialized
+    if (multicore_coordinator_launch_core1() == 0) {
+        printf("[OK] Multicore enabled: Core 0 (serial/LED), Core 1 (Matter/network)\n");
+    } else {
+        printf("WARNING: Failed to launch core 1\n");
+        printf("         Device will continue in single-core mode\n");
+    }
     multicore_coordinator_signal_ready();
 
     printf("Initialization complete. Reading serial data...\n");
