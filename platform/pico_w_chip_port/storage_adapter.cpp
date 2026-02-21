@@ -13,6 +13,8 @@
 // Include mutex header for LittleFS thread safety
 #include "pico/mutex.h"
 
+#include "multicore_coordinator.h"
+
 #ifdef LIB_PICO_MULTICORE
 #include "pico/multicore.h"
 #endif
@@ -75,19 +77,16 @@ int storage_adapter_init(void) {
         return -1;
     }
 
-    // Core 1 is not running yet at this point in startup.
-    // pico-lfs calls multicore_lockout_start_blocking() during flash erase/program,
-    // which hangs indefinitely waiting for Core 1 to respond as a lockout victim.
-    // Disable multicore lockout until Core 1 registers via
-    // storage_adapter_enable_multicore_lockout() (called after multicore_launch_core1).
-    //
-    // Note: We access pico_lfs_context.multicore_lockout_enabled directly because
-    // pico-lfs (pico-lfs commit 8cddb68) exposes this field in the public header
-    // (pico_lfs.h) but provides no API function to change it at runtime.
+    // If Core 1 is not yet running, disable multicore lockout to avoid hangs
+    // while pico-lfs performs flash erase/program before multicore_lockout_victim_init().
+    // During this early initialization stage Core 1 state is stable (it is either
+    // not started or sitting in its wait loop), so this one-time decision is safe.
+    // Once Core 1 is running (it registers as a lockout victim, then immediately
+    // sets core1_running true), leave lockout enabled for flash safety.
 #ifdef LIB_PICO_MULTICORE
     {
         struct pico_lfs_context *pico_ctx = (struct pico_lfs_context *)lfs_cfg->context;
-        pico_ctx->multicore_lockout_enabled = false;
+        pico_ctx->multicore_lockout_enabled = multicore_coordinator_is_core1_running();
     }
 #endif
 
@@ -128,7 +127,8 @@ void storage_adapter_enable_multicore_lockout(void) {
     // Re-enable multicore lockout after Core 1 has called multicore_lockout_victim_init().
     // This must be called only after Core 1 is running and registered as a lockout victim.
     if (!lfs_cfg) {
-        printf("[Storage] WARNING: storage_adapter_enable_multicore_lockout called before storage_adapter_init\n");
+        // Safe no-op if storage not initialized yet. Multicore now starts earlier,
+        // so this helper may be invoked before storage_adapter_init completes.
         return;
     }
 #ifdef LIB_PICO_MULTICORE

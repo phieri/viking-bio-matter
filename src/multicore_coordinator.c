@@ -9,6 +9,7 @@
 #include "platform_manager.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdatomic.h>
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "pico/util/queue.h"
@@ -18,8 +19,9 @@
 static queue_t viking_data_queue;
 
 // Core 1 state
-static volatile bool core1_running = false;
-static volatile bool core1_should_exit = false;
+static _Atomic bool core1_running = false;
+static _Atomic bool core1_should_exit = false;
+static _Atomic bool core1_ready_for_work = false;
 
 // Statistics (only updated from Core 1, read from Core 0)
 // Note: These are only incremented on Core 1, so no atomic operations needed
@@ -41,7 +43,19 @@ static void core1_entry(void) {
     multicore_lockout_victim_init();
 
     printf("Core 1: Started\n");
-    core1_running = true;
+    // Storage adapter relies on this ordering: we mark Core 1 running only
+    // after the lockout victim registration above has completed.
+    __atomic_store_n(&core1_running, true, __ATOMIC_RELEASE);
+    // Wait in a ready state (multicore_lockout_victim_init() above has already completed)
+    // until Core 0 finishes platform initialization so Core 1 does not run
+    // network/Matter tasks while flash/storage setup is still in progress.
+    while (true) {
+        __wfe();
+        if (__atomic_load_n(&core1_ready_for_work, __ATOMIC_ACQUIRE) ||
+            __atomic_load_n(&core1_should_exit, __ATOMIC_ACQUIRE)) {
+            break;
+        }
+    }
     
     viking_bio_data_t data;
     
@@ -142,4 +156,9 @@ void multicore_coordinator_get_stats(uint32_t *messages_processed, uint32_t *dat
     if (data_updates_processed) {
         *data_updates_processed = core1_data_updates_processed;
     }
+}
+
+void multicore_coordinator_signal_ready(void) {
+    __atomic_store_n(&core1_ready_for_work, true, __ATOMIC_RELEASE);
+    __sev();
 }
