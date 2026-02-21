@@ -13,12 +13,6 @@
 // Include mutex header for LittleFS thread safety
 #include "pico/mutex.h"
 
-#include "multicore_coordinator.h"
-
-#ifdef LIB_PICO_MULTICORE
-#include "pico/multicore.h"
-#endif
-
 #include "pico_lfs.h"
 
 // Storage configuration
@@ -76,19 +70,6 @@ int storage_adapter_init(void) {
         printf("[Storage] ERROR: Failed to initialize LittleFS configuration\n");
         return -1;
     }
-
-    // If Core 1 is not yet running, disable multicore lockout to avoid hangs
-    // while pico-lfs performs flash erase/program before multicore_lockout_victim_init().
-    // During this early initialization stage Core 1 state is stable (it is either
-    // not started or sitting in its wait loop), so this one-time decision is safe.
-    // Once Core 1 is running (it registers as a lockout victim, then immediately
-    // sets core1_running true), leave lockout enabled for flash safety.
-#ifdef LIB_PICO_MULTICORE
-    {
-        struct pico_lfs_context *pico_ctx = (struct pico_lfs_context *)lfs_cfg->context;
-        pico_ctx->multicore_lockout_enabled = multicore_coordinator_is_core1_running();
-    }
-#endif
 
     // Try to mount the filesystem
     int err = lfs_mount(&lfs, lfs_cfg);

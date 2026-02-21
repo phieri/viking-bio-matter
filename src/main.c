@@ -12,7 +12,6 @@
 #include "network_adapter.h"
 #include "platform_manager.h"
 #include "matter_minimal/matter_protocol.h"
-#include "multicore_coordinator.h"
 #include "version.h"
 
 // Event system for efficient interrupt-driven architecture
@@ -58,13 +57,6 @@ uint32_t calculate_next_wakeup(uint32_t led_tick_off_time, bool led_tick_active)
 int main() {
     // Initialize standard I/O
     stdio_init_all();
-    sleep_ms(10000);  // 10s delay for hardware troubleshooting (USB serial attach)
-
-    // Print version information
-    printf("\n");
-    version_print_info();
-    
-    printf("Viking Bio Matter Bridge starting...\n");
 
     // Initialize CYW43 WiFi chip first, before any other hardware.
     // cyw43_arch_init() (via network_adapter_init) must run before:
@@ -76,6 +68,13 @@ int main() {
     if (network_adapter_init() != 0) {
         printf("[Main] WARNING: CYW43 pre-init failed - will retry in platform_manager_init\n");
     }
+    sleep_ms(10000);  // 10s delay for hardware troubleshooting (USB serial attach)
+
+    // Print version information
+    printf("\n");
+    version_print_info();
+    
+    printf("Viking Bio Matter Bridge starting...\n");
 
     // Initialize components in order
     printf("Initializing Viking Bio protocol parser...\n");
@@ -84,19 +83,9 @@ int main() {
     printf("Initializing serial handler...\n");
     serial_handler_init();
 
-    // Initialize multicore coordination (inter-core queue)
-    printf("\nInitializing coordinator...\n");
-    if (multicore_coordinator_init() != 0) {
-        printf("[Main] ERROR: Failed to initialize coordinator\n");
-    }
-
     // Initialize Matter bridge (platform, storage, network, BLE, DNS-SD, attributes)
     printf("Initializing Matter bridge...\n");
     matter_bridge_init();
-
-    // Attempt to launch Core 1 (no-op when pico_multicore not linked)
-    multicore_coordinator_launch_core1();
-    multicore_coordinator_signal_ready();
 
     printf("Initialization complete. Reading serial data...\n");
     
@@ -122,7 +111,6 @@ int main() {
     uint32_t led_tick_off_time = 0;  // Timestamp when LED tick should turn off
     bool led_tick_active = false;    // Track if LED tick is active
     uint32_t led_grace_period_end = 0;  // Timestamp when grace period after tick ends
-    uint32_t queue_overflow_count = 0;  // Track queue overflows for rate-limited logging
     
     while (true) {
         // Track if any work was done this iteration
@@ -159,21 +147,8 @@ int main() {
                         timeout_triggered = false;
                     }
                     
-                    // Send Viking Bio data to core 1 for Matter attribute updates
-                    // Falls back to direct call if multicore not running
-                    if (multicore_coordinator_is_core1_running()) {
-                        if (multicore_coordinator_send_data(&viking_data) != 0) {
-                            // Queue full - count overflow and log periodically (every 10 overflows)
-                            queue_overflow_count++;
-                            if (queue_overflow_count % 10 == 1) {
-                                printf("Warning: Viking Bio data queue full (%lu overflows)\n", 
-                                       (unsigned long)queue_overflow_count);
-                            }
-                        }
-                    } else {
-                        // Fallback: update attributes directly on core 0
-                        matter_bridge_update_attributes(&viking_data);
-                    }
+                    // Update attributes directly on core 0
+                    matter_bridge_update_attributes(&viking_data);
                     
                     // Log data to USB serial
                     printf("Flame: %s, Fan Speed: %d%%, Temp: %d°C\n",
@@ -186,8 +161,7 @@ int main() {
         }
         
         // Process Matter messages
-        // Only run on core 0 if multicore is not active (fallback mode)
-        if (!multicore_coordinator_is_core1_running() && matter_bridge_task()) {
+        if (matter_bridge_task()) {
             work_done = true;
         }
         
@@ -210,12 +184,7 @@ int main() {
                 };
                 
                 // Update Matter attributes with cleared state
-                // Send to core 1 if multicore is running, otherwise update directly
-                if (multicore_coordinator_is_core1_running()) {
-                    multicore_coordinator_send_data(&cleared_data);
-                } else {
-                    matter_bridge_update_attributes(&cleared_data);
-                }
+                matter_bridge_update_attributes(&cleared_data);
             }
             
             // Check if WiFi is connected and BLE commissioning should be stopped

@@ -96,7 +96,6 @@ set(SOURCES
     src/serial_handler.c
     src/matter_bridge.cpp
     src/viking_bio_protocol.c
-    src/multicore_coordinator.c
     platform/pico_w_chip_port/network_adapter.cpp
     platform/pico_w_chip_port/storage_adapter.cpp
     platform/pico_w_chip_port/crypto_adapter.cpp
