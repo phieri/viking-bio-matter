@@ -174,7 +174,6 @@ target_link_libraries(viking_bio_matter
 
 # LittleFS compile definitions
 target_compile_definitions(viking_bio_matter PRIVATE
-    LFS_THREADSAFE=1
     LFS_NO_DEBUG=1
 )
 
@@ -225,4 +224,3 @@ if(PICO_PLATFORM)
     add_subdirectory(src/matter_minimal/clusters)
     add_subdirectory(src/matter_minimal/discovery)
 endif()
-

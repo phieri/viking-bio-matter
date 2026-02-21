@@ -1,7 +1,6 @@
 #include <string.h>
 #include <stdio.h>
 #include "pico/stdlib.h"
-#include "pico/critical_section.h"
 #include "matter_bridge.h"
 #include "../platform/pico_w_chip_port/platform_manager.h"
 #include "../platform/pico_w_chip_port/matter_attributes.h"
@@ -36,9 +35,7 @@ static uint32_t flame_on_timestamp = 0;  // Timestamp when flame turned on (mill
 
 // Matter bridge state
 static bool initialized = false;
-
-// Critical section for thread-safe attribute access
-static critical_section_t bridge_lock;
+// Bridge attribute state is updated/read from the single-threaded main loop.
 
 extern "C" {
 
@@ -47,9 +44,6 @@ void matter_bridge_init(void) {
     printf("==========================================\n");
     printf("  Viking Bio Matter Bridge - Full Mode\n");
     printf("==========================================\n\n");
-    
-    // Initialize critical section for thread safety
-    critical_section_init(&bridge_lock);
     
     // Load operational hours from flash storage
     uint32_t stored_hours = 0;
@@ -190,7 +184,6 @@ void matter_bridge_update_flame(bool flame_on) {
     
     uint32_t current_time = to_ms_since_boot(get_absolute_time());
     
-    critical_section_enter_blocking(&bridge_lock);
     bool changed = (attributes.flame_state != flame_on);
     if (changed) {
         // Track operational hours when flame state changes
@@ -219,7 +212,6 @@ void matter_bridge_update_flame(bool flame_on) {
         last_flame_state = flame_on;
         attributes.last_update_time = current_time;
     }
-    critical_section_exit(&bridge_lock);
     
     if (changed) {
         printf("Matter: OnOff cluster updated - Flame %s\n", flame_on ? "ON" : "OFF");
@@ -248,13 +240,11 @@ void matter_bridge_update_fan_speed(uint8_t speed) {
         return;
     }
     
-    critical_section_enter_blocking(&bridge_lock);
     bool changed = (attributes.fan_speed != speed);
     if (changed) {
         attributes.fan_speed = speed;
         attributes.last_update_time = to_ms_since_boot(get_absolute_time());
     }
-    critical_section_exit(&bridge_lock);
     
     if (changed) {
         printf("Matter: LevelControl cluster updated - Fan speed %d%%\n", speed);
@@ -277,13 +267,11 @@ void matter_bridge_update_temperature(uint16_t temp) {
         return;
     }
     
-    critical_section_enter_blocking(&bridge_lock);
     bool changed = (attributes.temperature != temp);
     if (changed) {
         attributes.temperature = temp;
         attributes.last_update_time = to_ms_since_boot(get_absolute_time());
     }
-    critical_section_exit(&bridge_lock);
     
     if (changed) {
         printf("Matter: TemperatureMeasurement cluster updated - %d°C\n", temp);
@@ -318,7 +306,6 @@ void matter_bridge_update_diagnostics(uint8_t error_code) {
         return;
     }
     
-    critical_section_enter_blocking(&bridge_lock);
     bool changed = (attributes.error_code != error_code);
     if (changed) {
         attributes.error_code = error_code;
@@ -333,7 +320,6 @@ void matter_bridge_update_diagnostics(uint8_t error_code) {
         
         attributes.last_update_time = to_ms_since_boot(get_absolute_time());
     }
-    critical_section_exit(&bridge_lock);
     
     if (changed) {
         printf("Matter: Diagnostics cluster updated - Error code: 0x%02X, State: %s, Faults: %d\n",
@@ -389,9 +375,7 @@ bool matter_bridge_task(void) {
 
 void matter_bridge_get_attributes(matter_attributes_t *attrs) {
     if (attrs != NULL && initialized) {
-        critical_section_enter_blocking(&bridge_lock);
         memcpy(attrs, &attributes, sizeof(matter_attributes_t));
-        critical_section_exit(&bridge_lock);
     }
 }
 

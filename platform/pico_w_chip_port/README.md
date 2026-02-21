@@ -254,7 +254,6 @@ Flash storage layout with LittleFS:
   - Automatic wear leveling to extend flash lifespan
   - Power-loss resilient operations
   - Efficient space utilization
-  - Thread-safe operations (when compiled with LFS_THREADSAFE=1)
 
 Adjust storage size if needed:
 

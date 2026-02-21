@@ -9,12 +9,11 @@ This directory contains a functional Matter attribute management system for the 
 ### Core System
 
 #### `matter_attributes.h` / `matter_attributes.cpp`
-Thread-safe attribute storage and management system:
+Attribute storage and management system:
 - **Attribute Registration**: Register Matter clusters/attributes with proper types
 - **Value Storage**: Store and retrieve attribute values
 - **Change Detection**: Automatically detect when values change
 - **Subscription System**: Callback-based notification for attribute changes
-- **Thread Safety**: Uses Pico SDK critical sections for concurrent access
 
 #### `matter_reporter.cpp` / `matter_reporter.h`
 Example subscriber that demonstrates the attribute reporting system:
@@ -50,12 +49,7 @@ Unlike the previous stub implementation, this system actually:
 - Callback-based notifications
 - Easy to extend for network transport layers
 
-### 4. Thread Safety
-- Uses Pico SDK critical sections
-- Safe for multi-threaded or interrupt-driven updates
-- Prevents race conditions in attribute access
-
-### 5. Matter Compliance
+### 4. Matter Compliance
 - Uses correct Matter cluster IDs
 - Proper attribute types per Matter specification
 - Temperature in centidegrees (Matter requirement)
@@ -241,7 +235,6 @@ This implementation provides a **functional** Matter attribute management system
 - ✅ Detects changes before reporting
 - ✅ Provides extensible subscription mechanism
 - ✅ Uses correct Matter cluster/attribute structure
-- ✅ Is thread-safe for embedded environments
 - ✅ Can be extended with network transport or full SDK
 
 It's no longer just logging - it's a working attribute management system ready for integration with network layers or the full Matter SDK.

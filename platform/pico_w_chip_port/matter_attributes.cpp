@@ -8,7 +8,6 @@
 #include <inttypes.h>
 #include <string.h>
 #include "pico/stdlib.h"
-#include "pico/critical_section.h"
 
 // Maximum number of attributes we can track
 #define MAX_ATTRIBUTES 16
@@ -23,17 +22,12 @@ static bool subscriber_active[MATTER_MAX_SUBSCRIBERS];
 
 // Initialization flag
 static bool initialized = false;
-
-// Critical section for thread safety
-static critical_section_t attr_lock;
+// Access is expected from the single-threaded main loop only.
 
 int matter_attributes_init(void) {
     if (initialized) {
         return 0;
     }
-    
-    // Initialize critical section for thread safety
-    critical_section_init(&attr_lock);
     
     // Clear all attributes
     memset(attributes, 0, sizeof(attributes));
@@ -61,14 +55,11 @@ int matter_attributes_register(uint8_t endpoint, uint32_t cluster_id,
         return -1;
     }
     
-    critical_section_enter_blocking(&attr_lock);
-    
     // Check if attribute already exists
     for (size_t i = 0; i < attribute_count; i++) {
         if (attributes[i].endpoint == endpoint &&
             attributes[i].cluster_id == cluster_id &&
             attributes[i].attribute_id == attribute_id) {
-            critical_section_exit(&attr_lock);
             printf("Matter: Attribute already registered (EP:%u, CL:0x%04lX, AT:0x%04lX)\n",
                    endpoint, (unsigned long)cluster_id, (unsigned long)attribute_id);
             return 0;  // Already registered
@@ -90,8 +81,6 @@ int matter_attributes_register(uint8_t endpoint, uint32_t cluster_id,
     }
     
     attribute_count++;
-    
-    critical_section_exit(&attr_lock);
     
     printf("Matter: Registered attribute (EP:%u, CL:0x%04" PRIx32 ", AT:0x%04" PRIx32 ")\n",
            endpoint, cluster_id, attribute_id);
@@ -131,11 +120,8 @@ int matter_attributes_update(uint8_t endpoint, uint32_t cluster_id,
         return -1;
     }
     
-    critical_section_enter_blocking(&attr_lock);
-    
     matter_attribute_t *attr = find_attribute(endpoint, cluster_id, attribute_id);
     if (!attr) {
-        critical_section_exit(&attr_lock);
         printf("Matter: WARNING - Attribute not found (EP:%u, CL:0x%04" PRIx32 ", AT:0x%04" PRIx32 ")\n",
                endpoint, cluster_id, attribute_id);
         return -1;
@@ -154,8 +140,6 @@ int matter_attributes_update(uint8_t endpoint, uint32_t cluster_id,
                 active_subscribers[active_count++] = subscribers[i];
             }
         }
-        
-        critical_section_exit(&attr_lock);
         
         // Log the change
         printf("Matter: Attribute changed (EP:%u, CL:0x%04" PRIx32 ", AT:0x%04" PRIx32 ") = ",
@@ -180,8 +164,6 @@ int matter_attributes_update(uint8_t endpoint, uint32_t cluster_id,
         for (int i = 0; i < active_count; i++) {
             active_subscribers[i](endpoint, cluster_id, attribute_id, value);
         }
-    } else {
-        critical_section_exit(&attr_lock);
     }
     
     return 0;
@@ -193,17 +175,12 @@ int matter_attributes_get(uint8_t endpoint, uint32_t cluster_id,
         return -1;
     }
     
-    critical_section_enter_blocking(&attr_lock);
-    
     matter_attribute_t *attr = find_attribute(endpoint, cluster_id, attribute_id);
     if (!attr) {
-        critical_section_exit(&attr_lock);
         return -1;
     }
     
     *value = attr->value;
-    
-    critical_section_exit(&attr_lock);
     
     return 0;
 }
@@ -213,20 +190,15 @@ int matter_attributes_subscribe(matter_subscriber_callback_t callback) {
         return -1;
     }
     
-    critical_section_enter_blocking(&attr_lock);
-    
     // Find free subscriber slot
     for (int i = 0; i < MATTER_MAX_SUBSCRIBERS; i++) {
         if (!subscriber_active[i]) {
             subscribers[i] = callback;
             subscriber_active[i] = true;
-            critical_section_exit(&attr_lock);
             printf("Matter: Subscriber %d registered\n", i);
             return i;
         }
     }
-    
-    critical_section_exit(&attr_lock);
     printf("[Matter] ERROR: Maximum subscribers reached\n");
     return -1;
 }
@@ -236,12 +208,8 @@ void matter_attributes_unsubscribe(int subscriber_id) {
         return;
     }
     
-    critical_section_enter_blocking(&attr_lock);
-    
     subscriber_active[subscriber_id] = false;
     subscribers[subscriber_id] = NULL;
-    
-    critical_section_exit(&attr_lock);
     
     printf("Matter: Subscriber %d unregistered\n", subscriber_id);
 }
@@ -251,16 +219,12 @@ void matter_attributes_process_reports(void) {
         return;
     }
     
-    // Collect dirty attributes and active subscribers while holding the lock
     matter_attribute_t dirty_attrs[MAX_ATTRIBUTES];
     size_t dirty_count = 0;
     
-    // Also copy subscriber state to avoid race conditions
     matter_subscriber_callback_t active_subscribers[MATTER_MAX_SUBSCRIBERS];
     int active_count = 0;
-    
-    critical_section_enter_blocking(&attr_lock);
-    
+
     // Collect dirty attributes
     for (size_t i = 0; i < attribute_count; i++) {
         if (attributes[i].dirty) {
@@ -276,12 +240,7 @@ void matter_attributes_process_reports(void) {
             active_subscribers[active_count++] = subscribers[s];
         }
     }
-    
-    critical_section_exit(&attr_lock);
-    
-    // Now notify subscribers without holding the lock
-    // Note: Callbacks must not call back into matter_attributes functions
-    // that acquire the lock, as that would cause deadlock
+
     for (size_t i = 0; i < dirty_count; i++) {
         matter_attribute_t *attr = &dirty_attrs[i];
         
@@ -301,15 +260,11 @@ void matter_attributes_clear(void) {
         return;
     }
     
-    critical_section_enter_blocking(&attr_lock);
-    
     memset(attributes, 0, sizeof(attributes));
     attribute_count = 0;
     
     memset(subscribers, 0, sizeof(subscribers));
     memset(subscriber_active, 0, sizeof(subscriber_active));
-    
-    critical_section_exit(&attr_lock);
     
     printf("Matter: All attributes cleared\n");
 }

@@ -453,7 +453,6 @@ The firmware uses **LittleFS** for persistent storage, providing:
 - **Wear Leveling**: Automatically distributes writes across flash memory to extend lifespan
 - **Power-Loss Resilience**: Atomic operations recoverable from unexpected power loss
 - **Efficient**: Dynamic block allocation with minimal overhead
-- **Thread-Safe**: Protected by mutexes when compiled with `LFS_THREADSAFE=1`
 
 **Configuration:**
 - **Location**: Last 256KB of the 2MB flash
