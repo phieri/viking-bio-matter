@@ -58,7 +58,6 @@ uint32_t calculate_next_wakeup(uint32_t led_tick_off_time, bool led_tick_active)
 int main() {
     // Initialize standard I/O
     stdio_init_all();
-    sleep_ms(10000);  // 10s delay for hardware troubleshooting (USB serial attach)
 
     // Print version information
     printf("\n");
@@ -76,6 +75,7 @@ int main() {
     if (network_adapter_init() != 0) {
         printf("[Main] WARNING: CYW43 pre-init failed - will retry in platform_manager_init\n");
     }
+    sleep_ms(10000);  // 10s delay for hardware troubleshooting (USB serial attach)
 
     // Initialize components in order
     printf("Initializing Viking Bio protocol parser...\n");
