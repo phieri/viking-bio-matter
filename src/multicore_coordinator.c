@@ -9,6 +9,7 @@
 #include "platform_manager.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdatomic.h>
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "pico/util/queue.h"
@@ -18,9 +19,9 @@
 static queue_t viking_data_queue;
 
 // Core 1 state
-static volatile bool core1_running = false;
-static volatile bool core1_should_exit = false;
-static volatile bool core1_ready_for_work = false;
+static _Atomic bool core1_running = false;
+static _Atomic bool core1_should_exit = false;
+static _Atomic bool core1_ready_for_work = false;
 
 // Statistics (only updated from Core 1, read from Core 0)
 // Note: These are only incremented on Core 1, so no atomic operations needed
