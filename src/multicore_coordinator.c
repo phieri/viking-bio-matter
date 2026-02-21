@@ -42,6 +42,8 @@ static void core1_entry(void) {
     multicore_lockout_victim_init();
 
     printf("Core 1: Started\n");
+    // Storage adapter relies on this ordering: we mark Core 1 running only
+    // after the lockout victim registration above has completed.
     core1_running = true;
     // Wait in a ready state (core1_entry registers as a lockout victim before this point)
     // until Core 0 finishes platform initialization so Core 1 does not run
@@ -155,7 +157,7 @@ void multicore_coordinator_get_stats(uint32_t *messages_processed, uint32_t *dat
 }
 
 void multicore_coordinator_signal_ready(void) {
-    __dsb();
     core1_ready_for_work = true;
+    __dsb();
     __sev();
 }
