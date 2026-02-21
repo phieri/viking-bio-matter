@@ -165,6 +165,14 @@ target_compile_definitions(viking_bio_matter PRIVATE
     LFS_NO_DEBUG=1
 )
 
+# Place BTstack flash bank (8KB) immediately before the LittleFS storage area
+# (last 256KB of flash) to prevent overlap.  Without this, BTstack defaults to
+# the very end of flash which falls inside the LittleFS region, corrupting both
+# BTstack bonding data and LittleFS metadata.
+target_compile_definitions(viking_bio_matter PRIVATE
+    "PICO_FLASH_BANK_STORAGE_OFFSET=(PICO_FLASH_SIZE_BYTES - (256 * 1024) - (FLASH_SECTOR_SIZE * 2))"
+)
+
 # Enable USB output, disable UART output
 pico_enable_stdio_usb(viking_bio_matter 1)
 pico_enable_stdio_uart(viking_bio_matter 0)
