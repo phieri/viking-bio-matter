@@ -31,18 +31,17 @@ static char current_instance_name[17] = {0}; // 16 hex chars + null
 
 // Generate a fresh 64-bit random instance name per Matter spec (16 upper-hex chars)
 static void generate_instance_name(void) {
+    uint32_t r1 = get_rand_32();
+    uint32_t r2 = get_rand_32();
     uint8_t random_bytes[8];
-    for (int i = 0; i < 8; i++) {
-        // get_rand_32() is hardware-backed; use one byte at a time to avoid bias
-        random_bytes[i] = (uint8_t)(get_rand_32() & 0xFF);
-    }
+    memcpy(random_bytes, &r1, sizeof(r1));
+    memcpy(random_bytes + 4, &r2, sizeof(r2));
 
     // Uppercase hex string, zero-terminated
     snprintf(current_instance_name, sizeof(current_instance_name),
              "%02X%02X%02X%02X%02X%02X%02X%02X",
              random_bytes[0], random_bytes[1], random_bytes[2], random_bytes[3],
              random_bytes[4], random_bytes[5], random_bytes[6], random_bytes[7]);
-    current_instance_name[16] = '\0';
 }
 
 // TXT record callback - adds Matter-specific TXT records
