@@ -22,6 +22,7 @@ static bool subscriber_active[MATTER_MAX_SUBSCRIBERS];
 
 // Initialization flag
 static bool initialized = false;
+// Access is expected from the single-threaded main loop only.
 
 int matter_attributes_init(void) {
     if (initialized) {

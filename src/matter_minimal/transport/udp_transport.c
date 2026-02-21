@@ -44,6 +44,8 @@ static struct {
     .initialized = false
 };
 
+// Transport queue access assumes the cooperative single-threaded poll loop.
+
 /**
  * Convert lwIP ip_addr_t to matter_transport_addr_t
  */

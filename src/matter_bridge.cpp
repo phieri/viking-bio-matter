@@ -35,6 +35,7 @@ static uint32_t flame_on_timestamp = 0;  // Timestamp when flame turned on (mill
 
 // Matter bridge state
 static bool initialized = false;
+// Bridge attribute state is updated/read from the single-threaded main loop.
 
 extern "C" {
 
