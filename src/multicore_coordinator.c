@@ -43,8 +43,9 @@ static void core1_entry(void) {
 
     printf("Core 1: Started\n");
     core1_running = true;
-    // Wait until Core 0 finishes platform initialization so Core 1 does not
-    // run network/Matter tasks while flash/storage setup is still in progress.
+    // Wait in a ready state (after registering as a lockout victim) until Core 0
+    // finishes platform initialization so Core 1 does not run network/Matter tasks
+    // while flash/storage setup is still in progress.
     __dsb();
     __sev();
     while (!core1_ready_for_work && !core1_should_exit) {
