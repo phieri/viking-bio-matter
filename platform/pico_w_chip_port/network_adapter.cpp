@@ -31,30 +31,9 @@ typedef enum {
 
 static bool wifi_connected = false;
 static bool wifi_initialized = false;
-static bool cyw43_chip_initialized = false;  // Tracks CYW43 chip init separately for early LED use
 static network_mode_t current_mode = NETWORK_MODE_NONE;
 
 extern "C" {
-
-int network_adapter_early_init(void) {
-    if (cyw43_chip_initialized) {
-        return 0;
-    }
-    // Initialize CYW43 chip only - makes LED available before full network setup
-    int rc = cyw43_arch_init_with_country(WIFI_COUNTRY);
-    if (rc != 0) {
-        printf("[NetworkAdapter] ERROR: CYW43 init failed (country=%d, rc=%d)\n",
-               WIFI_COUNTRY, rc);
-        // Fallback to default init (mirrors pico-examples blink)
-        rc = cyw43_arch_init();
-        if (rc != 0) {
-            printf("[NetworkAdapter] ERROR: CYW43 default init failed (rc=%d)\n", rc);
-            return -1;
-        }
-    }
-    cyw43_chip_initialized = true;
-    return 0;
-}
 
 int network_adapter_init(void) {
     if (wifi_initialized) {
@@ -63,13 +42,9 @@ int network_adapter_init(void) {
 
     printf("Initializing CYW43439 WiFi adapter...\n");
 
-    // Initialize CYW43 chip if not already done by early init
-    if (!cyw43_chip_initialized) {
-        if (cyw43_arch_init_with_country(WIFI_COUNTRY)) {
-            printf("[NetworkAdapter] ERROR: Failed to initialize CYW43 WiFi chip\n");
-            return -1;
-        }
-        cyw43_chip_initialized = true;
+    if (cyw43_arch_init_with_country(WIFI_COUNTRY)) {
+        printf("[NetworkAdapter] ERROR: Failed to initialize CYW43 WiFi chip\n");
+        return -1;
     }
 
     wifi_initialized = true;
