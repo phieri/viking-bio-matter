@@ -58,22 +58,6 @@ uint32_t calculate_next_wakeup(uint32_t led_tick_off_time, bool led_tick_active)
 int main() {
     // Initialize standard I/O
     stdio_init_all();
-
-    // CYW43 / WiFi chip MUST be initialized immediately after stdio_init_all(),
-    // before ANY other code including sleep_ms(). Every working Pico W SDK example
-    // follows this pattern. The pico_cyw43_arch_lwip_threadsafe_background async
-    // context (hardware alarm + user IRQ) must be set up in a clean hardware state.
-    // Calling cyw43_arch_init() after a long sleep_ms() (during which the USB CDC
-    // SOF interrupt fires at 1kHz, touching the alarm pool repeatedly) leaves the
-    // alarm pool and/or IRQ priority arbitration in a state where cyw43_arch_init()
-    // hangs indefinitely on hardware.
-    // The network_adapter_init() call in platform_manager_init() (Step 3/4) will
-    // see wifi_initialized==true and return 0 immediately (no-op).
-    if (network_adapter_init() != 0) {
-        // Non-fatal: continue without WiFi (LED and serial still work)
-        // Will be retried in platform_manager_init() if needed
-    }
-
     sleep_ms(10000);  // 10s delay for hardware troubleshooting (USB serial attach)
 
     // Print version information
@@ -81,6 +65,17 @@ int main() {
     version_print_info();
     
     printf("Viking Bio Matter Bridge starting...\n");
+
+    // Initialize CYW43 WiFi chip first, before any other hardware.
+    // cyw43_arch_init() (via network_adapter_init) must run before:
+    //   - serial_handler_init() (UART0 IRQ)
+    //   - storage_adapter_init() (flash operations with save_and_disable_interrupts)
+    // The subsequent call from platform_manager_init() (Step 3/4) will see
+    // wifi_initialized==true and return 0 immediately (no-op).
+    printf("Pre-initializing CYW43439 WiFi chip...\n");
+    if (network_adapter_init() != 0) {
+        printf("[Main] WARNING: CYW43 pre-init failed - will retry in platform_manager_init\n");
+    }
 
     // Initialize components in order
     printf("Initializing Viking Bio protocol parser...\n");

@@ -13,6 +13,22 @@ endif()
 add_compile_definitions(MBEDTLS_ALLOW_PRIVATE_ACCESS)
 set(PICO_MBEDTLS_CONFIG_HEADER "${CMAKE_CURRENT_LIST_DIR}/platform/pico_w_chip_port/config/mbedtls_config.h" CACHE STRING "Custom mbedTLS config" FORCE)
 
+# Place BTstack flash bank (8KB) immediately before the LittleFS storage area
+# (last 256KB of flash) to prevent overlap.  Without this, BTstack defaults to
+# the very end of flash (2MB - 8KB = 0x1FE000), which falls INSIDE the LittleFS
+# region (0x1C0000-0x200000).  When cyw43_arch_init() calls btstack_cyw43_init()
+# -> setup_tlv() -> btstack_tlv_flash_bank_init_instance(), the TLV scanner reads
+# LittleFS data from 0x1FE000.  A record 'len' field in that data can cause a
+# uint32_t offset overflow in the scan loop, producing an infinite loop and the
+# startup hang seen at "Initializing CYW43439 WiFi adapter...".
+#
+# MUST use add_compile_definitions() (global, before pico_sdk_init) so the
+# definition is visible when the SDK's pico_btstack_flash_bank.c is compiled.
+# target_compile_definitions(... PRIVATE ...) would only apply to our own sources.
+add_compile_definitions(
+    "PICO_FLASH_BANK_STORAGE_OFFSET=(PICO_FLASH_SIZE_BYTES - (256 * 1024) - (FLASH_SECTOR_SIZE * 2))"
+)
+
 # Initialize the Pico SDK
 include(pico_sdk_import.cmake)
 
@@ -163,14 +179,6 @@ target_link_libraries(viking_bio_matter
 target_compile_definitions(viking_bio_matter PRIVATE
     LFS_THREADSAFE=1
     LFS_NO_DEBUG=1
-)
-
-# Place BTstack flash bank (8KB) immediately before the LittleFS storage area
-# (last 256KB of flash) to prevent overlap.  Without this, BTstack defaults to
-# the very end of flash which falls inside the LittleFS region, corrupting both
-# BTstack bonding data and LittleFS metadata.
-target_compile_definitions(viking_bio_matter PRIVATE
-    "PICO_FLASH_BANK_STORAGE_OFFSET=(PICO_FLASH_SIZE_BYTES - (256 * 1024) - (FLASH_SECTOR_SIZE * 2))"
 )
 
 # Enable USB output, disable UART output
