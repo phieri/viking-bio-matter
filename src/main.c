@@ -73,11 +73,6 @@ int main() {
     printf("Initializing serial handler...\n");
     serial_handler_init();
 
-    printf("Initializing Matter bridge...\n");
-    matter_bridge_init();
-
-    printf("Initialization complete. Reading serial data...\n");
-    
     // Initialize multicore coordination
     printf("\nInitializing multicore support...\n");
     if (multicore_coordinator_init() != 0) {
@@ -92,6 +87,12 @@ int main() {
             printf("         Device will continue in single-core mode\n");
         }
     }
+
+    printf("Initializing Matter bridge...\n");
+    matter_bridge_init();
+    multicore_coordinator_signal_ready();
+
+    printf("Initialization complete. Reading serial data...\n");
     
     // Enable watchdog with 8 second timeout for system reliability
     // The watchdog must be updated at least once every 8 seconds

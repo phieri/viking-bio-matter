@@ -64,6 +64,12 @@ bool multicore_coordinator_is_core1_running(void);
  */
 void multicore_coordinator_get_stats(uint32_t *messages_processed, uint32_t *data_updates_processed);
 
+/**
+ * Signal Core 1 that platform initialization has completed and it can
+ * start processing work (network, Matter tasks).
+ */
+void multicore_coordinator_signal_ready(void);
+
 #ifdef __cplusplus
 }
 #endif

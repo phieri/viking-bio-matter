@@ -20,6 +20,7 @@ static queue_t viking_data_queue;
 // Core 1 state
 static volatile bool core1_running = false;
 static volatile bool core1_should_exit = false;
+static volatile bool core1_ready_for_work = false;
 
 // Statistics (only updated from Core 1, read from Core 0)
 // Note: These are only incremented on Core 1, so no atomic operations needed
@@ -42,6 +43,10 @@ static void core1_entry(void) {
 
     printf("Core 1: Started\n");
     core1_running = true;
+    // Wait until main thread signals that initialization is complete
+    while (!core1_ready_for_work && !core1_should_exit) {
+        tight_loop_contents();
+    }
     
     viking_bio_data_t data;
     
@@ -94,6 +99,7 @@ int multicore_coordinator_launch_core1(void) {
     }
     
     printf("Multicore: Launching core 1 for Matter/network processing...\n");
+    core1_ready_for_work = false;
     
     // Launch core 1
     multicore_launch_core1(core1_entry);
@@ -142,4 +148,8 @@ void multicore_coordinator_get_stats(uint32_t *messages_processed, uint32_t *dat
     if (data_updates_processed) {
         *data_updates_processed = core1_data_updates_processed;
     }
+}
+
+void multicore_coordinator_signal_ready(void) {
+    core1_ready_for_work = true;
 }
