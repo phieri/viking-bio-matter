@@ -13,22 +13,6 @@ endif()
 add_compile_definitions(MBEDTLS_ALLOW_PRIVATE_ACCESS)
 set(PICO_MBEDTLS_CONFIG_HEADER "${CMAKE_CURRENT_LIST_DIR}/platform/pico_w_chip_port/config/mbedtls_config.h" CACHE STRING "Custom mbedTLS config" FORCE)
 
-# Place BTstack flash bank (8KB) immediately before the LittleFS storage area
-# (last 256KB of flash) to prevent overlap.  Without this, BTstack defaults to
-# the very end of flash (2MB - 8KB = 0x1FE000), which falls INSIDE the LittleFS
-# region (0x1C0000-0x200000).  When cyw43_arch_init() calls btstack_cyw43_init()
-# -> setup_tlv() -> btstack_tlv_flash_bank_init_instance(), the TLV scanner reads
-# LittleFS data from 0x1FE000.  A record 'len' field in that data can cause a
-# uint32_t offset overflow in the scan loop, producing an infinite loop and the
-# startup hang seen at "Initializing CYW43439 WiFi adapter...".
-#
-# MUST use add_compile_definitions() (global, before pico_sdk_init) so the
-# definition is visible when the SDK's pico_btstack_flash_bank.c is compiled.
-# target_compile_definitions(... PRIVATE ...) would only apply to our own sources.
-add_compile_definitions(
-    "PICO_FLASH_BANK_STORAGE_OFFSET=(PICO_FLASH_SIZE_BYTES - (256 * 1024) - (FLASH_SECTOR_SIZE * 2))"
-)
-
 # Initialize the Pico SDK
 include(pico_sdk_import.cmake)
 
@@ -165,8 +149,15 @@ target_link_libraries(viking_bio_matter
     pico_mbedtls
     hardware_flash
     pico-lfs
-    pico_btstack_ble
-    pico_btstack_cyw43
+    # pico_btstack_ble and pico_btstack_cyw43 intentionally removed:
+    # Linking them sets CYW43_ENABLE_BLUETOOTH=1, which causes cyw43_arch_init()
+    # to call btstack_cyw43_init() -> setup_tlv() -> btstack_tlv_flash_bank_init_instance().
+    # The TLV scanner reads the BTstack flash bank area. On a device that has run
+    # prior firmware, this area may contain LittleFS page data with a `len` field
+    # of 0xFFFFFFF8 that causes uint32 overflow (offset += 8 + 0xFFFFFFF8 = 0)
+    # resulting in an infinite scan loop — the startup hang seen at
+    # "Initializing CYW43439 WiFi adapter...".  BLE commissioning is handled by
+    # the ble_adapter stub; WiFi provisioning uses the dedicated provisioning flow.
     -Wl,--start-group
     matter_protocol
     matter_tlv
