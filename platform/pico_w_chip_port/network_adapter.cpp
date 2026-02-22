@@ -33,8 +33,32 @@ static network_mode_t current_mode = NETWORK_MODE_NONE;
 extern "C" {
 
 int network_adapter_init(void) {
+    const uint32_t init_start_ms = to_ms_since_boot(get_absolute_time());
+
     printf("[NetworkAdapter] network_adapter_init() called (initialized=%d, connected=%d, mode=%d)\n",
            wifi_initialized ? 1 : 0, wifi_connected ? 1 : 0, (int) current_mode);
+    printf("[NetworkAdapter] init context: uptime=%lu ms, cyw43_arch=%s, bluetooth=%d\n",
+           (unsigned long) init_start_ms,
+#if defined(PICO_CYW43_ARCH_POLL)
+           "poll",
+#elif defined(PICO_CYW43_ARCH_THREADSAFE_BACKGROUND)
+           "threadsafe_background",
+#elif defined(PICO_CYW43_ARCH_FREERTOS)
+           "freertos",
+#else
+           "unknown",
+#endif
+#ifdef CYW43_ENABLE_BLUETOOTH
+           CYW43_ENABLE_BLUETOOTH
+#else
+           -1
+#endif
+    );
+    if (init_start_ms > 2000) {
+        printf("[NetworkAdapter] WARNING: CYW43 init starting late (%lu ms after boot). "
+               "Delayed init can cause startup stalls on Pico W.\n",
+               (unsigned long) init_start_ms);
+    }
 
     if (wifi_initialized) {
         printf("[NetworkAdapter] CYW43 already initialized, skipping init\n");
@@ -42,7 +66,6 @@ int network_adapter_init(void) {
     }
 
     printf("Initializing CYW43439 WiFi adapter...\n");
-    const uint32_t init_start_ms = to_ms_since_boot(get_absolute_time());
     printf("[NetworkAdapter] About to call cyw43_arch_init() at %lu ms since boot\n",
            (unsigned long) init_start_ms);
     fflush(stdout);
