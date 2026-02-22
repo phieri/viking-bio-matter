@@ -45,9 +45,6 @@ static btstack_packet_callback_registration_t hci_event_cb_reg;
 static uint8_t adv_data[31];
 static uint8_t adv_data_len = 0;
 
-/* Device name shown in BLE scans */
-static const char DEVICE_NAME[] = "VikingBio";
-
 /* ------------------------------------------------------------------ */
 /* HCI packet handler                                                   */
 /* ------------------------------------------------------------------ */
@@ -140,8 +137,8 @@ static void build_matter_adv_data(uint16_t discriminator,
     *p++ = 0xFF;        /* UUID high byte */
     /* Payload */
     *p++ = 0x03;                                         /* OpCode=0, CM=3 */
-    *p++ = (uint8_t)(discriminator & 0xFF);              /* disc[7:0]  */
-    *p++ = (uint8_t)((discriminator >> 8) & 0x0F);      /* disc[11:8] */
+    *p++ = (uint8_t)(discriminator & 0xFF);              /* disc[7:0]     */
+    *p++ = (uint8_t)((discriminator >> 8) & 0x0F);      /* disc[11:8], 4 bits */
     *p++ = (uint8_t)(vendor_id  & 0xFF);
     *p++ = (uint8_t)(vendor_id  >> 8);
     *p++ = (uint8_t)(product_id & 0xFF);
@@ -204,13 +201,13 @@ int ble_adapter_start_advertising(uint16_t discriminator,
      *   interval 100–200 ms (units of 0.625 ms → 0x00A0–0x0140)
      *   ADV_IND: connectable undirected, own public address, all channels
      */
-    bd_addr_t no_direct_addr = {0, 0, 0, 0, 0, 0};
+    bd_addr_t unused_peer_addr = {0, 0, 0, 0, 0, 0};
     gap_advertisements_set_params(
-        0x00A0,         /* adv_int_min: ~100 ms */
-        0x0140,         /* adv_int_max: ~200 ms */
-        0,              /* ADV_IND */
-        0,              /* own address type: public */
-        no_direct_addr,
+        0x00A0,           /* adv_int_min: ~100 ms */
+        0x0140,           /* adv_int_max: ~200 ms */
+        0,                /* ADV_IND */
+        0,                /* own address type: public */
+        unused_peer_addr,
         0x07,           /* all three advertising channels */
         0               /* no filter policy */
     );
