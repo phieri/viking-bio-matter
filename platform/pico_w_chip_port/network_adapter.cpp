@@ -29,20 +29,80 @@ typedef enum {
 static bool wifi_connected = false;
 static bool wifi_initialized = false;
 static network_mode_t current_mode = NETWORK_MODE_NONE;
+// CYW43 init should happen near boot; beyond this deadline we flag likely problematic init ordering.
+// This check is intended for startup diagnostics (well before ~49.7-day uint32 millisecond wrap-around).
+static const uint32_t CYW43_LATE_INIT_WARNING_THRESHOLD_MS = 2000;
+#ifdef CYW43_ENABLE_BLUETOOTH
+static const bool CYW43_BLUETOOTH_ENABLED = true;
+#else
+static const bool CYW43_BLUETOOTH_ENABLED = false;
+#endif
 
 extern "C" {
 
 int network_adapter_init(void) {
+    const uint32_t init_start_ms = to_ms_since_boot(get_absolute_time());
+
+    printf("[NetworkAdapter] network_adapter_init() called (initialized=%d, connected=%d, mode=%d)\n",
+           wifi_initialized ? 1 : 0, wifi_connected ? 1 : 0, (int) current_mode);
+    printf("[NetworkAdapter] init context: uptime=%lu ms, cyw43_arch=%s, bluetooth=%d\n",
+           (unsigned long) init_start_ms,
+#if defined(PICO_CYW43_ARCH_POLL)
+           "poll",
+#elif defined(PICO_CYW43_ARCH_THREADSAFE_BACKGROUND)
+           "threadsafe_background",
+#elif defined(PICO_CYW43_ARCH_FREERTOS)
+           "freertos",
+#else
+           "unknown",
+#endif
+           CYW43_BLUETOOTH_ENABLED ? 1 : 0
+    );
+    const char *flash_bank_offset_state =
+#ifdef PICO_FLASH_BANK_STORAGE_OFFSET
+        "set";
+#else
+        "unset";
+#endif
+    printf("[NetworkAdapter] build context: flash_bank_offset=%s\n",
+           flash_bank_offset_state);
+    if (init_start_ms > CYW43_LATE_INIT_WARNING_THRESHOLD_MS) {
+        printf("[NetworkAdapter] WARNING: CYW43 init starting late (%lu ms after boot). "
+               "Delayed init can cause startup stalls on Pico W.\n",
+               (unsigned long) init_start_ms);
+        printf("[NetworkAdapter] HINT: Check for startup delays before network init (e.g. sleep_ms(10000)).\n");
+    }
+    if (CYW43_BLUETOOTH_ENABLED) {
+    printf("[NetworkAdapter] WARNING: CYW43_ENABLE_BLUETOOTH=1. CYW43 init will also run BTstack init.\n");
+    printf("[NetworkAdapter] HINT: If startup stalls, verify btstack libs/flash-bank config and disable Bluetooth if not needed.\n");
+    }
+#ifdef PICO_CYW43_ARCH_THREADSAFE_BACKGROUND
+    printf("[NetworkAdapter] WARNING: Using threadsafe_background arch. This mode has caused CYW43 init hangs on Pico W.\n");
+    printf("[NetworkAdapter] HINT: Prefer pico_cyw43_arch_lwip_poll for this firmware.\n");
+#endif
+    if (CYW43_BLUETOOTH_ENABLED && init_start_ms > CYW43_LATE_INIT_WARNING_THRESHOLD_MS) {
+        printf("[NetworkAdapter] HIGH-RISK: late init + bluetooth enabled; CYW43 startup hang is likely.\n");
+    }
+
     if (wifi_initialized) {
+        printf("[NetworkAdapter] CYW43 already initialized, skipping init\n");
         return 0;
     }
 
     printf("Initializing CYW43439 WiFi adapter...\n");
+    printf("[NetworkAdapter] About to call cyw43_arch_init() at %lu ms (prechecks complete)\n",
+           (unsigned long) init_start_ms);
+    fflush(stdout);
 
-    if (cyw43_arch_init() != 0) {
-        printf("[NetworkAdapter] ERROR: Failed to initialize CYW43 WiFi chip\n");
+    const int cyw43_result = cyw43_arch_init();
+    const uint32_t init_end_ms = to_ms_since_boot(get_absolute_time());
+    if (cyw43_result != 0) {
+        printf("[NetworkAdapter] ERROR: cyw43_arch_init() failed with %d after %lu ms\n",
+               cyw43_result, (unsigned long) (init_end_ms - init_start_ms));
         return -1;
     }
+    printf("[NetworkAdapter] cyw43_arch_init() succeeded after %lu ms\n",
+           (unsigned long) (init_end_ms - init_start_ms));
 
     wifi_initialized = true;
     printf("WiFi adapter initialized\n");
