@@ -56,12 +56,7 @@ uint32_t calculate_next_wakeup(uint32_t led_tick_off_time, bool led_tick_active)
 
 int main() {
     stdio_init_all();
-    setvbuf(stdout, NULL, _IONBF, 0);
-
-    // Initialize CYW43 immediately after stdio setup to prevent startup stalls.
-    if (network_adapter_init() != 0) {
-        printf("[Main] WARNING: Early WiFi init failed, will retry during Matter platform init\n");
-    }
+    sleep(8000);
 
     // Print version information
     printf("\n");
