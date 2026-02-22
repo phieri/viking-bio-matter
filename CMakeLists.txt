@@ -11,6 +11,13 @@ endif()
 # Set custom mbedTLS configuration (SDK 2.x) - must be before pico_sdk_import.cmake
 # Define MBEDTLS_ALLOW_PRIVATE_ACCESS to enable access to private members in mbedTLS 3.x
 add_compile_definitions(MBEDTLS_ALLOW_PRIVATE_ACCESS)
+# Keep BTstack flash-bank metadata away from the LittleFS storage region (last 256KB).
+# These must be global compile definitions before SDK/libraries are configured.
+# For Pico W 2MB flash: 0x1B0000 + 0x2000 = 0x1B2000, below LittleFS start at 0x1C0000.
+add_compile_definitions(
+    PICO_FLASH_BANK_TOTAL_SIZE=8192
+    PICO_FLASH_BANK_STORAGE_OFFSET=0x1B0000
+)
 set(PICO_MBEDTLS_CONFIG_HEADER "${CMAKE_CURRENT_LIST_DIR}/platform/pico_w_chip_port/config/mbedtls_config.h" CACHE STRING "Custom mbedTLS config" FORCE)
 
 # Initialize the Pico SDK
