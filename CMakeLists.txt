@@ -12,11 +12,10 @@ endif()
 # Define MBEDTLS_ALLOW_PRIVATE_ACCESS to enable access to private members in mbedTLS 3.x
 add_compile_definitions(MBEDTLS_ALLOW_PRIVATE_ACCESS)
 # Note: PICO_FLASH_BANK_TOTAL_SIZE / PICO_FLASH_BANK_STORAGE_OFFSET are intentionally
-# NOT defined here.  BTstack stores its persistent data in LittleFS through the
-# btstack_tlv_littlefs backend, so no dedicated BTstack flash-bank region is required.
-# The flash-bank TLV registered by setup_tlv() during cyw43_arch_init() is replaced at
-# runtime by ble_adapter_init() calling btstack_tlv_set_instance() with the LittleFS
-# backend.
+# NOT defined here.  BTstack TLV state is overridden in ble_adapter_init() with a
+# RAM-only backend (btstack_tlv_littlefs) so no dedicated BTstack flash-bank region
+# is required.  LittleFS has been removed for CYW43 init diagnostics; all storage
+# is RAM-only in this build.
 set(PICO_MBEDTLS_CONFIG_HEADER "${CMAKE_CURRENT_LIST_DIR}/platform/pico_w_chip_port/config/mbedtls_config.h" CACHE STRING "Custom mbedTLS config" FORCE)
 
 # Initialize the Pico SDK
@@ -75,8 +74,8 @@ add_compile_definitions(
 # Initialize the Pico SDK
 pico_sdk_init()
 
-# Include pico-lfs library for LittleFS support
-add_subdirectory(libs/pico-lfs)
+# LittleFS (libs/pico-lfs) removed for CYW43 init diagnostic test.
+# Storage is now RAM-only via storage_adapter.cpp stub.
 
 # Compiler optimizations - prioritize speed over size
 # -O3: Aggressive optimization for speed
@@ -157,14 +156,11 @@ target_link_libraries(viking_bio_matter
     pico_cyw43_arch_lwip_poll
     pico_mbedtls
     hardware_flash
-    pico-lfs
+    # pico-lfs removed for CYW43 init diagnostic test
     # BTstack BLE libraries for Matter commissioning.
     # pico_btstack_cyw43 sets CYW43_ENABLE_BLUETOOTH=1 and integrates BTstack
-    # with the CYW43 async context.  The startup hang that previously prevented
-    # linking these libraries (btstack_tlv_flash_bank_init_instance infinite scan
-    # on LittleFS data) is resolved by overriding the TLV backend in
-    # ble_adapter_init() with the LittleFS-backed btstack_tlv_littlefs backend
-    # immediately after storage_adapter_init() completes.
+    # with the CYW43 async context.  The TLV backend is overridden in
+    # ble_adapter_init() with a RAM-only backend so no flash scan occurs.
     pico_btstack_ble
     pico_btstack_cyw43
     -Wl,--start-group
@@ -179,10 +175,7 @@ target_link_libraries(viking_bio_matter
     -Wl,--end-group
 )
 
-# LittleFS compile definitions
-target_compile_definitions(viking_bio_matter PRIVATE
-    LFS_NO_DEBUG=1
-)
+# LittleFS compile definitions removed (pico-lfs no longer linked)
 
 # Enable USB output, disable UART output
 pico_enable_stdio_usb(viking_bio_matter 1)
