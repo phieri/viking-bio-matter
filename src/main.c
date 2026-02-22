@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "pico/stdlib.h"
+#include "pico/stdio_usb.h"
 #include "pico/cyw43_arch.h"
 #include "hardware/uart.h"
 #include "hardware/gpio.h"
@@ -57,9 +58,11 @@ uint32_t calculate_next_wakeup(uint32_t led_tick_off_time, bool led_tick_active)
 int main() {
     stdio_init_all();
 
-    // Give USB CDC a short spin-wait window to enumerate before CYW43 init.
+    // Give USB CDC up to 1500ms to enumerate before CYW43 init.
     // Use busy_wait (not sleep_ms) to avoid alarm-pool interactions before WiFi init.
-    busy_wait_ms(1500);
+    for (int attempt = 0; attempt < 150 && !stdio_usb_connected(); ++attempt) {
+        busy_wait_ms(10);
+    }
 
     // Initialize CYW43 early to avoid startup stalls caused by delayed init
     if (network_adapter_init() != 0) {
