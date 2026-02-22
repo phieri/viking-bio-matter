@@ -57,6 +57,10 @@ uint32_t calculate_next_wakeup(uint32_t led_tick_off_time, bool led_tick_active)
 int main() {
     stdio_init_all();
 
+    // Give USB CDC a short spin-wait window to enumerate before CYW43 init.
+    // Use busy_wait (not sleep_ms) to avoid alarm-pool interactions before WiFi init.
+    busy_wait_ms(1500);
+
     // Initialize CYW43 early to avoid startup stalls caused by delayed init
     if (network_adapter_init() != 0) {
         printf("[Main] WARNING: Early WiFi init failed, will retry during Matter platform init\n");
