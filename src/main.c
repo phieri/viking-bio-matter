@@ -59,7 +59,7 @@ int main() {
 
     // Initialize CYW43 early to avoid startup stalls caused by delayed init
     if (network_adapter_init() != 0) {
-        printf("[Main] WARNING: Early WiFi init failed, continuing startup\n");
+        printf("[Main] WARNING: Early WiFi init failed, will retry during Matter platform init\n");
     }
 
     sleep_ms(10000);  // 10s delay for hardware troubleshooting (USB serial attach)
