@@ -11,6 +11,12 @@ endif()
 # Set custom mbedTLS configuration (SDK 2.x) - must be before pico_sdk_import.cmake
 # Define MBEDTLS_ALLOW_PRIVATE_ACCESS to enable access to private members in mbedTLS 3.x
 add_compile_definitions(MBEDTLS_ALLOW_PRIVATE_ACCESS)
+# Note: PICO_FLASH_BANK_TOTAL_SIZE / PICO_FLASH_BANK_STORAGE_OFFSET are intentionally
+# NOT defined here.  BTstack stores its persistent data in LittleFS through the
+# btstack_tlv_littlefs backend, so no dedicated BTstack flash-bank region is required.
+# The flash-bank TLV registered by setup_tlv() during cyw43_arch_init() is replaced at
+# runtime by ble_adapter_init() calling btstack_tlv_set_instance() with the LittleFS
+# backend.
 set(PICO_MBEDTLS_CONFIG_HEADER "${CMAKE_CURRENT_LIST_DIR}/platform/pico_w_chip_port/config/mbedtls_config.h" CACHE STRING "Custom mbedTLS config" FORCE)
 
 # Initialize the Pico SDK
@@ -105,6 +111,7 @@ set(SOURCES
     platform/pico_w_chip_port/matter_network_transport.cpp
     platform/pico_w_chip_port/matter_network_subscriber.cpp
     platform/pico_w_chip_port/ble_adapter.cpp
+    platform/pico_w_chip_port/btstack_tlv_littlefs.cpp
 )
 
 # Add lwIP mDNS source files (not compiled by default in Pico SDK)
@@ -151,15 +158,15 @@ target_link_libraries(viking_bio_matter
     pico_mbedtls
     hardware_flash
     pico-lfs
-    # pico_btstack_ble and pico_btstack_cyw43 intentionally removed:
-    # Linking them sets CYW43_ENABLE_BLUETOOTH=1, which causes cyw43_arch_init()
-    # to call btstack_cyw43_init() -> setup_tlv() -> btstack_tlv_flash_bank_init_instance().
-    # The TLV scanner reads the BTstack flash bank area. On a device that has run
-    # prior firmware, this area may contain LittleFS page data with a `len` field
-    # of 0xFFFFFFF8 that causes uint32 overflow (offset += 8 + 0xFFFFFFF8 = 0)
-    # resulting in an infinite scan loop — the startup hang seen at
-    # "Initializing CYW43439 WiFi adapter...".  BLE commissioning is handled by
-    # the ble_adapter stub; WiFi provisioning uses the dedicated provisioning flow.
+    # BTstack BLE libraries for Matter commissioning.
+    # pico_btstack_cyw43 sets CYW43_ENABLE_BLUETOOTH=1 and integrates BTstack
+    # with the CYW43 async context.  The startup hang that previously prevented
+    # linking these libraries (btstack_tlv_flash_bank_init_instance infinite scan
+    # on LittleFS data) is resolved by overriding the TLV backend in
+    # ble_adapter_init() with the LittleFS-backed btstack_tlv_littlefs backend
+    # immediately after storage_adapter_init() completes.
+    pico_btstack_ble
+    pico_btstack_cyw43
     -Wl,--start-group
     matter_protocol
     matter_tlv
