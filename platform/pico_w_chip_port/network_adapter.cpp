@@ -29,6 +29,9 @@ typedef enum {
 static bool wifi_connected = false;
 static bool wifi_initialized = false;
 static network_mode_t current_mode = NETWORK_MODE_NONE;
+// CYW43 init should happen near boot; beyond this deadline we flag likely problematic init ordering.
+// This check is intended for startup diagnostics (well before ~49.7-day uint32 millisecond wrap-around).
+static const uint32_t CYW43_LATE_INIT_WARNING_THRESHOLD_MS = 2000;
 
 extern "C" {
 
@@ -49,12 +52,12 @@ int network_adapter_init(void) {
            "unknown",
 #endif
 #ifdef CYW43_ENABLE_BLUETOOTH
-           CYW43_ENABLE_BLUETOOTH
+           1
 #else
-           -1
+           0
 #endif
     );
-    if (init_start_ms > 2000) {
+    if (init_start_ms > CYW43_LATE_INIT_WARNING_THRESHOLD_MS) {
         printf("[NetworkAdapter] WARNING: CYW43 init starting late (%lu ms after boot). "
                "Delayed init can cause startup stalls on Pico W.\n",
                (unsigned long) init_start_ms);
@@ -66,7 +69,7 @@ int network_adapter_init(void) {
     }
 
     printf("Initializing CYW43439 WiFi adapter...\n");
-    printf("[NetworkAdapter] About to call cyw43_arch_init() at %lu ms since boot\n",
+    printf("[NetworkAdapter] About to call cyw43_arch_init() at %lu ms (prechecks complete)\n",
            (unsigned long) init_start_ms);
     fflush(stdout);
 
