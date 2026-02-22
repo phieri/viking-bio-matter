@@ -15,6 +15,9 @@
 #include "matter_minimal/matter_protocol.h"
 #include "version.h"
 
+#define USB_ENUM_TIMEOUT_MS 10000  // Preserve prior 10s attach window for USB serial
+#define USB_ENUM_POLL_MS 10
+
 // Event system for efficient interrupt-driven architecture
 // Volatile since modified from interrupt context
 volatile uint32_t event_flags = 0;
@@ -61,8 +64,8 @@ int main() {
 
     // Give USB CDC up to 10s to enumerate before CYW43 init.
     // Use busy_wait (not sleep_ms) to avoid alarm-pool interactions before WiFi init.
-    for (int attempt = 0; attempt < 1000 && !stdio_usb_connected(); ++attempt) {
-        busy_wait_ms(10);
+    for (int elapsed_ms = 0; elapsed_ms < USB_ENUM_TIMEOUT_MS && !stdio_usb_connected(); elapsed_ms += USB_ENUM_POLL_MS) {
+        busy_wait_ms(USB_ENUM_POLL_MS);
     }
 
     printf("Boot: USB stdio initialized\n");
