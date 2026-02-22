@@ -85,8 +85,6 @@ add_subdirectory(libs/pico-lfs)
 # -fno-trapping-math: Allow optimizations assuming no FP exceptions
 # -funroll-loops: Unroll loops for speed
 add_compile_options(
-    -O3
-    -ffast-math
     -fno-signed-zeros
     -fno-trapping-math
     -funroll-loops
