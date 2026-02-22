@@ -56,7 +56,7 @@ uint32_t calculate_next_wakeup(uint32_t led_tick_off_time, bool led_tick_active)
 
 int main() {
     stdio_init_all();
-    sleep(8000);
+    sleep_ms(8000);
 
     // Print version information
     printf("\n");
