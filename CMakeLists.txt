@@ -110,7 +110,7 @@ set(SOURCES
     platform/pico_w_chip_port/matter_network_transport.cpp
     platform/pico_w_chip_port/matter_network_subscriber.cpp
     platform/pico_w_chip_port/ble_adapter.cpp
-    platform/pico_w_chip_port/btstack_tlv_littlefs.cpp
+    # btstack_tlv_littlefs.cpp removed: depends on BTstack headers (removed for diagnostics)
 )
 
 # Add lwIP mDNS source files (not compiled by default in Pico SDK)
@@ -157,12 +157,14 @@ target_link_libraries(viking_bio_matter
     pico_mbedtls
     hardware_flash
     # pico-lfs removed for CYW43 init diagnostic test
-    # BTstack BLE libraries for Matter commissioning.
-    # pico_btstack_cyw43 sets CYW43_ENABLE_BLUETOOTH=1 and integrates BTstack
-    # with the CYW43 async context.  The TLV backend is overridden in
-    # ble_adapter_init() with a RAM-only backend so no flash scan occurs.
-    pico_btstack_ble
-    pico_btstack_cyw43
+    # BTstack BLE libraries removed for CYW43 init diagnostic test.
+    # pico_btstack_cyw43 sets CYW43_ENABLE_BLUETOOTH=1, which forces
+    # cyw43_arch_init() to load BT firmware over SDIO in addition to WiFi
+    # firmware.  Removing these libraries makes cyw43_arch_init() a pure
+    # WiFi-only init so we can confirm whether BT firmware loading is the
+    # root cause of the startup hang.
+    # pico_btstack_ble
+    # pico_btstack_cyw43
     -Wl,--start-group
     matter_protocol
     matter_tlv
