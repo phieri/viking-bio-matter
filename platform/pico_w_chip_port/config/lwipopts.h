@@ -49,9 +49,16 @@
 #define DHCP_DOES_ARP_CHECK         0
 #define LWIP_DHCP_DOES_ACD_CHECK    0
 
-// mDNS options for Matter device discovery
-#define LWIP_MDNS_RESPONDER         1
+// mDNS removed for CYW43 init diagnostic.
+// mdns_resp_init() sends multicast join packets on the CYW43 netif right
+// after cyw43_arch_init() which may be causing the startup hang.
+// Also: DHCP + IGMP + MDNS need 3 netif client-data slots but only 2 are
+// allocated, risking out-of-bounds memory writes.
+#define LWIP_MDNS_RESPONDER         0
 #define LWIP_IGMP                   1
+// With LWIP_MDNS_RESPONDER=0, only DHCP (slot 0) and IGMP (slot 1) claim
+// client-data slots, so 2 is correct.  If MDNS is re-enabled, increase
+// this to 3 to avoid out-of-bounds writes.
 #define LWIP_NUM_NETIF_CLIENT_DATA  2
 
 // Threading

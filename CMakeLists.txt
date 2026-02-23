@@ -113,12 +113,13 @@ set(SOURCES
     # btstack_tlv_littlefs.cpp removed: depends on BTstack headers (removed for diagnostics)
 )
 
-# Add lwIP mDNS source files (not compiled by default in Pico SDK)
-set(LWIP_MDNS_SOURCES
-    ${PICO_SDK_PATH}/lib/lwip/src/apps/mdns/mdns.c
-    ${PICO_SDK_PATH}/lib/lwip/src/apps/mdns/mdns_out.c
-    ${PICO_SDK_PATH}/lib/lwip/src/apps/mdns/mdns_domain.c
-)
+# mDNS source files removed for CYW43 init diagnostic (LWIP_MDNS_RESPONDER=0).
+# set(LWIP_MDNS_SOURCES
+#     ${PICO_SDK_PATH}/lib/lwip/src/apps/mdns/mdns.c
+#     ${PICO_SDK_PATH}/lib/lwip/src/apps/mdns/mdns_out.c
+#     ${PICO_SDK_PATH}/lib/lwip/src/apps/mdns/mdns_domain.c
+# )
+set(LWIP_MDNS_SOURCES "")
 
 # Matter is always enabled
 add_compile_definitions(ENABLE_MATTER=1)
