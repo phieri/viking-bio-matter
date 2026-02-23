@@ -56,6 +56,28 @@ uint32_t calculate_next_wakeup(uint32_t led_tick_off_time, bool led_tick_active)
 
 int main() {
     stdio_init_all();
+    // Make stdout unbuffered so every printf is visible immediately on USB
+    // serial even if we hang before the next newline.
+    setvbuf(stdout, NULL, _IONBF, 0);
+
+    // -----------------------------------------------------------------------
+    // DIAGNOSTIC: CYW43 init moved to be the very first operation after
+    // stdio_init_all().  Previous hardware tests ruled out LittleFS, BTstack,
+    // and mDNS as causes for the hang.  We now test whether the hang is
+    // inside cyw43_arch_init() itself (hardware/firmware issue) or whether
+    // the 8-second sleep, serial_handler_init() (UART0 IRQ), or the deep
+    // matter_bridge_init() call chain were interfering with it.
+    //
+    // network_adapter_init() has a wifi_initialized guard so the later call
+    // from platform_manager_init() will safely return 0 without re-init.
+    // -----------------------------------------------------------------------
+    printf("DIAG: calling network_adapter_init() before sleep/serial-init...\n");
+    if (network_adapter_init() != 0) {
+        printf("DIAG: network_adapter_init() FAILED -- hanging here for USB capture\n");
+        while (true) { tight_loop_contents(); } /* intentional: keep USB alive so log is captured */
+    }
+    printf("DIAG: network_adapter_init() SUCCEEDED\n");
+
     sleep_ms(8000);
 
     // Print version information
