@@ -4,9 +4,9 @@ A Matter bridge for the [Viking Bio 20](https://varmebaronen.se/produkter/single
 
 ## Features
 
-- **Dual-Core Architecture**: Utilizes both RP2040 cores for optimal performance
-  - Core 0: Serial input, LED control, watchdog management
-  - Core 1: Matter protocol, network processing, attribute reporting
+- **Single-Core Architecture**: All tasks run on Core 0 via cooperative polling
+  - Serial input, LED control, watchdog management
+  - Matter protocol, network processing, attribute reporting
 - **Serial Communication**: Reads TTL serial data at 9600&nbsp;baud from Viking Bio 20 burner
 - **Flame Detection**: Reports real-time flame status
 - **Fan Speed Monitoring**: Reports current fan speed (0-100&nbsp;%)
@@ -141,8 +141,8 @@ The devcontainer automatically:
 
 1. **Build the firmware:**
    ```bash
-   mkdir build
-   cd build
+   mkdir build-matter
+   cd build-matter
    cmake ..
    make
    ```
@@ -200,7 +200,7 @@ Credentials can be stored in flash during initial setup. The device will automat
 
 1. Hold the BOOTSEL button on the Pico W while connecting it via USB
 2. The Pico W will appear as a mass storage device
-3. Copy `build/viking_bio_matter.uf2` to the Pico W
+3. Copy the `.uf2` file from `build-matter/` to the Pico W (e.g. `build-matter/viking_bio_matter-abc1234.uf2`; use `ls build-matter/*.uf2` to find it)
 4. The Pico W will automatically reboot with the new firmware
 
 ## GitHub Actions
@@ -289,7 +289,7 @@ The firmware is automatically built on push to `main` or `develop` branches. Bui
 - The PIN derivation algorithm is documented in `tools/derive_pin.py` and can be computed offline from a printed MAC address.
 
 For detailed commissioning steps and troubleshooting, see:
-- [docs/WIFI_COMMISSIONING_SUMMARY.md](docs/WIFI_COMMISSIONING_SUMMARY.md) - WiFi provisioning details
+- [docs/BLE_COMMISSIONING_SUMMARY.md](docs/BLE_COMMISSIONING_SUMMARY.md) - BLE commissioning details
 - [platform/pico_w_chip_port/README.md](platform/pico_w_chip_port/README.md) - Matter configuration
 
 ## Device Discovery
@@ -415,7 +415,13 @@ viking-bio-matter/
 │   ├── main.c                 # Main application entry point
 │   ├── serial_handler.c       # UART/serial communication
 │   ├── viking_bio_protocol.c  # Viking Bio protocol parser
-│   └── matter_bridge.c        # Matter bridge implementation
+│   ├── matter_bridge.cpp      # Matter bridge implementation
+│   └── matter_minimal/        # Minimal Matter protocol implementation
+│       ├── codec/             # TLV and message encoding
+│       ├── transport/         # UDP transport layer
+│       ├── security/          # PASE and session management
+│       ├── interaction/       # Interaction model (read/subscribe)
+│       └── clusters/          # Standard Matter clusters
 ├── include/
 │   ├── serial_handler.h
 │   ├── viking_bio_protocol.h
@@ -427,17 +433,6 @@ viking-bio-matter/
 │       ├── crypto_adapter.cpp     # mbedTLS crypto
 │       ├── platform_manager.cpp   # Platform coordination
 │       └── README.md              # Detailed Matter documentation
-├── src/
-│   ├── matter_minimal/          # Minimal Matter protocol implementation
-│   │   ├── codec/               # TLV and message encoding
-│   │   ├── transport/           # UDP transport layer
-│   │   ├── security/            # PASE and session management
-│   │   ├── interaction/         # Interaction model (read/subscribe)
-│   │   └── clusters/            # Standard Matter clusters
-│   ├── main.c                   # Entry point
-│   ├── serial_handler.c         # UART RX handler
-│   ├── matter_bridge.cpp        # Matter integration
-│   └── viking_bio_protocol.c    # Protocol parser
 ├── examples/
 │   └── viking_bio_simulator.py # Serial data simulator for testing
 ├── CMakeLists.txt             # Build configuration
@@ -524,9 +519,9 @@ Matter: LevelControl cluster updated - Fan speed 80%
 
 1. **Build and flash firmware:**
    ```bash
-   cd build
+   cd build-matter
    cmake .. && make
-   # Flash viking_bio_matter.uf2 to Pico W
+   # Flash viking_bio_matter-{version}.uf2 to Pico W
    ```
 
 2. **Monitor commissioning info:**
@@ -586,9 +581,8 @@ Matter: LevelControl cluster updated - Fan speed 80%
 - For production, consider using the full discriminator range (0-4095) by modifying `DISCRIMINATOR_TEST_MIN` and `DISCRIMINATOR_TEST_MAX` in `platform/pico_w_chip_port/platform_manager.cpp`
 
 **WiFi Security:**
-- WiFi credentials are hardcoded in `platform/pico_w_chip_port/network_adapter.cpp`
-- Never commit credentials to version control
-- Consider using a secure provisioning method for production
+- WiFi credentials are provisioned via BLE commissioning and stored in flash (never hardcoded in source)
+- Credentials are cleared by re-flashing firmware; the device will restart BLE advertising automatically
 
 ## Future Enhancements
 

@@ -132,15 +132,6 @@ int matter_attributes_update(uint8_t endpoint, uint32_t cluster_id,
         attr->value = *value;
         attr->dirty = true;
         
-        // Make a copy of subscriber info before releasing lock
-        matter_subscriber_callback_t active_subscribers[MATTER_MAX_SUBSCRIBERS];
-        int active_count = 0;
-        for (int i = 0; i < MATTER_MAX_SUBSCRIBERS; i++) {
-            if (subscriber_active[i] && subscribers[i]) {
-                active_subscribers[active_count++] = subscribers[i];
-            }
-        }
-        
         // Log the change
         printf("Matter: Attribute changed (EP:%u, CL:0x%04" PRIx32 ", AT:0x%04" PRIx32 ") = ",
                endpoint, cluster_id, attribute_id);
@@ -159,11 +150,8 @@ int matter_attributes_update(uint8_t endpoint, uint32_t cluster_id,
                 printf("%lu\n", (unsigned long)attr->value.uint32_val);
                 break;
         }
-        
-        // Notify subscribers of the change (outside of critical section)
-        for (int i = 0; i < active_count; i++) {
-            active_subscribers[i](endpoint, cluster_id, attribute_id, value);
-        }
+        // Subscribers are notified via matter_attributes_process_reports()
+        // which is called from the main loop (platform_manager_task).
     }
     
     return 0;
