@@ -64,6 +64,9 @@
 /* Maximum reassembled Matter-over-BLE message size */
 #define COBLE_MAX_MSG_SIZE      1024u
 
+/* Maximum single COBLe fragment size (must be >= max ATT MTU) */
+#define COBLE_MAX_FRAGMENT_SIZE 256u
+
 /* ------------------------------------------------------------------ */
 /* Internal state                                                       */
 /* ------------------------------------------------------------------ */
@@ -473,7 +476,7 @@ static void coble_tx_send_next(void) {
     const size_t MAX_DATA_FIRST  = MAX_ATT_DATA - 4u; /* SYN hdr: flags+ctr+len16 */
     const size_t MAX_DATA_REST   = MAX_ATT_DATA - 1u; /* flags only              */
 
-    uint8_t fragment[256];
+    uint8_t fragment[COBLE_MAX_FRAGMENT_SIZE];
     size_t  frag_hdr = 0;
     size_t  data_capacity;
 
@@ -527,10 +530,7 @@ static void coble_tx_send_next(void) {
 
     /* Indication queued; next fragment will be sent from the
      * ATT_EVENT_HANDLE_VALUE_INDICATION_COMPLETE handler.
-     * If this was the last fragment, the handler will clear coble_tx_active. */
-    if (coble_tx_msg_sent >= coble_tx_msg_len) {
-        /* Last fragment — mark complete on next confirm event */
-    }
+     * That handler also clears coble_tx_active after the last fragment. */
 }
 
 /* ------------------------------------------------------------------ */
