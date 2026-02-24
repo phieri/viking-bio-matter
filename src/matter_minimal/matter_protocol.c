@@ -22,6 +22,15 @@
 // Internal state
 static bool initialized = false;
 
+/*
+ * BLE session state – set to true while matter_protocol_process_ble_message()
+ * is executing so that matter_protocol_send() stores the encoded response in
+ * g_ble_response_buf instead of sending it over UDP.
+ */
+static bool    g_ble_session_active  = false;
+static uint8_t g_ble_response_buf[MATTER_MAX_MESSAGE_SIZE];
+static size_t  g_ble_response_len    = 0;
+
 /**
  * Initialize Matter protocol stack
  */
@@ -288,7 +297,16 @@ int matter_protocol_send(const char *dest_ip, uint16_t dest_port,
     if (matter_message_encode(&msg, buffer, sizeof(buffer), &encoded_len) < 0) {
         return -1;
     }
-    
+
+    // If currently processing a BLE message, capture response for BLE delivery
+    if (g_ble_session_active) {
+        if (encoded_len <= sizeof(g_ble_response_buf)) {
+            memcpy(g_ble_response_buf, buffer, encoded_len);
+            g_ble_response_len = encoded_len;
+        }
+        return 0;
+    }
+
     // Send via transport
     return udp_transport_send(dest_ip, dest_port, buffer, encoded_len);
 }
@@ -310,6 +328,75 @@ int matter_protocol_start_commissioning(const char *setup_pin, uint16_t discrimi
  */
 bool matter_protocol_is_commissioned(void) {
     return commissioning_is_commissioned();
+}
+
+/**
+ * matter_protocol_process_ble_message – decode, decrypt and route a raw
+ * Matter message received over the BLE COBLe channel and return the encoded
+ * response (if any) that must be sent back to the controller via BLE notify.
+ *
+ * @param input        Raw bytes of the received Matter message
+ * @param input_len    Length of input
+ * @param output       Buffer to receive the encoded response
+ * @param output_size  Size of output buffer
+ * @param output_len   Set to the actual response length (0 = no response)
+ * @return 0 on success, -1 on decode/route failure
+ */
+int matter_protocol_process_ble_message(const uint8_t *input, size_t input_len,
+                                         uint8_t *output, size_t output_size,
+                                         size_t *output_len) {
+    if (!initialized || !input || !output_len) {
+        return -1;
+    }
+
+    static uint8_t plaintext_ble[MATTER_MAX_PAYLOAD_SIZE];
+    /* NOTE: static is safe here because the entire firmware runs on a single
+     * cooperative thread (Core 0); matter_protocol_process_ble_message() is
+     * never called concurrently.  This avoids 1280-byte stack allocation.  */
+
+    matter_message_t msg;
+    if (matter_message_decode(input, input_len, &msg) < 0) {
+        printf("BLE Matter: Failed to decode message\n");
+        return -1;
+    }
+
+    /* Decrypt if secured */
+    if (msg.header.session_id != 0) {
+        size_t plaintext_len;
+        if (session_decrypt(msg.header.session_id,
+                            msg.payload, msg.payload_length,
+                            plaintext_ble, sizeof(plaintext_ble),
+                            &plaintext_len) == 0) {
+            msg.payload        = plaintext_ble;
+            msg.payload_length = plaintext_len;
+        } else {
+            printf("BLE Matter: Decryption failed\n");
+            return -1;
+        }
+    }
+
+    /* Activate BLE session so matter_protocol_send() captures the response */
+    g_ble_session_active = true;
+    g_ble_response_len   = 0;
+
+    /* Route through existing handlers (PASE, IM, etc.) */
+    route_message(&msg, "ble", 0);
+
+    g_ble_session_active = false;
+
+    /* Return captured response to caller */
+    if (g_ble_response_len > 0 && output) {
+        size_t copy_len = g_ble_response_len;
+        if (copy_len > output_size) {
+            copy_len = output_size;
+        }
+        memcpy(output, g_ble_response_buf, copy_len);
+        *output_len = copy_len;
+    } else {
+        *output_len = 0;
+    }
+
+    return 0;
 }
 
 /**

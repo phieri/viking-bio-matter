@@ -7,8 +7,10 @@
 #include "../platform/pico_w_chip_port/matter_reporter.h"
 #include "../platform/pico_w_chip_port/matter_network_subscriber.h"
 #include "../platform/pico_w_chip_port/matter_network_transport.h"
+#include "../platform/pico_w_chip_port/ble_adapter.h"
 #include "matter_minimal/interaction/subscription_bridge.h"
 #include "matter_minimal/matter_protocol.h"
+#include "matter_minimal/codec/message_codec.h"
 
 // Forward declare storage functions
 extern "C" {
@@ -361,12 +363,39 @@ bool matter_bridge_task(void) {
     
     bool work_done = false;
     
-    // Process Matter protocol messages (returns number of messages processed)
+    // Process Matter protocol messages received over UDP
     int messages_processed = matter_protocol_task();
     if (messages_processed > 0) {
         work_done = true;
     }
-    
+
+    // Process Matter messages received over BLE (COBLe channel)
+    if (ble_adapter_is_connected()) {
+        /* Static buffers are safe because matter_bridge_task() runs on Core 0
+         * only; there is no concurrent or reentrant execution in this firmware. */
+        static uint8_t ble_msg[MATTER_MAX_MESSAGE_SIZE];
+        static uint8_t ble_response[MATTER_MAX_MESSAGE_SIZE];
+        size_t  ble_msg_len = 0;
+
+        if (ble_adapter_receive_message(ble_msg, sizeof(ble_msg), &ble_msg_len) == 0 &&
+            ble_msg_len > 0) {
+            printf("Matter Bridge: Processing BLE message (%zu bytes)\n", ble_msg_len);
+            size_t  ble_response_len = 0;
+
+            int ret = matter_protocol_process_ble_message(
+                ble_msg, ble_msg_len,
+                ble_response, sizeof(ble_response),
+                &ble_response_len);
+
+            if (ret == 0 && ble_response_len > 0) {
+                printf("Matter Bridge: Sending BLE response (%zu bytes)\n",
+                       ble_response_len);
+                ble_adapter_send_data(ble_response, ble_response_len);
+            }
+            work_done = true;
+        }
+    }
+
     // Process Matter platform tasks (includes attribute reporting)
     platform_manager_task();
     
