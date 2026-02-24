@@ -67,6 +67,15 @@
 /* Maximum single COBLe fragment size (must be >= max ATT MTU) */
 #define COBLE_MAX_FRAGMENT_SIZE 256u
 
+/*
+ * Backoff (ms) applied after a real BLE disconnect before advertising
+ * restarts.  Prevents rapid connect/disconnect loops (e.g. iOS 26 issue).
+ * Override at compile time: -DBLE_RECONNECT_BACKOFF_MS=0 to disable.
+ */
+#ifndef BLE_RECONNECT_BACKOFF_MS
+#define BLE_RECONNECT_BACKOFF_MS  100
+#endif
+
 /* ------------------------------------------------------------------ */
 /* Internal state                                                       */
 /* ------------------------------------------------------------------ */
@@ -321,24 +330,48 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
             break;
         }
 
-        case HCI_EVENT_DISCONNECTION_COMPLETE:
-            printf("BLE: Client disconnected\n");
-            active_con_handle = HCI_CON_HANDLE_INVALID;
-            current_state     = BLE_STATE_ADVERTISING;
-            /* Reset COBLe state */
+        case HCI_EVENT_DISCONNECTION_COMPLETE: {
+            uint8_t reason = hci_event_disconnection_complete_get_reason(packet);
+            if (active_con_handle == HCI_CON_HANDLE_INVALID) {
+                /* Duplicate disconnect event — already handled, ignore it. */
+                printf("BLE: Duplicate disconnect event (reason=0x%02X), ignoring\n",
+                       (unsigned)reason);
+                break;
+            }
+            printf("BLE: Client disconnected (reason=0x%02X)\n", (unsigned)reason);
+            active_con_handle    = HCI_CON_HANDLE_INVALID;
+            current_state        = BLE_STATE_ADVERTISING;
+            /* Reset COBLe reassembly and TX state once on a real disconnect */
             coble_rx_in_progress = false;
             coble_rx_ready       = false;
             coble_rx_offset      = 0;
             coble_tx_active      = false;
+            /* Notify higher layers promptly before the backoff delay */
             if (conn_callback) {
                 conn_callback(false);
             }
+            /* Small backoff before resuming advertising to avoid rapid
+             * reconnect loops (configurable, default 100 ms). */
+#if BLE_RECONNECT_BACKOFF_MS > 0
+            sleep_ms(BLE_RECONNECT_BACKOFF_MS);
+#endif
             break;
+        }
 
         case HCI_EVENT_LE_META: {
             if (hci_event_le_meta_get_subevent_code(packet) ==
                     HCI_SUBEVENT_LE_CONNECTION_COMPLETE) {
-                active_con_handle = hci_subevent_le_connection_complete_get_connection_handle(packet);
+                hci_con_handle_t new_handle =
+                    hci_subevent_le_connection_complete_get_connection_handle(packet);
+                if (current_state == BLE_STATE_CONNECTED &&
+                        active_con_handle == new_handle) {
+                    /* Duplicate connection event for the same handle — ignore
+                     * it to prevent higher layers from toggling session state. */
+                    printf("BLE: Duplicate connection event (handle=0x%04X), ignoring\n",
+                           (unsigned)new_handle);
+                    break;
+                }
+                active_con_handle = new_handle;
                 printf("BLE: Client connected (handle=0x%04X)\n",
                        (unsigned)active_con_handle);
                 current_state = BLE_STATE_CONNECTED;
