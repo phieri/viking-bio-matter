@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include <stdint.h>
 #include "pico/stdlib.h"
 #include "matter_bridge.h"
 #include "../platform/pico_w_chip_port/platform_manager.h"
@@ -47,7 +48,17 @@ void matter_bridge_init(void) {
     printf("  Viking Bio Matter Bridge - Full Mode\n");
     printf("==========================================\n\n");
     
-    // Load operational hours from flash storage
+    // Initialize Matter platform (this also initializes storage via storage_adapter_init())
+    printf("Initializing Matter platform for Pico W...\n");
+    if (platform_manager_init() != 0) {
+        printf("[Matter] ERROR: Failed to initialize Matter platform\n");
+        printf("Device will continue in degraded mode (no Matter support)\n");
+        initialized = false;
+        return;
+    }
+    
+    // Load operational hours from flash storage (must be after platform_manager_init()
+    // which calls storage_adapter_init() to mount LittleFS)
     uint32_t stored_hours = 0;
     if (storage_adapter_load_operational_hours(&stored_hours) == 0) {
         attributes.total_operational_hours = stored_hours;
@@ -56,15 +67,6 @@ void matter_bridge_init(void) {
     } else {
         printf("No operational hours in storage, starting from 0\n");
         attributes.total_operational_hours = 0;
-    }
-    
-    // Initialize Matter platform
-    printf("Initializing Matter platform for Pico W...\n");
-    if (platform_manager_init() != 0) {
-        printf("[Matter] ERROR: Failed to initialize Matter platform\n");
-        printf("Device will continue in degraded mode (no Matter support)\n");
-        initialized = false;
-        return;
     }
     
     // Check for WiFi credentials in storage
@@ -279,8 +281,11 @@ void matter_bridge_update_temperature(uint16_t temp) {
         printf("Matter: TemperatureMeasurement cluster updated - %d°C\n", temp);
         
         // Update Matter attribute (convert to centidegrees for Matter spec)
+        // Matter TemperatureMeasurement is int16_t (max 32767 = 327.67 °C).
+        // Cap at INT16_MAX to avoid overflow for temperatures above 327 °C.
         matter_attr_value_t value;
-        value.int16_val = (int16_t)(temp * 100); // Convert to centidegrees
+        int32_t centidegrees = (int32_t)temp * 100;
+        value.int16_val = (centidegrees > INT16_MAX) ? INT16_MAX : (int16_t)centidegrees;
         int ret = matter_attributes_update(1, MATTER_CLUSTER_TEMPERATURE_MEASUREMENT, MATTER_ATTR_MEASURED_VALUE, &value);
         if (ret != 0) {
             printf("[Matter] ERROR: Failed to update Temperature attribute (ret=%d)\n", ret);
