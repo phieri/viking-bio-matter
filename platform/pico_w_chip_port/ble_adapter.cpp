@@ -37,9 +37,11 @@
 #include "btstack.h"
 #include "pico/btstack_cyw43.h"
 
-/* ATT server for CHIPoBLE GATT service */
-#include "att_server.h"
-#include "att_db_util.h"
+/* btstack.h (with ENABLE_BLE) already includes:
+ *   ble/att_db_util.h  → att_db_util_init(), att_db_util_add_*
+ *   ble/att_server.h   → att_server_init(), att_server_notify(), etc.
+ * No separate includes needed.
+ */
 
 /* ------------------------------------------------------------------ */
 /* CHIPoBLE constants                                                   */
