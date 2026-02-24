@@ -10,6 +10,7 @@
 #include "viking_bio_protocol.h"
 #include "matter_bridge.h"
 #include "network_adapter.h"
+#include "ble_adapter.h"
 #include "platform_manager.h"
 #include "matter_minimal/matter_protocol.h"
 #include "version.h"
@@ -40,7 +41,8 @@ bool periodic_timer_callback(struct repeating_timer *t) {
  * Calculate time until next scheduled wakeup event
  * Returns duration in milliseconds until next event, or 100ms default
  */
-uint32_t calculate_next_wakeup(uint32_t led_tick_off_time, bool led_tick_active) {
+uint32_t calculate_next_wakeup(uint32_t led_tick_off_time, bool led_tick_active,
+                                uint32_t commissioning_blink_time, bool commissioning_active) {
     uint32_t now = to_ms_since_boot(get_absolute_time());
     uint32_t next_wakeup = UINT32_MAX;
 
@@ -48,6 +50,16 @@ uint32_t calculate_next_wakeup(uint32_t led_tick_off_time, bool led_tick_active)
     if (led_tick_active && led_tick_off_time > now) {
         uint32_t led_delta = led_tick_off_time - now;
         next_wakeup = (led_delta < next_wakeup) ? led_delta : next_wakeup;
+    }
+
+    // Commissioning blink timeout (2 Hz = 250ms intervals)
+    if (commissioning_active) {
+        if (commissioning_blink_time > now) {
+            uint32_t blink_delta = commissioning_blink_time - now;
+            next_wakeup = (blink_delta < next_wakeup) ? blink_delta : next_wakeup;
+        } else {
+            next_wakeup = 0;  // Blink is due now, don't sleep
+        }
     }
 
     // Default to 100ms if nothing scheduled soon (cap for responsiveness)
@@ -99,6 +111,8 @@ int main() {
     uint32_t led_tick_off_time = 0;  // Timestamp when LED tick should turn off
     bool led_tick_active = false;    // Track if LED tick is active
     uint32_t led_grace_period_end = 0;  // Timestamp when grace period after tick ends
+    uint32_t commissioning_blink_time = 0;  // Timestamp for next commissioning blink toggle
+    bool commissioning_blink_state = false; // Current commissioning blink LED state
     
     while (true) {
         // Track if any work was done this iteration
@@ -218,20 +232,32 @@ int main() {
         
         // LED behavior: Constantly ON when connected to WiFi + Matter fabric but not receiving serial data
         // When receiving serial data, show 200ms tick instead
+        // When in commissioning mode (BLE advertising), blink at 2 Hz
         // When not connected/commissioned, LED is off
         if (!led_tick_active && now >= led_grace_period_end) {
             // Check if connected to WiFi and commissioned to Matter fabric
             if (network_adapter_is_connected() && matter_protocol_is_commissioned()) {
                 // Keep LED constantly on to indicate ready state
                 cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+                commissioning_blink_time = 0;  // Reset blink timer
+            } else if (ble_adapter_get_state() == BLE_STATE_ADVERTISING) {
+                // Commissioning mode: blink at 2 Hz (250ms on / 250ms off)
+                if (now >= commissioning_blink_time) {
+                    commissioning_blink_state = !commissioning_blink_state;
+                    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, commissioning_blink_state ? 1 : 0);
+                    commissioning_blink_time = now + 250;
+                }
             } else {
                 cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+                commissioning_blink_time = 0;  // Reset blink timer
             }
         }
         
         // Dynamic sleep if no work was done
         if (!work_done) {
-            uint32_t sleep_duration = calculate_next_wakeup(led_tick_off_time, led_tick_active);
+            uint32_t sleep_duration = calculate_next_wakeup(led_tick_off_time, led_tick_active,
+                                                              commissioning_blink_time,
+                                                              ble_adapter_get_state() == BLE_STATE_ADVERTISING);
             if (sleep_duration > 0) {
                 // Cap sleep at 100ms for responsiveness
                 uint32_t capped_sleep = (sleep_duration < 100) ? sleep_duration : 100;
