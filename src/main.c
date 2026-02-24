@@ -138,10 +138,10 @@ int main() {
                 // Parse Viking Bio data
                 if (viking_bio_parse_data(buffer, bytes_read, &viking_data)) {
                     uint32_t now = to_ms_since_boot(get_absolute_time());
-                    // Turn on LED for 200ms to indicate serial message received
+                    // Turn on LED for 100ms to indicate serial message received
                     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
                     led_tick_active = true;
-                    led_tick_off_time = now + 200;
+                    led_tick_off_time = now + 100;
                     
                     // Check if data resumed after timeout
                     if (timeout_triggered) {
@@ -222,12 +222,12 @@ int main() {
         // Handle LED tick timeout and steady state
         uint32_t now = to_ms_since_boot(get_absolute_time());
         
-        // Turn off LED tick after 200ms
+        // Turn off LED tick
         if (led_tick_active && now >= led_tick_off_time) {
             cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
             led_tick_active = false;
-            // Set grace period: keep LED off for 800ms after tick to make it visible
-            led_grace_period_end = now + 800;
+            // Set grace period: keep LED off for 50ms after tick to make it visible
+            led_grace_period_end = now + 50;
         }
         
         // LED behavior: Constantly ON when connected to WiFi + Matter fabric but not receiving serial data
