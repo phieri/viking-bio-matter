@@ -12,18 +12,22 @@
  *                                (runs setup_tlv() with default flash-bank TLV)
  *   2. storage_adapter_init()  → LittleFS mounted and ready
  *   3. ble_adapter_init()      → overrides TLV with LittleFS backend,
- *                                sets up CHIPoBLE GATT service,
+ *                                sets up GAP + GATT + CHIPoBLE GATT services,
  *                                registers HCI + ATT packet handlers
- *   4. ble_adapter_start_advertising() → sets advert data, calls
- *                                        hci_power_control(HCI_POWER_ON)
+ *   4. ble_adapter_start_advertising() → sets advert data/params, calls
+ *                                        hci_power_control(HCI_POWER_ON);
+ *                                        gap_advertisements_enable(1) is
+ *                                        called from the HCI_STATE_WORKING
+ *                                        event handler.
  *
  * BLE events are driven by cyw43_arch_poll() in the main loop.
  *
- * CHIPoBLE GATT service (Matter Core Spec §3.6):
- *   Service UUID128: 0000FFF6-0000-1000-8000-00805F9B34FB
- *   Characteristic 0xFFF7: Write Without Response (controller → device)
- *   Characteristic 0xFFF8: Notify (device → controller)
- *     + Client Characteristic Configuration Descriptor (0x2902)
+ * ATT database layout (built with att_db_util):
+ *   1. GAP service (0x1800): Device Name "Matter" + Appearance
+ *   2. GATT service (0x1801): no mandatory characteristics for peripherals
+ *   3. CHIPoBLE service (0xFFF6):
+ *      0xFFF7 - Write Without Response (controller → device)
+ *      0xFFF8 - Notify (device → controller) + auto-CCCD
  */
 
 #include <stdio.h>
@@ -310,6 +314,11 @@ static void build_matter_adv_data(uint16_t discriminator,
     *p++ = 0xF6;        /* UUID low byte  */
     *p++ = 0xFF;        /* UUID high byte */
 
+    /* --- Shortened Local Name: "Matter" (helps scanners identify device) --- */
+    *p++ = 0x07;        /* length: 1 (type) + 6 (name) */
+    *p++ = 0x08;        /* AD type: Shortened Local Name */
+    *p++ = 'M'; *p++ = 'a'; *p++ = 't'; *p++ = 't'; *p++ = 'e'; *p++ = 'r';
+
     /* --- Service Data for UUID 0xFFF6 --- */
     *p++ = 0x0A;        /* length: 10 bytes (type + UUID + 7 payload bytes) */
     *p++ = 0x16;        /* AD type: Service Data – 16-bit UUID */
@@ -375,12 +384,39 @@ int ble_adapter_init(void) {
     hci_add_event_handler(&hci_event_cb_reg);
 
     /* -------------------------------------------------------------- */
-    /* CHIPoBLE GATT service setup                                      */
+    /* GATT database setup                                             */
     /* -------------------------------------------------------------- */
     att_db_util_init();
 
-    /* Primary service: 0000FFF6-0000-1000-8000-00805F9B34FB */
-    att_db_util_add_service_uuid128(MATTER_BLE_SVC_UUID128);
+    /* 1. GAP service (0x1800): Device Name + Appearance.
+     *    Many BLE stacks and Matter controllers expect these to be present
+     *    before accepting an ATT connection to a peripheral.
+     */
+    att_db_util_add_service_uuid16(0x1800);
+    {
+        static const uint8_t device_name[] = "Matter";
+        att_db_util_add_characteristic_uuid16(
+            0x2A00,                /* Device Name */
+            ATT_PROPERTY_READ,
+            ATT_SECURITY_NONE, ATT_SECURITY_NONE,
+            (uint8_t *)device_name, sizeof(device_name) - 1);
+    }
+    {
+        static const uint8_t appearance[] = {0x00, 0x00}; /* unknown */
+        att_db_util_add_characteristic_uuid16(
+            0x2A01,                /* Appearance */
+            ATT_PROPERTY_READ,
+            ATT_SECURITY_NONE, ATT_SECURITY_NONE,
+            (uint8_t *)appearance, sizeof(appearance));
+    }
+
+    /* 2. GATT service (0x1801): no mandatory characteristics for a peripheral. */
+    att_db_util_add_service_uuid16(0x1801);
+
+    /* 3. CHIPoBLE service (0xFFF6 = 0000FFF6-0000-1000-8000-00805F9B34FB).
+     *    Use the 16-bit UUID form — equivalent for Bluetooth SIG base UUIDs.
+     */
+    att_db_util_add_service_uuid16(0xFFF6);
 
     /*
      * Characteristic 0xFFF7: TX channel – controller writes Matter
@@ -440,29 +476,25 @@ int ble_adapter_start_advertising(uint16_t discriminator,
     build_matter_adv_data(discriminator, vendor_id, product_id);
 
     /*
-     * Mark advertisement as pending.  The actual gap_advertisements_set_*
-     * calls happen inside the BTSTACK_EVENT_STATE / HCI_STATE_WORKING
-     * handler once the controller is ready.  This is the canonical BTstack
-     * pattern (see pico-examples/pico_w/bt/standalone/server/server.c).
-     *
-     * If the controller is already running (e.g., called a second time),
-     * apply the advertisement immediately.
+     * Set advertisement data and parameters now.  BTstack stores them
+     * internally and will apply them to the controller once it is ready.
+     * gap_advertisements_enable(1) is issued from the HCI_STATE_WORKING
+     * handler — canonical BTstack pattern (pico-examples standalone/server.c).
      */
-    if (current_state == BLE_STATE_OFF) {
-        /* Controller not yet up – queue and power on */
-        adv_pending = true;
-        hci_power_control(HCI_POWER_ON);
-        /* current_state stays BLE_STATE_OFF until HCI_STATE_WORKING fires
-         * and the advertisement is actually enabled in the packet handler. */
-    } else {
-        /* Controller already running – apply directly */
-        gap_advertisements_set_data(adv_data_len, adv_data);
+    gap_advertisements_set_data(adv_data_len, adv_data);
+    {
         bd_addr_t unused_peer_addr = {0, 0, 0, 0, 0, 0};
         gap_advertisements_set_params(
-            0x00A0, 0x0140, 0, 0, unused_peer_addr, 0x07, 0);
-        gap_advertisements_enable(1);
-        current_state = BLE_STATE_ADVERTISING;
+            0x00A0,           /* adv_int_min: ~100 ms (units of 0.625 ms) */
+            0x0140,           /* adv_int_max: ~200 ms */
+            0,                /* ADV_IND: connectable undirected */
+            0,                /* own address type: public */
+            unused_peer_addr,
+            0x07,             /* all three advertising channels */
+            0                 /* no filter policy */
+        );
     }
+    hci_power_control(HCI_POWER_ON);
     return 0;
 }
 
