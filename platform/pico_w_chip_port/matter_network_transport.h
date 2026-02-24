@@ -20,7 +20,7 @@ extern "C" {
 
 // Matter controller information
 typedef struct {
-    uint32_t ip_address;        // IP address (network byte order)
+    uint8_t ip_address[16];     // IPv6 address (16 bytes)
     uint16_t port;              // UDP port for reports
     bool active;                // Controller is subscribed
     uint32_t last_report_time;  // Last time we sent a report (ms)

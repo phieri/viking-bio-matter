@@ -56,7 +56,9 @@ static void lwip_addr_to_transport_addr(const ip_addr_t *lwip_addr, uint16_t por
     if (IP_IS_V6(lwip_addr)) {
         transport_addr->is_ipv6 = true;
         memcpy(transport_addr->addr, ip_2_ip6(lwip_addr)->addr, 16);
-    } else {
+    }
+#if LWIP_IPV4
+    else {
         transport_addr->is_ipv6 = false;
         // Store IPv4 as IPv4-mapped IPv6 address
         memset(transport_addr->addr, 0, 10);
@@ -65,6 +67,7 @@ static void lwip_addr_to_transport_addr(const ip_addr_t *lwip_addr, uint16_t por
         uint32_t ipv4 = ip_2_ip4(lwip_addr)->addr;
         memcpy(&transport_addr->addr[12], &ipv4, 4);
     }
+#endif
 }
 
 /**
@@ -75,13 +78,16 @@ static void transport_addr_to_lwip_addr(const matter_transport_addr_t *transport
     if (transport_addr->is_ipv6) {
         IP_SET_TYPE(lwip_addr, IPADDR_TYPE_V6);
         memcpy(ip_2_ip6(lwip_addr)->addr, transport_addr->addr, 16);
-    } else {
+    }
+#if LWIP_IPV4
+    else {
         IP_SET_TYPE(lwip_addr, IPADDR_TYPE_V4);
         // Extract IPv4 from IPv4-mapped IPv6 address
         uint32_t ipv4;
         memcpy(&ipv4, &transport_addr->addr[12], 4);
         ip_2_ip4(lwip_addr)->addr = ipv4;
     }
+#endif
 }
 
 /**
@@ -356,6 +362,7 @@ int matter_transport_addr_from_ipv4(const char *addr_str, uint16_t port,
         return MATTER_TRANSPORT_ERROR_INVALID_PARAM;
     }
     
+#if LWIP_IPV4
     ip4_addr_t ipv4_addr;
     if (!ip4addr_aton(addr_str, &ipv4_addr)) {
         return MATTER_TRANSPORT_ERROR_INVALID_PARAM;
@@ -371,6 +378,12 @@ int matter_transport_addr_from_ipv4(const char *addr_str, uint16_t port,
     memcpy(&addr->addr[12], &ipv4_addr.addr, 4);
     
     return MATTER_TRANSPORT_SUCCESS;
+#else
+    (void)addr_str;
+    (void)port;
+    (void)addr;
+    return MATTER_TRANSPORT_ERROR_INVALID_PARAM;
+#endif
 }
 
 int matter_transport_addr_from_ipv6(const char *addr_str, uint16_t port, 
@@ -402,13 +415,19 @@ int matter_transport_addr_to_string(const matter_transport_addr_t *addr,
         memcpy(ipv6_addr.addr, addr->addr, 16);
         return snprintf(buffer, buffer_size, "[%s]:%u", 
                        ip6addr_ntoa(&ipv6_addr), addr->port);
-    } else {
+    }
+#if LWIP_IPV4
+    else {
         // Extract IPv4 from IPv4-mapped IPv6
         ip4_addr_t ipv4_addr;
         memcpy(&ipv4_addr.addr, &addr->addr[12], 4);
         return snprintf(buffer, buffer_size, "%s:%u", 
                        ip4addr_ntoa(&ipv4_addr), addr->port);
     }
+#endif
+    // Fallback: not reached when LWIP_IPV4=1 (all paths return above),
+    // and is_ipv6 should always be true when LWIP_IPV4=0.
+    return snprintf(buffer, buffer_size, "[unknown]:%u", addr->port);
 }
 
 // Legacy wrapper functions for backward compatibility
@@ -429,6 +448,7 @@ int udp_transport_send(const char *dest_ip, uint16_t dest_port,
     matter_transport_addr_t addr;
     int result;
     
+#if LWIP_IPV4
     // Try IPv4 first
     result = matter_transport_addr_from_ipv4(dest_ip, dest_port, &addr);
     if (result < 0) {
@@ -438,6 +458,13 @@ int udp_transport_send(const char *dest_ip, uint16_t dest_port,
             return result;
         }
     }
+#else
+    // IPv6 only
+    result = matter_transport_addr_from_ipv6(dest_ip, dest_port, &addr);
+    if (result < 0) {
+        return result;
+    }
+#endif
     
     return matter_transport_send(data, length, &addr);
 }
@@ -458,12 +485,15 @@ int udp_transport_recv(uint8_t *buffer, size_t buffer_size, size_t *actual_lengt
             ip6_addr_t ipv6_addr;
             memcpy(ipv6_addr.addr, source_addr.addr, 16);
             snprintf(source_ip, source_ip_size, "%s", ip6addr_ntoa(&ipv6_addr));
-        } else {
+        }
+#if LWIP_IPV4
+        else {
             // Extract IPv4 from IPv4-mapped IPv6
             ip4_addr_t ipv4_addr;
             memcpy(&ipv4_addr.addr, &source_addr.addr[12], 4);
             snprintf(source_ip, source_ip_size, "%s", ip4addr_ntoa(&ipv4_addr));
         }
+#endif
         *source_port = source_addr.port;
     }
     

@@ -12,6 +12,7 @@
 #include "lwip/udp.h"
 #include "lwip/pbuf.h"
 #include "lwip/ip_addr.h"
+#include "lwip/ip6_addr.h"
 
 // Matter controllers storage
 static matter_controller_t controllers[MAX_MATTER_CONTROLLERS];
@@ -49,15 +50,14 @@ int matter_network_transport_add_controller(const char *ip_address, uint16_t por
     // Find free controller slot
     for (int i = 0; i < MAX_MATTER_CONTROLLERS; i++) {
         if (!controllers[i].active) {
-            // Parse IP address
-            ip_addr_t ipaddr;
-            bool ip_ok = ipaddr_aton(ip_address, &ipaddr);
-            if (!ip_ok) {
-                printf("[Matter Transport] ERROR: Invalid IP address: %s\n", ip_address);
+            // Parse IPv6 address
+            ip6_addr_t ipv6_addr;
+            if (!ip6addr_aton(ip_address, &ipv6_addr)) {
+                printf("[Matter Transport] ERROR: Invalid IPv6 address: %s\n", ip_address);
                 return -1;
             }
             
-            controllers[i].ip_address = ip_addr_get_ip4_u32(&ipaddr);
+            memcpy(controllers[i].ip_address, ipv6_addr.addr, 16);
             controllers[i].port = port;
             controllers[i].active = true;
             controllers[i].last_report_time = 0;
@@ -178,8 +178,8 @@ int matter_network_transport_send_report(uint8_t endpoint, uint32_t cluster_id,
             }
         }
         
-        ip_addr_t dest_addr;
-        ip_addr_set_ip4_u32(&dest_addr, controllers[i].ip_address);
+        ip6_addr_t dest_addr;
+        memcpy(dest_addr.addr, controllers[i].ip_address, 16);
 
         // Allocate buffer for UDP packet (use msg_len for efficiency)
         struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, msg_len, PBUF_RAM);
