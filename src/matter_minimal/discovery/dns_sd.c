@@ -76,9 +76,9 @@ static void matter_txt_callback(struct mdns_service *service, void *txt_userdata
     }
     
     // DT= (Device Type) - OPTIONAL
-    // 16-bit device type value
+    // 16-bit device type value expressed as decimal per Matter 1.5 spec
     if (current_device_type != 0) {
-        len = snprintf(txt_buffer, sizeof(txt_buffer), "DT=0x%04X", current_device_type);
+        len = snprintf(txt_buffer, sizeof(txt_buffer), "DT=%u", current_device_type);
         if (len > 0 && len < sizeof(txt_buffer)) {
             mdns_resp_add_service_txtitem(service, txt_buffer, len);
             printf("  DNS-SD: Added TXT record: %s\n", txt_buffer);

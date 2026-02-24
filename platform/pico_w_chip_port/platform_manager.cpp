@@ -124,7 +124,27 @@ static int derive_setup_pin_from_mac(const uint8_t mac[6], char out_pin8[9]) {
     
     // Compute PIN = hash_value % 100000000 (8-digit decimal)
     uint32_t pin = hash_value % 100000000;
-    
+
+    // Matter spec §5.1.8.1: reject passcodes that are trivially guessable.
+    // The list of invalid passcodes is defined in the Matter Core Specification.
+    static const uint32_t invalid_pins[] = {
+        0u,        11111111u, 22222222u, 33333333u, 44444444u,
+        55555555u, 66666666u, 77777777u, 88888888u, 99999999u,
+        12345678u, 87654321u
+    };
+    for (size_t i = 0; i < sizeof(invalid_pins) / sizeof(invalid_pins[0]); i++) {
+        if (pin == invalid_pins[i]) {
+            // Rotate by 1 using the next hash bytes to get a valid PIN
+            pin = (hash_value ^ ((uint32_t)hash[4] << 16 | (uint32_t)hash[5] << 8 |
+                                  (uint32_t)hash[6])) % 100000000;
+            // Clamp to avoid 0 (which maps to 00000000 and is invalid)
+            if (pin == 0) {
+                pin = 1;
+            }
+            break;
+        }
+    }
+
     // Format as zero-padded 8-digit string
     snprintf(out_pin8, 9, "%08lu", (unsigned long)pin);
     

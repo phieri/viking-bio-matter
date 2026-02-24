@@ -51,12 +51,21 @@ int ble_adapter_start_advertising(uint16_t device_discriminator,
 int ble_adapter_stop_advertising(void);
 
 /**
- * @brief Send data over BLE connection
+ * @brief Send data over BLE connection using COBLe framing
  * @param data Pointer to data buffer
  * @param length Length of data
- * @return Number of bytes sent, or -1 on failure
+ * @return 0 on success, -1 on failure
  */
 int ble_adapter_send_data(const uint8_t *data, size_t length);
+
+/**
+ * @brief Dequeue the next fully-reassembled COBLe message received from controller.
+ * @param buffer  Destination buffer
+ * @param max_len Size of destination buffer
+ * @param actual_len Set to the actual message length on success
+ * @return 0 if a complete message was available and copied, -1 otherwise
+ */
+int ble_adapter_receive_message(uint8_t *buffer, size_t max_len, size_t *actual_len);
 
 /**
  * @brief Check if BLE is connected

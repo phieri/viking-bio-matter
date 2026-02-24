@@ -50,6 +50,25 @@ bool matter_protocol_is_commissioned(void);
 int matter_protocol_task(void);
 
 /**
+ * Process a raw Matter message received over BLE (COBLe channel).
+ *
+ * Decodes, decrypts (if secured) and routes the message through the same
+ * handlers as UDP messages.  The encoded response (if any) is placed in
+ * *output and should be sent back to the BLE controller via
+ * ble_adapter_send_data().
+ *
+ * @param input       Raw bytes of the received Matter message
+ * @param input_len   Length of input
+ * @param output      Buffer to receive the encoded response
+ * @param output_size Size of output buffer
+ * @param output_len  Set to the actual response length (0 = no response)
+ * @return 0 on success, -1 on failure
+ */
+int matter_protocol_process_ble_message(const uint8_t *input, size_t input_len,
+                                         uint8_t *output, size_t output_size,
+                                         size_t *output_len);
+
+/**
  * Deinitialize Matter protocol stack
  * Cleans up all resources
  */
