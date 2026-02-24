@@ -370,23 +370,26 @@ int ble_adapter_init(void) {
     /*
      * Characteristic 0xFFF7: TX channel – controller writes Matter
      * messages to this characteristic (Write Without Response).
+     * Parameters: uuid16, properties, read_permission, write_permission, data, data_len
      */
     char_tx_handle = att_db_util_add_characteristic_uuid16(
         0xFFF7,
         ATT_PROPERTY_WRITE_WITHOUT_RESPONSE | ATT_PROPERTY_DYNAMIC,
+        ATT_SECURITY_NONE, ATT_SECURITY_NONE,
         NULL, 0);
 
     /*
      * Characteristic 0xFFF8: RX channel – device sends Matter
      * responses to the controller via notifications.
+     * A Client Characteristic Configuration Descriptor (CCCD) at
+     * char_rx_handle+1 is automatically created by BTstack when
+     * ATT_PROPERTY_NOTIFY is specified.
      */
     char_rx_handle = att_db_util_add_characteristic_uuid16(
         0xFFF8,
         ATT_PROPERTY_NOTIFY | ATT_PROPERTY_DYNAMIC,
+        ATT_SECURITY_NONE, ATT_SECURITY_NONE,
         NULL, 0);
-
-    /* CCCD (0x2902) so the controller can enable notifications */
-    att_db_util_add_client_characteristic_configuration();
 
     /* Start the ATT server with the database we just built */
     att_server_init(att_db_util_get_address(),
@@ -519,11 +522,11 @@ int ble_adapter_send_data(const uint8_t *data, size_t length) {
         memcpy(fragment + frag_hdr, data + sent, chunk);
         sent += chunk;
 
-        int err = att_server_notify(active_con_handle, char_rx_handle,
+        uint8_t err = att_server_notify(active_con_handle, char_rx_handle,
                                     fragment, (uint16_t)(frag_hdr + chunk));
-        if (err != 0) {
-            printf("BLE: Notification failed (err=%d, sent=%zu/%zu)\n",
-                   err, sent - chunk, length);
+        if (err != ERROR_CODE_SUCCESS) {
+            printf("BLE: Notification failed (err=0x%02X, sent=%zu/%zu)\n",
+                   (unsigned)err, sent - chunk, length);
             return -1;
         }
     }
