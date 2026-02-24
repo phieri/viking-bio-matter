@@ -469,9 +469,9 @@ int ble_adapter_stop_advertising(void) {
  * ble_adapter_send_data – send a raw Matter message over the BLE RX
  * characteristic using COBLe framing (Matter Core Spec §3.6.1).
  *
- * Large messages are fragmented into ATT-sized segments.
- * Uses the default conservative fragment size; the controller will
- * negotiate a larger MTU if desired.
+ * Large messages are fragmented into segments whose payload fits within
+ * the current ATT MTU (queried via att_server_get_mtu()).  Falls back to
+ * the BLE default (20 bytes) if the MTU has not been negotiated yet.
  */
 int ble_adapter_send_data(const uint8_t *data, size_t length) {
     if (!ble_initialized || active_con_handle == HCI_CON_HANDLE_INVALID ||
@@ -480,18 +480,21 @@ int ble_adapter_send_data(const uint8_t *data, size_t length) {
     }
 
     /*
-     * Conservative fragment payload size: allow 4 bytes for the
-     * SYN header (flags + counter + length-LE16) leaving room
-     * within the default 20-byte BLE payload.  Controllers that
-     * negotiate a larger MTU will still receive valid fragments.
+     * Determine the maximum ATT payload per fragment.
+     * ATT MTU includes the 1-byte opcode and 2-byte handle → subtract 3.
+     * Guard the result: att_server_get_mtu() may return 0 before negotiation.
      */
-    const size_t MAX_PAYLOAD_PER_FRAG = 244u; /* Negotiated ATT MTU (247) minus
-                                                * 3-byte ATT PDU header         */
-    const size_t MAX_DATA_IN_FIRST    = MAX_PAYLOAD_PER_FRAG - 4u; /* SYN hdr */
-    const size_t MAX_DATA_IN_REST     = MAX_PAYLOAD_PER_FRAG - 1u; /* flags only */
+    uint16_t att_mtu = att_server_get_mtu(active_con_handle);
+    if (att_mtu < 23u) {
+        att_mtu = 23u;   /* BLE default MTU */
+    }
+    const size_t MAX_ATT_DATA = (size_t)(att_mtu - 3u); /* subtract ATT header */
 
-    uint8_t fragment[247];
-    size_t  sent    = 0;
+    const size_t MAX_DATA_IN_FIRST = MAX_ATT_DATA - 4u; /* SYN hdr: flags+ctr+len16 */
+    const size_t MAX_DATA_IN_REST  = MAX_ATT_DATA - 1u; /* flags only              */
+
+    uint8_t fragment[256]; /* larger than any supported ATT MTU */
+    size_t  sent     = 0;
     bool    is_first = true;
 
     while (sent < length) {
@@ -523,7 +526,7 @@ int ble_adapter_send_data(const uint8_t *data, size_t length) {
         sent += chunk;
 
         uint8_t err = att_server_notify(active_con_handle, char_rx_handle,
-                                    fragment, (uint16_t)(frag_hdr + chunk));
+                                        fragment, (uint16_t)(frag_hdr + chunk));
         if (err != ERROR_CODE_SUCCESS) {
             printf("BLE: Notification failed (err=0x%02X, sent=%zu/%zu)\n",
                    (unsigned)err, sent - chunk, length);
@@ -531,8 +534,6 @@ int ble_adapter_send_data(const uint8_t *data, size_t length) {
         }
     }
 
-    printf("BLE: Sent %zu-byte message via COBLe (%zu fragments)\n",
-           length, (length + MAX_DATA_IN_FIRST - 1) / MAX_DATA_IN_FIRST);
     return 0;
 }
 

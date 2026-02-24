@@ -48,7 +48,10 @@
 #define ENABLE_PRINTF_HEXDUMP
 
 // HCI
-#define HCI_ACL_PAYLOAD_SIZE 69
+// HCI_ACL_PAYLOAD_SIZE must be large enough to hold a maximum-sized LE ATT PDU.
+// Matter BLE commissioning controllers negotiate a 247-byte ATT MTU. With the
+// 4-byte L2CAP header, the ACL payload needs to be at least 251 bytes.
+#define HCI_ACL_PAYLOAD_SIZE 256
 #define HCI_ACL_CHUNK_SIZE_ALIGNMENT 4
 #define HCI_OUTGOING_PRE_BUFFER_SIZE 4
 
