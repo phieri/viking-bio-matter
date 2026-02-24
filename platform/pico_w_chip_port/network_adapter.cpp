@@ -10,7 +10,7 @@
 #include "pico/cyw43_arch.h"
 #include "lwip/netif.h"
 #include "lwip/ip_addr.h"
-#include "lwip/dhcp.h"
+#include "lwip/ip6_addr.h"
 
 // Forward declaration of storage functions
 extern "C" {
@@ -105,9 +105,13 @@ int network_adapter_connect(const char *ssid, const char *password) {
     struct netif *netif = netif_default;
     if (netif) {
         printf("WiFi connected successfully\n");
-        printf("IP Address: %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
-        printf("Netmask: %s\n", ip4addr_ntoa(netif_ip4_netmask(netif)));
-        printf("Gateway: %s\n", ip4addr_ntoa(netif_ip4_gw(netif)));
+#if LWIP_IPV6
+        for (int i = 0; i < LWIP_IPV6_NUM_ADDRESSES; i++) {
+            if (ip6_addr_isvalid(netif_ip6_addr_state(netif, i))) {
+                printf("IPv6 Address[%d]: %s\n", i, ip6addr_ntoa(netif_ip6_addr(netif, i)));
+            }
+        }
+#endif
     }
 
     current_mode = NETWORK_MODE_STA;
@@ -147,7 +151,7 @@ void network_adapter_get_ip_address(char *buffer, size_t buffer_len) {
     }
 
     if (!wifi_initialized) {
-        snprintf(buffer, buffer_len, "0.0.0.0");
+        snprintf(buffer, buffer_len, "::");
         return;
     }
 
@@ -159,10 +163,19 @@ void network_adapter_get_ip_address(char *buffer, size_t buffer_len) {
     }
 
     if (netif && netif_is_up(netif)) {
-        const char *ip_str = ip4addr_ntoa(netif_ip4_addr(netif));
-        snprintf(buffer, buffer_len, "%s", ip_str);
+#if LWIP_IPV6
+        // Return first valid IPv6 address
+        for (int i = 0; i < LWIP_IPV6_NUM_ADDRESSES; i++) {
+            if (ip6_addr_isvalid(netif_ip6_addr_state(netif, i))) {
+                const char *ip_str = ip6addr_ntoa(netif_ip6_addr(netif, i));
+                snprintf(buffer, buffer_len, "%s", ip_str);
+                return;
+            }
+        }
+#endif
+        snprintf(buffer, buffer_len, "::");
     } else {
-        snprintf(buffer, buffer_len, "0.0.0.0");
+        snprintf(buffer, buffer_len, "::");
     }
 }
 
