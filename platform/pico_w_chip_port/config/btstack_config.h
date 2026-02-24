@@ -7,33 +7,28 @@
 #ifndef BTSTACK_CONFIG_H
 #define BTSTACK_CONFIG_H
 
-// BTstack features
+// BTstack features — peripheral-only; no central scanning, no BLE-layer security
+// (Matter uses PASE/CASE for application-layer security; BLE SM pairing is not needed)
 #define ENABLE_BLE
 #define ENABLE_LE_PERIPHERAL
-#define ENABLE_LE_CENTRAL
-#define ENABLE_L2CAP_LE_CREDIT_BASED_FLOW_CONTROL_MODE
 
 // BTstack configuration
-#define MAX_NR_WHITELIST_ENTRIES 16
+#define MAX_NR_WHITELIST_ENTRIES 4
 #define MAX_NR_HCI_CONNECTIONS 1
-#define MAX_NR_L2CAP_SERVICES 3
-#define MAX_NR_L2CAP_CHANNELS 3
+#define MAX_NR_L2CAP_SERVICES 2
+#define MAX_NR_L2CAP_CHANNELS 2
 #define MAX_NR_RFCOMM_MULTIPLEXERS 0
 #define MAX_NR_RFCOMM_SERVICES 0
 #define MAX_NR_RFCOMM_CHANNELS 0
 #define MAX_NR_BTSTACK_LINK_KEY_DB_MEMORY_ENTRIES 2
-#define MAX_NR_LE_DEVICE_DB_ENTRIES 3
-#define NVM_NUM_DEVICE_DB_ENTRIES 3
+#define MAX_NR_LE_DEVICE_DB_ENTRIES 2
+#define NVM_NUM_DEVICE_DB_ENTRIES 2
 #define MAX_NR_BNEP_SERVICES 0
 #define MAX_NR_BNEP_CHANNELS 0
 #define MAX_NR_HFP_CONNECTIONS 0
 #define MAX_NR_GATT_CLIENTS 0
-#define MAX_NR_SM_LOOKUP_ENTRIES 3
+#define MAX_NR_SM_LOOKUP_ENTRIES 2
 #define MAX_NR_MESH_VIRTUAL_ADDRESSES 0
-
-// LE Security Manager
-#define ENABLE_LE_SECURE_CONNECTIONS
-#define ENABLE_LE_PRIVACY_ADDRESS_RESOLUTION
 
 // ATT DB configuration
 #define MAX_ATT_DB_SIZE 512

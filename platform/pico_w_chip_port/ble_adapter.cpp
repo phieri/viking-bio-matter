@@ -60,15 +60,6 @@
 /* Maximum reassembled Matter-over-BLE message size */
 #define COBLE_MAX_MSG_SIZE      1024u
 
-/*
- * CHIPoBLE service UUID128: 0000FFF6-0000-1000-8000-00805F9B34FB
- * Stored little-endian (ATT byte order).
- */
-static const uint8_t MATTER_BLE_SVC_UUID128[16] = {
-    0xFB, 0x34, 0x9B, 0x5F, 0x80, 0x00, 0x00, 0x80,
-    0x00, 0x10, 0x00, 0x00, 0xF6, 0xFF, 0x00, 0x00
-};
-
 /* ------------------------------------------------------------------ */
 /* Internal state                                                       */
 /* ------------------------------------------------------------------ */
@@ -83,11 +74,6 @@ static btstack_packet_callback_registration_t hci_event_cb_reg;
 /* Advertisement payload (max 31 bytes for legacy BLE adv) */
 static uint8_t adv_data[31];
 static uint8_t adv_data_len = 0;
-
-/* Advertising parameters saved by start_advertising() so they can be
- * applied inside the BTSTACK_EVENT_STATE / HCI_STATE_WORKING handler
- * (canonical BTstack pattern from pico-examples/pico_w/bt/standalone). */
-static bool     adv_pending       = false;
 
 /* GATT attribute handles for CHIPoBLE characteristics */
 static uint16_t char_tx_handle = 0;   /* 0xFFF7 value handle (Write WR) */
@@ -238,29 +224,16 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
         case BTSTACK_EVENT_STATE: {
             uint8_t state = btstack_event_state_get_state(packet);
             if (state == HCI_STATE_WORKING) {
-                printf("BLE: HCI controller ready\n");
+                printf("BLE: HCI controller ready — enabling advertisements\n");
                 /*
-                 * Apply advertisement data and parameters now that the
-                 * controller is up.  This is the canonical BTstack pattern:
-                 * set up advertisement inside the HCI_STATE_WORKING handler
-                 * so we know the controller can accept GAP commands.
+                 * gap_advertisements_set_data() and gap_advertisements_set_params()
+                 * were already called in ble_adapter_start_advertising() and stored
+                 * internally by BTstack.  Now that HCI is up, issue the enable
+                 * command.  This is the canonical BTstack pattern from
+                 * pico-examples/pico_w/bt/standalone/server/server.c.
                  */
-                if (adv_pending) {
-                    gap_advertisements_set_data(adv_data_len, adv_data);
-                    bd_addr_t unused_peer_addr = {0, 0, 0, 0, 0, 0};
-                    gap_advertisements_set_params(
-                        0x00A0,           /* adv_int_min: ~100 ms (units of 0.625 ms) */
-                        0x0140,           /* adv_int_max: ~200 ms */
-                        0,                /* ADV_IND: connectable undirected */
-                        0,                /* own address type: public */
-                        unused_peer_addr,
-                        0x07,             /* all three advertising channels */
-                        0                 /* no filter policy */
-                    );
-                    gap_advertisements_enable(1);
-                    adv_pending = false;
-                    current_state = BLE_STATE_ADVERTISING;
-                }
+                gap_advertisements_enable(1);
+                current_state = BLE_STATE_ADVERTISING;
             } else if (state == HCI_STATE_OFF) {
                 current_state       = BLE_STATE_OFF;
                 active_con_handle   = HCI_CON_HANDLE_INVALID;
