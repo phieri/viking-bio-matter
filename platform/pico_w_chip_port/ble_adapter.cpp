@@ -89,9 +89,28 @@ static uint16_t adv_vendor_id     = 0;
 static uint16_t adv_product_id    = 0;
 static bool     adv_configured    = false;
 
+/*
+ * CHIPoBLE characteristic 128-bit UUIDs per Matter Core Spec §4.12.
+ * UUID string form is represented big-endian (MSB first), which is how
+ * BTstack's att_db_util_add_characteristic_uuid128() expects them.
+ *
+ * C1 (controller → device, Write Without Response):
+ *   18EE2EF5-263D-4559-959F-4F9C429F9D11
+ * C2 (device → controller, Notify + CCCD):
+ *   18EE2EF5-263D-4559-959F-4F9C429F9D12
+ */
+static const uint8_t chip_c1_uuid128[16] = {
+    0x18, 0xEE, 0x2E, 0xF5, 0x26, 0x3D, 0x45, 0x59,
+    0x95, 0x9F, 0x4F, 0x9C, 0x42, 0x9F, 0x9D, 0x11
+};
+static const uint8_t chip_c2_uuid128[16] = {
+    0x18, 0xEE, 0x2E, 0xF5, 0x26, 0x3D, 0x45, 0x59,
+    0x95, 0x9F, 0x4F, 0x9C, 0x42, 0x9F, 0x9D, 0x12
+};
+
 /* GATT attribute handles for CHIPoBLE characteristics */
-static uint16_t char_tx_handle = 0;   /* 0xFFF7 value handle (Write WR) */
-static uint16_t char_rx_handle = 0;   /* 0xFFF8 value handle (Notify)   */
+static uint16_t char_tx_handle = 0;   /* C1 value handle (Write WR, controller→device) */
+static uint16_t char_rx_handle = 0;   /* C2 value handle (Notify, device→controller)   */
 
 /* Active BLE connection handle (HCI_CON_HANDLE_INVALID when disconnected) */
 static hci_con_handle_t active_con_handle = HCI_CON_HANDLE_INVALID;
@@ -264,8 +283,8 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
 
                     bd_addr_t unused_peer_addr = {0, 0, 0, 0, 0, 0};
                     gap_advertisements_set_params(
-                        0x00A0,           /* adv_int_min: ~100 ms */
-                        0x0140,           /* adv_int_max: ~200 ms */
+                        0x0020,           /* adv_int_min: 32 × 0.625ms = 20ms (Matter spec §5.4.2.2 min) */
+                        0x0060,           /* adv_int_max: 96 × 0.625ms = 60ms (Matter spec §5.4.2.2 max) */
                         0,                /* ADV_IND: connectable undirected */
                         0,                /* own address type: public */
                         unused_peer_addr,
@@ -483,25 +502,28 @@ int ble_adapter_init(void) {
     att_db_util_add_service_uuid16(0xFFF6);
 
     /*
-     * Characteristic 0xFFF7: TX channel – controller writes Matter
-     * messages to this characteristic (Write Without Response).
-     * Parameters: uuid16, properties, read_permission, write_permission, data, data_len
+     * C1 characteristic (18EE2EF5-263D-4559-959F-4F9C429F9D11):
+     * Controller writes Matter messages to this characteristic
+     * (Write Without Response).
+     * Per Matter Core Spec §4.12.3.2 — MUST use the 128-bit UUID; iOS
+     * and other controllers will NOT find this characteristic if a
+     * 16-bit shorthand (0xFFF7) is used instead.
      */
-    char_tx_handle = att_db_util_add_characteristic_uuid16(
-        0xFFF7,
+    char_tx_handle = att_db_util_add_characteristic_uuid128(
+        chip_c1_uuid128,
         ATT_PROPERTY_WRITE_WITHOUT_RESPONSE | ATT_PROPERTY_DYNAMIC,
         ATT_SECURITY_NONE, ATT_SECURITY_NONE,
         NULL, 0);
 
     /*
-     * Characteristic 0xFFF8: RX channel – device sends Matter
-     * responses to the controller via notifications.
-     * A Client Characteristic Configuration Descriptor (CCCD) at
-     * char_rx_handle+1 is automatically created by BTstack when
-     * ATT_PROPERTY_NOTIFY is specified.
+     * C2 characteristic (18EE2EF5-263D-4559-959F-4F9C429F9D12):
+     * Device sends Matter responses to the controller via notifications.
+     * Per Matter Core Spec §4.12.3.3 — MUST use the 128-bit UUID.
+     * A CCCD is automatically created by BTstack when ATT_PROPERTY_NOTIFY
+     * is specified.
      */
-    char_rx_handle = att_db_util_add_characteristic_uuid16(
-        0xFFF8,
+    char_rx_handle = att_db_util_add_characteristic_uuid128(
+        chip_c2_uuid128,
         ATT_PROPERTY_NOTIFY | ATT_PROPERTY_DYNAMIC,
         ATT_SECURITY_NONE, ATT_SECURITY_NONE,
         NULL, 0);
