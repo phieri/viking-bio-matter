@@ -20,6 +20,10 @@
 // TXT record buffer
 #define TXT_BUFFER_SIZE 128
 
+// Pairing Hint (PH) bit flags per Matter 1.5 spec section 4.3.1.3
+#define MATTER_PH_POWER_CYCLE    (1u << 0)  // Power cycle device
+#define MATTER_PH_SEE_MANUAL     (1u << 5)  // See device manual for commissioning instructions
+
 // Static state
 static bool is_advertising = false;
 static uint16_t current_discriminator = 0;
@@ -84,6 +88,16 @@ static void matter_txt_callback(struct mdns_service *service, void *txt_userdata
     // CM= (Commissioning Mode) - Flag
     // 1 = in commissioning mode, 0 = commissioned
     len = snprintf(txt_buffer, sizeof(txt_buffer), "CM=%u", current_commissioning_mode);
+    if (len > 0 && len < sizeof(txt_buffer)) {
+        mdns_resp_add_service_txtitem(service, txt_buffer, len);
+        printf("  DNS-SD: Added TXT record: %s\n", txt_buffer);
+    }
+
+    // PH= (Pairing Hint) - MANDATORY per Matter 1.5 spec section 4.3.1.3
+    // Bit 0 (1): Power cycle device
+    // Bit 5 (32): See device manual for commissioning instructions
+    len = snprintf(txt_buffer, sizeof(txt_buffer), "PH=%u",
+                   (unsigned)(MATTER_PH_POWER_CYCLE | MATTER_PH_SEE_MANUAL));
     if (len > 0 && len < sizeof(txt_buffer)) {
         mdns_resp_add_service_txtitem(service, txt_buffer, len);
         printf("  DNS-SD: Added TXT record: %s\n", txt_buffer);

@@ -13,7 +13,8 @@
 #endif
 #define MEM_ALIGNMENT               4
 #ifndef MEM_SIZE
-#define MEM_SIZE                    4000
+// 8KB required for mDNS responder memory allocation at init (mdns_resp_init())
+#define MEM_SIZE                    (8 * 1024)
 #endif
 #define MEMP_NUM_TCP_SEG            32
 #define MEMP_NUM_ARP_QUEUE          10
@@ -46,6 +47,8 @@
 #define LWIP_NETIF_TX_SINGLE_PBUF   1
 #define DHCP_DOES_ARP_CHECK         0
 #define LWIP_DHCP_DOES_ACD_CHECK    0
+#define LWIP_MDNS_RESPONDER         1
+#define LWIP_NUM_NETIF_CLIENT_DATA  2
 
 #ifndef NDEBUG
 #define LWIP_DEBUG                  1
