@@ -52,14 +52,53 @@
 /* ------------------------------------------------------------------ */
 
 /*
- * COBLe (CHIP over BLE) segment header flags per Matter Core Spec §3.6.1.2.1
- *   bit 0 (0x01) - CONN_START (SYN): first segment of a new message
- *   bit 1 (0x02) - CONN_END   (FIN): last segment of a message
- *   bit 2 (0x04) - ACK_MSG        : ack counter present in header
+ * BTP (Bluetooth Transport Protocol) fragment header flags.
+ * Defined by connectedhomeip src/ble/BtpEngine.h (class HeaderFlags).
+ *
+ *   0x01 kStartMessage    – first segment of a message
+ *   0x02 kContinueMessage – middle segment (not first, not last)
+ *   0x04 kEndMessage      – last segment of a message
+ *   0x08 kFragmentAck     – ACK counter field present after flags byte
+ *
+ * A single-fragment message has both kStartMessage and kEndMessage set
+ * (flags = 0x05).  The ACK counter (0x08) is a separate optional field
+ * and must NOT be confused with kEndMessage (0x04).
  */
-#define COBLE_FLAG_SYN          0x01u
-#define COBLE_FLAG_FIN          0x02u
-#define COBLE_FLAG_ACK          0x04u
+#define COBLE_FLAG_START    0x01u   /* kStartMessage:    first fragment     */
+#define COBLE_FLAG_CONTINUE 0x02u   /* kContinueMessage: middle fragment    */
+#define COBLE_FLAG_END      0x04u   /* kEndMessage:      last fragment      */
+#define COBLE_FLAG_ACK      0x08u   /* kFragmentAck:     ACK counter present */
+/* Aliases used by coble_tx_send_next (keep backward-compat names) */
+#define COBLE_FLAG_SYN  COBLE_FLAG_START
+#define COBLE_FLAG_FIN  COBLE_FLAG_END
+
+/*
+ * BLE Transport Capabilities exchange magic bytes.
+ * The BLE transport capabilities request/response are raw packets written
+ * directly to C1 (NOT BTP-framed).  They are identified by the first two
+ * bytes being the magic values below.
+ * Source: connectedhomeip src/ble/BleLayer.cpp
+ *   CAPABILITIES_MSG_CHECK_BYTE_1 = 0b01100101 = 0x65
+ *   CAPABILITIES_MSG_CHECK_BYTE_2 = 0b01101100 = 0x6C
+ *
+ * Capabilities request (9 bytes, central → peripheral, written to C1):
+ *   bytes 0-1: magic (0x65 0x6C)
+ *   bytes 2-5: supported BTP versions (4 bytes of packed nibbles)
+ *   bytes 6-7: client ATT MTU (little-endian, may be 0 if unknown)
+ *   byte  8  : client receive window size
+ *
+ * Capabilities response (6 bytes, peripheral → central, via C2 indication):
+ *   bytes 0-1: magic (0x65 0x6C)
+ *   byte  2  : selected BTP version
+ *   bytes 3-4: fragment size = min(ATT_MTU - 3, 244) (little-endian)
+ *   byte  5  : peripheral receive window size
+ */
+#define BLE_CAPS_MAGIC_1    0x65u   /* capabilities message magic byte 1 */
+#define BLE_CAPS_MAGIC_2    0x6Cu   /* capabilities message magic byte 2 */
+#define BLE_CAPS_REQ_LEN    9u      /* fixed length of capabilities request  */
+#define BLE_CAPS_RESP_LEN   6u      /* fixed length of capabilities response */
+#define BLE_CAPS_VERSION    4u      /* BTP version 4 (only version in use)   */
+#define BLE_CAPS_WINDOW     6u      /* peripheral receive window size        */
 
 /* Maximum reassembled Matter-over-BLE message size */
 #define COBLE_MAX_MSG_SIZE      1024u
@@ -84,8 +123,6 @@ static ble_state_t current_state   = BLE_STATE_OFF;
 static bool        ble_initialized = false;
 static ble_data_received_callback_t data_callback = NULL;
 static ble_connection_callback_t    conn_callback  = NULL;
-
-static btstack_packet_callback_registration_t hci_event_cb_reg;
 
 /* Advertisement payload (max 31 bytes for legacy BLE adv) */
 static uint8_t adv_data[31];
@@ -121,8 +158,22 @@ static const uint8_t chip_c2_uuid128[16] = {
 };
 
 /* GATT attribute handles for CHIPoBLE characteristics */
-static uint16_t char_tx_handle = 0;   /* C1 value handle (Write WR, controller→device) */
-static uint16_t char_rx_handle = 0;   /* C2 value handle (Notify, device→controller)   */
+static uint16_t char_tx_handle      = 0;   /* C1 value handle (Write WR, controller→device) */
+static uint16_t char_rx_handle      = 0;   /* C2 value handle (Notify, device→controller)   */
+static uint16_t char_rx_cccd_handle = 0;   /* C2 CCCD handle  (= char_rx_handle + 1)        */
+
+/*
+ * C2 Client Characteristic Configuration Descriptor (CCCD) value.
+ *
+ * BTstack marks the auto-generated CCCD as ATT_PROPERTY_DYNAMIC, meaning
+ * all reads/writes go through att_read_callback / att_write_callback.  We
+ * must therefore maintain the CCCD state ourselves so that:
+ *   (a) att_read_callback returns the correct 2-byte value when iOS reads it
+ *   (b) att_server_indicate() / att_server_notify() can verify iOS subscribed
+ *       (BTstack reads the CCCD via att_read_callback before sending)
+ * Value 0x0000 = disabled, 0x0001 = notifications, 0x0002 = indications.
+ */
+static uint16_t char_rx_cccd_value  = 0;
 
 /* Active BLE connection handle (HCI_CON_HANDLE_INVALID when disconnected) */
 static hci_con_handle_t active_con_handle = HCI_CON_HANDLE_INVALID;
@@ -137,8 +188,11 @@ static size_t   coble_rx_total_len   = 0;
 static bool     coble_rx_in_progress = false;
 static bool     coble_rx_ready       = false;
 
-/* Outgoing message counter (incremented per transmitted message) */
-static uint8_t  coble_tx_counter     = 0;
+/* Outgoing message counter (incremented per transmitted fragment).
+ * Peripheral TX sequence numbers start at 1 per the BTP spec
+ * (connectedhomeip BtpEngine::Init with expect_first_ack=true sets
+ * mTxNextSeqNum = 1).  Reset to 1 on each disconnect. */
+static uint8_t  coble_tx_counter     = 1;
 
 /* ------------------------------------------------------------------ */
 /* Indication-based TX state (COBLe fragmented sending via indicate)   */
@@ -150,6 +204,16 @@ static size_t   coble_tx_msg_sent        = 0;
 static bool     coble_tx_first_frag      = false;
 static bool     coble_tx_active          = false;
 
+/*
+ * BLE transport capabilities response.
+ *
+ * Built when the capabilities request (magic bytes 0x65 0x6C) arrives on C1.
+ * Sent as a C2 indication when the central subsequently subscribes (writes
+ * CCCD = 0x0002).  Cleared on disconnect.
+ */
+static uint8_t  ble_caps_resp[BLE_CAPS_RESP_LEN];
+static bool     ble_caps_resp_ready = false;
+
 /* Forward declaration for indication-driven fragment sender */
 static void coble_tx_send_next(void);
 
@@ -158,7 +222,13 @@ static void coble_tx_send_next(void);
 /* ------------------------------------------------------------------ */
 
 /*
- * att_read_callback – no readable dynamic characteristics, return 0.
+ * att_read_callback – return CCCD value for C2; return 0 bytes for everything
+ * else (no other readable dynamic characteristics).
+ *
+ * BTstack calls this for DYNAMIC attributes when:
+ *   • A central reads an attribute directly (ATT Read Request)
+ *   • att_server_indicate() / att_server_notify() checks the CCCD to decide
+ *     whether the client has subscribed before sending
  */
 static uint16_t att_read_callback(hci_con_handle_t connection_handle,
                                    uint16_t att_handle,
@@ -166,25 +236,52 @@ static uint16_t att_read_callback(hci_con_handle_t connection_handle,
                                    uint8_t *buffer,
                                    uint16_t buffer_size) {
     (void)connection_handle;
-    (void)att_handle;
     (void)offset;
+
+    if (att_handle == char_rx_cccd_handle) {
+        /* Return the 2-byte CCCD value (little-endian). */
+        if (buffer && buffer_size >= 2) {
+            buffer[0] = (uint8_t)(char_rx_cccd_value & 0xFF);
+            buffer[1] = (uint8_t)(char_rx_cccd_value >> 8);
+        }
+        return 2;
+    }
+
     (void)buffer;
     (void)buffer_size;
     return 0;
 }
 
 /*
- * att_write_callback – receives COBLe segments written to characteristic 0xFFF7.
+ * att_write_callback – receives raw writes to C1 and CCCD writes to C2.
  *
- * Packet format per Matter Core Spec §3.6.1.2.1:
- *   byte 0      : flags (SYN=0x01, FIN=0x02, ACK=0x04)
- *   if SYN:
- *     byte 1    : message counter
- *     bytes 2-3 : total message length (little-endian uint16)
- *   if ACK:
- *     next byte : ack counter
- *   remaining   : payload bytes
+ * C1 can receive two types of writes:
+ *
+ *  (a) BLE Transport Capabilities Request (9 bytes, magic 0x65 0x6C)
+ *      NOT a BTP-framed message.  Arrives before the central subscribes
+ *      to C2.  We build the 6-byte capabilities response and queue it;
+ *      it is sent as a C2 indication when the subscribe (CCCD write) arrives.
+ *
+ *  (b) BTP data frame (variable length, first byte is the BTP flags byte)
+ *      BTP frame format (connectedhomeip BtpEngine):
+ *        byte 0      : flags
+ *                      0x01 kStartMessage  – first segment
+ *                      0x02 kContinueMessage – middle segment
+ *                      0x04 kEndMessage    – last segment
+ *                      0x08 kFragmentAck   – ACK counter byte follows
+ *        if ACK(0x08): 1 byte ack counter
+ *        ALWAYS      : 1 byte sequence number
+ *        if Start    : 2 bytes total message length (LE)
+ *        payload bytes
+ *
+ * C2 CCCD receives the subscription value (0x0000/0x0001/0x0002).
+ * If the value is 0x0002 (indications) and we have a queued capabilities
+ * response, we send it immediately as a C2 indication.
  */
+
+/* Forward declaration for capabilities request handler (defined below) */
+static void handle_capabilities_request(const uint8_t *buf, uint16_t len);
+
 static int att_write_callback(hci_con_handle_t connection_handle,
                                uint16_t att_handle,
                                uint16_t transaction_mode,
@@ -195,27 +292,79 @@ static int att_write_callback(hci_con_handle_t connection_handle,
     (void)transaction_mode;
     (void)offset;
 
+    /* ---- C2 CCCD: record subscription; send queued caps response ---- */
+    if (att_handle == char_rx_cccd_handle) {
+        if (buffer_size >= 2) {
+            char_rx_cccd_value = (uint16_t)(buffer[0] |
+                                  ((uint16_t)buffer[1] << 8));
+            printf("BLE: C2 CCCD = 0x%04X%s\n",
+                   (unsigned)char_rx_cccd_value,
+                   char_rx_cccd_value == 0x0002 ? " (indications enabled)" :
+                   char_rx_cccd_value == 0x0001 ? " (notifications enabled)" :
+                                                  " (disabled)");
+        }
+        /*
+         * Send the queued BLE transport capabilities response as a C2
+         * indication now that the central has subscribed.  This mirrors
+         * connectedhomeip BLEEndPoint::HandleSubscribeReceived().
+         */
+        if (char_rx_cccd_value == 0x0002 && ble_caps_resp_ready &&
+                active_con_handle != HCI_CON_HANDLE_INVALID) {
+            uint8_t err = att_server_indicate(active_con_handle, char_rx_handle,
+                                              ble_caps_resp, sizeof(ble_caps_resp));
+            if (err != ERROR_CODE_SUCCESS) {
+                err = att_server_notify(active_con_handle, char_rx_handle,
+                                        ble_caps_resp, sizeof(ble_caps_resp));
+            }
+            if (err == ERROR_CODE_SUCCESS) {
+                ble_caps_resp_ready = false;
+                printf("BLE BTP: Caps RESP sent on subscribe\n");
+            } else {
+                printf("BLE BTP: Caps RESP send failed (err=0x%02X)\n",
+                       (unsigned)err);
+            }
+        }
+        return 0;
+    }
+
+    /* All other writes must target C1 */
     if (att_handle != char_tx_handle || buffer_size < 1) {
         return 0;
     }
 
-    uint8_t  flags         = buffer[0];
-    uint16_t payload_start = 1;
+    /* ---- BLE transport capabilities request (magic 0x65 0x6C) ---- */
+    if (buffer_size >= 2 &&
+            buffer[0] == BLE_CAPS_MAGIC_1 &&
+            buffer[1] == BLE_CAPS_MAGIC_2) {
+        handle_capabilities_request(buffer, buffer_size);
+        return 0;
+    }
 
-    if (flags & COBLE_FLAG_SYN) {
-        /* First segment – header contains counter + total length */
-        if (buffer_size < 4) {
+    /* ---- BTP data frame ---- */
+    uint8_t  flags  = buffer[0];
+    uint16_t offset2 = 1;   /* position after the flags byte */
+
+    /* Skip ACK counter if present (before sequence number) */
+    if (flags & COBLE_FLAG_ACK) {
+        if (offset2 >= buffer_size) return 0;
+        offset2++;
+    }
+
+    /* Sequence number is always present */
+    if (offset2 >= buffer_size) return 0;
+    offset2++;  /* skip seq_num */
+
+    if (flags & COBLE_FLAG_START) {
+        /* First fragment: read total message length */
+        if (offset2 + 1 >= buffer_size) {
             printf("BLE COBLe: SYN segment too short (%u bytes)\n",
                    (unsigned)buffer_size);
             return 0;
         }
 
-        /* byte[1] = message counter (consume but don't act on for now) */
-        payload_start++;        /* skip counter                  */
-
-        uint16_t total_len = (uint16_t)(buffer[payload_start] |
-                             ((uint16_t)buffer[payload_start + 1] << 8));
-        payload_start += 2;
+        uint16_t total_len = (uint16_t)(buffer[offset2] |
+                             ((uint16_t)buffer[offset2 + 1] << 8));
+        offset2 += 2;
 
         if (total_len > COBLE_MAX_MSG_SIZE) {
             printf("BLE COBLe: Message too large (%u bytes), dropping\n",
@@ -228,29 +377,22 @@ static int att_write_callback(hci_con_handle_t connection_handle,
         coble_rx_total_len   = total_len;
         coble_rx_in_progress = true;
         coble_rx_ready       = false;
-    }
-
-    /* Skip optional ACK byte when present */
-    if ((flags & COBLE_FLAG_ACK) && payload_start < buffer_size) {
-        payload_start++;
-    }
-
-    if (!coble_rx_in_progress) {
-        return 0;   /* FIN without SYN – stray segment, ignore */
+    } else if (!coble_rx_in_progress) {
+        return 0;   /* Continue/End without prior Start – stray segment, ignore */
     }
 
     /* Append payload bytes to reassembly buffer */
-    if (payload_start < buffer_size) {
-        uint16_t data_len = buffer_size - payload_start;
+    if (offset2 < buffer_size) {
+        uint16_t data_len = buffer_size - offset2;
         if (coble_rx_offset + data_len > COBLE_MAX_MSG_SIZE) {
             data_len = (uint16_t)(COBLE_MAX_MSG_SIZE - coble_rx_offset);
         }
         memcpy(coble_rx_buf + coble_rx_offset,
-               buffer + payload_start, data_len);
+               buffer + offset2, data_len);
         coble_rx_offset += data_len;
     }
 
-    if (flags & COBLE_FLAG_FIN) {
+    if (flags & COBLE_FLAG_END) {
         coble_rx_ready       = true;
         coble_rx_in_progress = false;
         printf("BLE COBLe: Complete message received (%zu/%zu bytes)\n",
@@ -273,9 +415,166 @@ static void build_matter_adv_data(uint16_t discriminator,
 static void build_scan_response(void);
 
 /* ------------------------------------------------------------------ */
-/* HCI + ATT packet handler                                             */
+/* BLE transport capabilities request handler                          */
 /* ------------------------------------------------------------------ */
 
+/*
+ * handle_capabilities_request – process a BLE transport capabilities
+ * request received on C1, build a capabilities response, and queue it.
+ * The response is sent as a C2 indication when the central subscribes
+ * (writes CCCD = 0x0002).
+ *
+ * Capabilities request format (9 bytes):
+ *   bytes 0-1: magic (0x65 0x6C)
+ *   bytes 2-5: supported BTP versions (4 bytes, packed nibbles)
+ *   bytes 6-7: client ATT MTU (LE, may be 0)
+ *   byte  8  : client receive window size
+ *
+ * Capabilities response format (6 bytes):
+ *   bytes 0-1: magic (0x65 0x6C)
+ *   byte  2  : selected BTP version
+ *   bytes 3-4: fragment size = min(ATT_MTU - 3, 244) (LE)
+ *   byte  5  : peripheral receive window size
+ *
+ * Reference: connectedhomeip src/ble/BleLayer.cpp (BleTransportCapabilities*),
+ *            src/ble/BLEEndPoint.cpp (HandleCapabilitiesRequestReceived).
+ */
+static void handle_capabilities_request(const uint8_t *buf, uint16_t len) {
+    if (len < BLE_CAPS_REQ_LEN) {
+        printf("BLE BTP: Caps REQ too short (%u bytes)\n", (unsigned)len);
+        return;
+    }
+
+    /* bytes 2-5: packed nibble versions.  Lower nibble of byte 2 is first
+     * supported version.  We accept any request that includes v4. */
+    uint8_t  req_version0 = buf[2] & 0x0F;
+    uint16_t client_mtu   = (uint16_t)(buf[6] | ((uint16_t)buf[7] << 8));
+    uint8_t  client_window = buf[8];
+
+    printf("BLE BTP: Caps REQ (versions[0]=%u mtu=%u window=%u)\n",
+           (unsigned)req_version0, (unsigned)client_mtu,
+           (unsigned)client_window);
+
+    /* Determine ATT MTU negotiated at the HCI level */
+    uint16_t server_mtu = (active_con_handle != HCI_CON_HANDLE_INVALID)
+                          ? att_server_get_mtu(active_con_handle)
+                          : 23u;
+
+    /* Fragment size = min(ATT_MTU - 3, 244) per BLEEndPoint */
+    uint16_t frag_size = (server_mtu > 3u) ? (server_mtu - 3u) : 20u;
+    if (frag_size > 244u) {
+        frag_size = 244u;
+    }
+    /* Use client-reported MTU if it's smaller and non-zero */
+    if (client_mtu > 3u) {
+        uint16_t client_frag = client_mtu - 3u;
+        if (client_frag < frag_size) {
+            frag_size = client_frag;
+        }
+    }
+
+    /* Window size: min of client's window and our maximum */
+    uint8_t window = (client_window > 0u && client_window < BLE_CAPS_WINDOW)
+                     ? client_window : BLE_CAPS_WINDOW;
+
+    /* Build 6-byte capabilities response */
+    ble_caps_resp[0] = BLE_CAPS_MAGIC_1;
+    ble_caps_resp[1] = BLE_CAPS_MAGIC_2;
+    ble_caps_resp[2] = BLE_CAPS_VERSION;
+    ble_caps_resp[3] = (uint8_t)(frag_size & 0xFF);
+    ble_caps_resp[4] = (uint8_t)(frag_size >> 8);
+    ble_caps_resp[5] = window;
+    ble_caps_resp_ready = true;
+
+    printf("BLE BTP: Caps RESP queued "
+           "(version=%u frag_size=%u window=%u)\n",
+           (unsigned)BLE_CAPS_VERSION, (unsigned)frag_size,
+           (unsigned)window);
+}
+
+/* ------------------------------------------------------------------ */
+/* HCI state handler (BTSTACK_EVENT_STATE only)                        */
+/* ------------------------------------------------------------------ */
+
+/*
+ * hci_state_handler – registered via hci_add_event_handler.
+ *
+ * Handles ONLY BTSTACK_EVENT_STATE so that the advertisement setup runs
+ * at the right moment (HCI_STATE_WORKING).  All other BLE events
+ * (connection, disconnection, ATT) are handled by packet_handler which
+ * is registered via att_server_register_packet_handler; registering the
+ * same function with both would cause every HCI event to be processed
+ * twice, producing the "Duplicate" event noise seen in the original log.
+ */
+static btstack_packet_callback_registration_t hci_state_cb_reg;
+
+static void hci_state_handler(uint8_t packet_type, uint16_t channel,
+                               uint8_t *packet, uint16_t size) {
+    (void)channel;
+    (void)size;
+
+    if (packet_type != HCI_EVENT_PACKET) {
+        return;
+    }
+    if (hci_event_packet_get_type(packet) != BTSTACK_EVENT_STATE) {
+        return;
+    }
+
+    uint8_t state = btstack_event_state_get_state(packet);
+    if (state == HCI_STATE_WORKING) {
+        printf("BLE: HCI controller ready\n");
+        /*
+         * Canonical BTstack pattern: set advertisement data, scan
+         * response, and parameters HERE (after HCI is working), then
+         * enable.  Calling these before hci_power_control() risks the
+         * controller discarding the data during its reset sequence.
+         * See pico-examples/pico_w/bt/standalone/server/server.c.
+         */
+        if (adv_configured) {
+            build_matter_adv_data(adv_discriminator, adv_vendor_id,
+                                  adv_product_id);
+            gap_advertisements_set_data(adv_data_len, adv_data);
+
+            build_scan_response();
+            gap_scan_response_set_data(scan_rsp_data_len, scan_rsp_data);
+
+            bd_addr_t unused_peer_addr = {0, 0, 0, 0, 0, 0};
+            gap_advertisements_set_params(
+                0x0020,           /* adv_int_min: 32 × 0.625ms = 20ms */
+                0x0060,           /* adv_int_max: 96 × 0.625ms = 60ms */
+                0,                /* ADV_IND: connectable undirected */
+                0,                /* own address type: public */
+                unused_peer_addr,
+                0x07,             /* all three advertising channels */
+                0                 /* no filter policy */
+            );
+
+            gap_advertisements_enable(1);
+            current_state = BLE_STATE_ADVERTISING;
+            printf("BLE: Matter advertisements enabled "
+                   "(discriminator=0x%03X)\n",
+                   (unsigned)adv_discriminator);
+        }
+    } else if (state == HCI_STATE_OFF) {
+        current_state     = BLE_STATE_OFF;
+        active_con_handle = HCI_CON_HANDLE_INVALID;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* BLE connection + ATT packet handler                                  */
+/* ------------------------------------------------------------------ */
+
+/*
+ * packet_handler – registered via att_server_register_packet_handler.
+ *
+ * The att_server forwards HCI_EVENT_LE_META (connection) and
+ * HCI_EVENT_DISCONNECTION_COMPLETE to this handler in addition to
+ * ATT_EVENT_* events.  Because we no longer also register with
+ * hci_add_event_handler for these events, each event is processed
+ * exactly once – eliminating the duplicate-event dedup code that
+ * PR #90 had to add.
+ */
 static void packet_handler(uint8_t packet_type, uint16_t channel,
                             uint8_t *packet, uint16_t size) {
     (void)channel;
@@ -287,91 +586,43 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
 
     switch (hci_event_packet_get_type(packet)) {
 
-        case BTSTACK_EVENT_STATE: {
-            uint8_t state = btstack_event_state_get_state(packet);
-            if (state == HCI_STATE_WORKING) {
-                printf("BLE: HCI controller ready\n");
-                /*
-                 * Canonical BTstack pattern: set advertisement data, scan
-                 * response, and parameters HERE (after HCI is working), then
-                 * enable.  Calling these before hci_power_control() risks the
-                 * controller discarding the data during its reset sequence.
-                 * See pico-examples/pico_w/bt/standalone/server/server.c.
-                 */
-                if (adv_configured) {
-                    build_matter_adv_data(adv_discriminator, adv_vendor_id,
-                                          adv_product_id);
-                    gap_advertisements_set_data(adv_data_len, adv_data);
-
-                    build_scan_response();
-                    gap_scan_response_set_data(scan_rsp_data_len, scan_rsp_data);
-
-                    bd_addr_t unused_peer_addr = {0, 0, 0, 0, 0, 0};
-                    gap_advertisements_set_params(
-                        0x0020,           /* adv_int_min: 32 × 0.625ms = 20ms (Matter spec §5.4.2.2 min) */
-                        0x0060,           /* adv_int_max: 96 × 0.625ms = 60ms (Matter spec §5.4.2.2 max) */
-                        0,                /* ADV_IND: connectable undirected */
-                        0,                /* own address type: public */
-                        unused_peer_addr,
-                        0x07,             /* all three advertising channels */
-                        0                 /* no filter policy */
-                    );
-
-                    gap_advertisements_enable(1);
-                    current_state = BLE_STATE_ADVERTISING;
-                    printf("BLE: Matter advertisements enabled "
-                           "(discriminator=0x%03X)\n",
-                           (unsigned)adv_discriminator);
-                }
-            } else if (state == HCI_STATE_OFF) {
-                current_state       = BLE_STATE_OFF;
-                active_con_handle   = HCI_CON_HANDLE_INVALID;
-            }
-            break;
-        }
-
         case HCI_EVENT_DISCONNECTION_COMPLETE: {
             uint8_t reason = hci_event_disconnection_complete_get_reason(packet);
-            if (active_con_handle == HCI_CON_HANDLE_INVALID) {
-                /* Duplicate disconnect event — already handled, ignore it. */
-                printf("BLE: Duplicate disconnect event (reason=0x%02X), ignoring\n",
-                       (unsigned)reason);
-                break;
-            }
-            printf("BLE: Client disconnected (reason=0x%02X)\n", (unsigned)reason);
+            printf("BLE: Client disconnected (reason=0x%02X)\n",
+                   (unsigned)reason);
             active_con_handle    = HCI_CON_HANDLE_INVALID;
             current_state        = BLE_STATE_ADVERTISING;
-            /* Reset COBLe reassembly and TX state once on a real disconnect */
+            /* Reset COBLe/BTP state for next connection */
             coble_rx_in_progress = false;
             coble_rx_ready       = false;
             coble_rx_offset      = 0;
             coble_tx_active      = false;
-            /* Notify higher layers promptly before the backoff delay */
+            coble_tx_counter     = 1;   /* peripheral TX seq starts at 1 */
+            char_rx_cccd_value   = 0;   /* reset subscription for next session */
+            ble_caps_resp_ready  = false;
+            /* Notify higher layers */
             if (conn_callback) {
                 conn_callback(false);
             }
-            /* Small backoff before resuming advertising to avoid rapid
-             * reconnect loops (configurable, default 100 ms). */
+            /* Small backoff before restarting advertising */
 #if BLE_RECONNECT_BACKOFF_MS > 0
             sleep_ms(BLE_RECONNECT_BACKOFF_MS);
 #endif
+            /* Explicitly re-enable advertising so iOS can reconnect and
+             * retry commissioning. */
+            if (adv_configured) {
+                gap_advertisements_enable(1);
+                printf("BLE: Advertising restarted after disconnect\n");
+            }
             break;
         }
 
         case HCI_EVENT_LE_META: {
             if (hci_event_le_meta_get_subevent_code(packet) ==
                     HCI_SUBEVENT_LE_CONNECTION_COMPLETE) {
-                hci_con_handle_t new_handle =
-                    hci_subevent_le_connection_complete_get_connection_handle(packet);
-                if (current_state == BLE_STATE_CONNECTED &&
-                        active_con_handle == new_handle) {
-                    /* Duplicate connection event for the same handle — ignore
-                     * it to prevent higher layers from toggling session state. */
-                    printf("BLE: Duplicate connection event (handle=0x%04X), ignoring\n",
-                           (unsigned)new_handle);
-                    break;
-                }
-                active_con_handle = new_handle;
+                active_con_handle =
+                    hci_subevent_le_connection_complete_get_connection_handle(
+                        packet);
                 printf("BLE: Client connected (handle=0x%04X)\n",
                        (unsigned)active_con_handle);
                 current_state = BLE_STATE_CONNECTED;
@@ -506,27 +757,31 @@ static void coble_tx_send_next(void) {
         att_mtu = 23u;
     }
     const size_t MAX_ATT_DATA    = (size_t)(att_mtu - 3u);
-    const size_t MAX_DATA_FIRST  = MAX_ATT_DATA - 4u; /* SYN hdr: flags+ctr+len16 */
-    const size_t MAX_DATA_REST   = MAX_ATT_DATA - 1u; /* flags only              */
+    /* First fragment header: flags(1) + seq_num(1) + total_len(2) = 4 bytes */
+    const size_t MAX_DATA_FIRST  = MAX_ATT_DATA - 4u;
+    /* Non-first fragment header: flags(1) + seq_num(1) = 2 bytes */
+    const size_t MAX_DATA_REST   = MAX_ATT_DATA - 2u;
 
     uint8_t fragment[COBLE_MAX_FRAGMENT_SIZE];
     size_t  frag_hdr = 0;
     size_t  data_capacity;
 
     if (coble_tx_first_frag) {
-        uint8_t flags = COBLE_FLAG_SYN;
+        uint8_t flags = COBLE_FLAG_START;
         if (coble_tx_msg_sent + MAX_DATA_FIRST >= coble_tx_msg_len) {
-            flags |= COBLE_FLAG_FIN;
+            flags |= COBLE_FLAG_END;
         }
         fragment[frag_hdr++] = flags;
-        fragment[frag_hdr++] = coble_tx_counter++;
+        fragment[frag_hdr++] = coble_tx_counter++;   /* seq_num */
         fragment[frag_hdr++] = (uint8_t)(coble_tx_msg_len & 0xFF);
         fragment[frag_hdr++] = (uint8_t)((coble_tx_msg_len >> 8) & 0xFF);
         data_capacity = MAX_DATA_FIRST;
         coble_tx_first_frag = false;
     } else {
         bool is_last = (coble_tx_msg_sent + MAX_DATA_REST >= coble_tx_msg_len);
-        fragment[frag_hdr++] = is_last ? COBLE_FLAG_FIN : 0x00u;
+        /* Middle fragment uses kContinueMessage (0x02); last uses kEndMessage (0x04) */
+        fragment[frag_hdr++] = is_last ? COBLE_FLAG_END : COBLE_FLAG_CONTINUE;
+        fragment[frag_hdr++] = coble_tx_counter++;   /* seq_num always present */
         data_capacity = MAX_DATA_REST;
     }
 
@@ -603,8 +858,18 @@ int ble_adapter_init(void) {
     l2cap_init();
     sm_init();
     sm_set_io_capabilities(IO_CAPABILITY_NO_INPUT_NO_OUTPUT);
-    hci_event_cb_reg.callback = &packet_handler;
-    hci_add_event_handler(&hci_event_cb_reg);
+    /*
+     * Register hci_state_handler ONLY for BTSTACK_EVENT_STATE so that the
+     * advertising setup (gap_advertisements_*) runs exactly once when the HCI
+     * controller is ready.  BLE connection/disconnection events are handled by
+     * packet_handler which is registered via att_server_register_packet_handler
+     * below.  Registering the same callback with both hci_add_event_handler AND
+     * att_server_register_packet_handler would cause every HCI connection /
+     * disconnection event to be delivered twice, producing spurious "Duplicate"
+     * log lines and potential state-machine glitches.
+     */
+    hci_state_cb_reg.callback = &hci_state_handler;
+    hci_add_event_handler(&hci_state_cb_reg);
 
     /* -------------------------------------------------------------- */
     /* GATT database setup                                             */
@@ -669,6 +934,13 @@ int ble_adapter_init(void) {
         ATT_PROPERTY_INDICATE | ATT_PROPERTY_NOTIFY | ATT_PROPERTY_DYNAMIC,
         ATT_SECURITY_NONE, ATT_SECURITY_NONE,
         NULL, 0);
+    /*
+     * The CCCD for C2 is created by att_db_util immediately after the value
+     * attribute (handle N+1).  We record its handle so that att_read_callback
+     * and att_write_callback can maintain the subscription state that BTstack
+     * reads before allowing att_server_indicate() / att_server_notify().
+     */
+    char_rx_cccd_handle = char_rx_handle + 1;
 
     /* Start the ATT server with the database we just built */
     att_server_init(att_db_util_get_address(),
@@ -679,8 +951,9 @@ int ble_adapter_init(void) {
     att_server_register_packet_handler(packet_handler);
 
     printf("BLE: CHIPoBLE GATT service registered "
-           "(TX handle=0x%04X, RX handle=0x%04X)\n",
-           (unsigned)char_tx_handle, (unsigned)char_rx_handle);
+           "(TX handle=0x%04X, RX handle=0x%04X, CCCD handle=0x%04X)\n",
+           (unsigned)char_tx_handle, (unsigned)char_rx_handle,
+           (unsigned)char_rx_cccd_handle);
 
     ble_initialized   = true;
     current_state     = BLE_STATE_OFF;
