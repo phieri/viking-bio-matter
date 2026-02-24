@@ -79,6 +79,16 @@ static btstack_packet_callback_registration_t hci_event_cb_reg;
 static uint8_t adv_data[31];
 static uint8_t adv_data_len = 0;
 
+/* Scan response payload (max 31 bytes) */
+static uint8_t scan_rsp_data[31];
+static uint8_t scan_rsp_data_len = 0;
+
+/* Saved advertising parameters — applied from HCI_STATE_WORKING (canonical BTstack pattern) */
+static uint16_t adv_discriminator = 0;
+static uint16_t adv_vendor_id     = 0;
+static uint16_t adv_product_id    = 0;
+static bool     adv_configured    = false;
+
 /* GATT attribute handles for CHIPoBLE characteristics */
 static uint16_t char_tx_handle = 0;   /* 0xFFF7 value handle (Write WR) */
 static uint16_t char_rx_handle = 0;   /* 0xFFF8 value handle (Notify)   */
@@ -211,6 +221,14 @@ static int att_write_callback(hci_con_handle_t connection_handle,
 }
 
 /* ------------------------------------------------------------------ */
+/* Forward declarations                                                 */
+/* ------------------------------------------------------------------ */
+static void build_matter_adv_data(uint16_t discriminator,
+                                   uint16_t vendor_id,
+                                   uint16_t product_id);
+static void build_scan_response(void);
+
+/* ------------------------------------------------------------------ */
 /* HCI + ATT packet handler                                             */
 /* ------------------------------------------------------------------ */
 
@@ -228,16 +246,39 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
         case BTSTACK_EVENT_STATE: {
             uint8_t state = btstack_event_state_get_state(packet);
             if (state == HCI_STATE_WORKING) {
-                printf("BLE: HCI controller ready — enabling advertisements\n");
+                printf("BLE: HCI controller ready\n");
                 /*
-                 * gap_advertisements_set_data() and gap_advertisements_set_params()
-                 * were already called in ble_adapter_start_advertising() and stored
-                 * internally by BTstack.  Now that HCI is up, issue the enable
-                 * command.  This is the canonical BTstack pattern from
-                 * pico-examples/pico_w/bt/standalone/server/server.c.
+                 * Canonical BTstack pattern: set advertisement data, scan
+                 * response, and parameters HERE (after HCI is working), then
+                 * enable.  Calling these before hci_power_control() risks the
+                 * controller discarding the data during its reset sequence.
+                 * See pico-examples/pico_w/bt/standalone/server/server.c.
                  */
-                gap_advertisements_enable(1);
-                current_state = BLE_STATE_ADVERTISING;
+                if (adv_configured) {
+                    build_matter_adv_data(adv_discriminator, adv_vendor_id,
+                                          adv_product_id);
+                    gap_advertisements_set_data(adv_data_len, adv_data);
+
+                    build_scan_response();
+                    gap_scan_response_set_data(scan_rsp_data_len, scan_rsp_data);
+
+                    bd_addr_t unused_peer_addr = {0, 0, 0, 0, 0, 0};
+                    gap_advertisements_set_params(
+                        0x00A0,           /* adv_int_min: ~100 ms */
+                        0x0140,           /* adv_int_max: ~200 ms */
+                        0,                /* ADV_IND: connectable undirected */
+                        0,                /* own address type: public */
+                        unused_peer_addr,
+                        0x07,             /* all three advertising channels */
+                        0                 /* no filter policy */
+                    );
+
+                    gap_advertisements_enable(1);
+                    current_state = BLE_STATE_ADVERTISING;
+                    printf("BLE: Matter advertisements enabled "
+                           "(discriminator=0x%03X)\n",
+                           (unsigned)adv_discriminator);
+                }
             } else if (state == HCI_STATE_OFF) {
                 current_state       = BLE_STATE_OFF;
                 active_con_handle   = HCI_CON_HANDLE_INVALID;
@@ -287,8 +328,11 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
  * Format per Matter Core Spec §5.4.2.5.2 (stable across v1.x):
  *   AD 0x01 Flags                               (3 bytes)
  *   AD 0x03 Complete 16-bit UUID list: 0xFFF6   (4 bytes)
- *   AD 0x08 Shortened Local Name "Matter"       (8 bytes)
  *   AD 0x16 Service Data UUID 0xFFF6           (12 bytes)
+ *
+ * The local name is placed in the scan response (built separately) so that
+ * the advertisement stays minimal and iOS active-scan receives the device
+ * name in the scan response PDU.
  *
  * Service-data payload (7 bytes, Table 5.14):
  *   byte 0: bits[1:0]=CM, bits[3:2]=OpCode
@@ -298,7 +342,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
  *             OpCode bits[3:2]: 0b00=Commissionable, 0b01=Commissioner
  *             → byte value = 0x01  (CM=SCM, OpCode=Commissionable)
  *   byte 1: Discriminator[7:0]
- *   byte 2: Discriminator[11:8]  (upper nibble, bits[3:0])
+ *   byte 2: Discriminator[11:8]  (bits[3:0])
  *   bytes 3-4: Vendor ID  (little-endian)
  *   bytes 5-6: Product ID (little-endian)
  */
@@ -318,20 +362,13 @@ static void build_matter_adv_data(uint16_t discriminator,
     *p++ = 0xF6;        /* UUID low byte  */
     *p++ = 0xFF;        /* UUID high byte */
 
-    /* --- Shortened Local Name: "Matter" (helps scanners identify device) --- */
-    *p++ = 0x07;        /* length: 1 (type) + 6 (name) */
-    *p++ = 0x08;        /* AD type: Shortened Local Name */
-    *p++ = 'M'; *p++ = 'a'; *p++ = 't'; *p++ = 't'; *p++ = 'e'; *p++ = 'r';
-
     /* --- Service Data for UUID 0xFFF6 --- */
     *p++ = 0x0A;        /* length: 10 bytes (type + UUID + 7 payload bytes) */
     *p++ = 0x16;        /* AD type: Service Data – 16-bit UUID */
     *p++ = 0xF6;        /* UUID low byte  */
     *p++ = 0xFF;        /* UUID high byte */
     /* Service-data payload (7 bytes, Matter Core Spec §5.4.2.5.2 Table 5.14):
-     *   byte 0: bits[1:0]=CM, bits[3:2]=OpCode
-     *     CM=0b01 (Standard Commissioning Mode) per §5.4.2.5.2 Table 5.14
-     *     OpCode=0b00 (Commissionable)  →  byte value = 0x01
+     *   byte 0: CM=0b01 (Standard Commissioning Mode), OpCode=0b00  → 0x01
      *   byte 1: Discriminator[7:0]
      *   byte 2: Discriminator[11:8] (lower nibble)
      *   bytes 3-6: Vendor ID and Product ID (little-endian)
@@ -345,6 +382,29 @@ static void build_matter_adv_data(uint16_t discriminator,
     *p++ = (uint8_t)(product_id >> 8);
 
     adv_data_len = (uint8_t)(p - adv_data);
+}
+
+/*
+ * Build the scan response payload.
+ *
+ * iOS (and other active-scanning BLE hosts) sends a Scan Request after
+ * seeing the advertisement.  Including the Complete Local Name here lets
+ * iOS display a friendly device name and — critically — ensures the device
+ * is surfaced in the Matter commissioning UI even on stricter iOS builds.
+ */
+static void build_scan_response(void) {
+    uint8_t *p = scan_rsp_data;
+
+    /* --- Complete Local Name: "Matter" --- */
+    const char *name     = "Matter";
+    uint8_t     name_len = (uint8_t)(sizeof("Matter") - 1);  /* 6 */
+    *p++ = name_len + 1;             /* length: 1 (type) + 6 (chars) */
+    *p++ = 0x09;                     /* AD type: Complete Local Name  */
+    for (uint8_t i = 0; i < name_len; i++) {
+        *p++ = (uint8_t)name[i];
+    }
+
+    scan_rsp_data_len = (uint8_t)(p - scan_rsp_data);
 }
 
 /* ------------------------------------------------------------------ */
@@ -473,31 +533,23 @@ int ble_adapter_start_advertising(uint16_t discriminator,
         return -1;
     }
 
-    printf("BLE: Starting Matter advertisement "
+    printf("BLE: Preparing Matter advertisement "
            "(discriminator=0x%03X VID=0x%04X PID=0x%04X)\n",
            discriminator, vendor_id, product_id);
 
-    build_matter_adv_data(discriminator, vendor_id, product_id);
-
     /*
-     * Set advertisement data and parameters now.  BTstack stores them
-     * internally and will apply them to the controller once it is ready.
-     * gap_advertisements_enable(1) is issued from the HCI_STATE_WORKING
-     * handler — canonical BTstack pattern (pico-examples standalone/server.c).
+     * Save parameters; the actual gap_advertisements_set_data(),
+     * gap_scan_response_set_data(), gap_advertisements_set_params(), and
+     * gap_advertisements_enable(1) calls are deferred to the
+     * HCI_STATE_WORKING event handler.  This is the canonical BTstack
+     * pattern: applying advertisement data before the controller is ready
+     * can cause the data to be silently discarded during HCI reset.
      */
-    gap_advertisements_set_data(adv_data_len, adv_data);
-    {
-        bd_addr_t unused_peer_addr = {0, 0, 0, 0, 0, 0};
-        gap_advertisements_set_params(
-            0x00A0,           /* adv_int_min: ~100 ms (units of 0.625 ms) */
-            0x0140,           /* adv_int_max: ~200 ms */
-            0,                /* ADV_IND: connectable undirected */
-            0,                /* own address type: public */
-            unused_peer_addr,
-            0x07,             /* all three advertising channels */
-            0                 /* no filter policy */
-        );
-    }
+    adv_discriminator = discriminator;
+    adv_vendor_id     = vendor_id;
+    adv_product_id    = product_id;
+    adv_configured    = true;
+
     hci_power_control(HCI_POWER_ON);
     return 0;
 }
