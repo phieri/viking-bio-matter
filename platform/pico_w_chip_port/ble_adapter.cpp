@@ -284,15 +284,19 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
 /*
  * Build a Matter-compliant BLE advertisement payload.
  *
- * Format per Matter Core Spec 1.5 §5.4.2.5.2:
- *   AD 0x01 Flags           (3 bytes)
+ * Format per Matter Core Spec §5.4.2.5.2 (stable across v1.x):
+ *   AD 0x01 Flags                               (3 bytes)
  *   AD 0x03 Complete 16-bit UUID list: 0xFFF6   (4 bytes)
- *   AD 0x16 Service Data UUID 0xFFF6 (12 bytes)
+ *   AD 0x08 Shortened Local Name "Matter"       (8 bytes)
+ *   AD 0x16 Service Data UUID 0xFFF6           (12 bytes)
  *
  * Service-data payload (7 bytes, Table 5.14):
  *   byte 0: bits[1:0]=CM, bits[3:2]=OpCode
- *             CM=0x02 (standard/open commissioning mode per §5.4.2.5.3)
- *             OpCode=0x00 (commissionable)
+ *             CM   bits[1:0]: 0b00=not commissioning,
+ *                             0b01=Standard Commissioning Mode ← we use this
+ *                             0b10=Enhanced Commissioning Mode
+ *             OpCode bits[3:2]: 0b00=Commissionable, 0b01=Commissioner
+ *             → byte value = 0x01  (CM=SCM, OpCode=Commissionable)
  *   byte 1: Discriminator[7:0]
  *   byte 2: Discriminator[11:8]  (upper nibble, bits[3:0])
  *   bytes 3-4: Vendor ID  (little-endian)
@@ -324,15 +328,15 @@ static void build_matter_adv_data(uint16_t discriminator,
     *p++ = 0x16;        /* AD type: Service Data – 16-bit UUID */
     *p++ = 0xF6;        /* UUID low byte  */
     *p++ = 0xFF;        /* UUID high byte */
-    /* Service-data payload (7 bytes, Matter Core Spec 1.5 Table 5.14):
+    /* Service-data payload (7 bytes, Matter Core Spec §5.4.2.5.2 Table 5.14):
      *   byte 0: bits[1:0]=CM, bits[3:2]=OpCode
-     *     CM=0x02 (standard open commissioning window) per §5.4.2.5.3
-     *     OpCode=0x00 (commissionable)  →  byte value = 0x02
+     *     CM=0b01 (Standard Commissioning Mode) per §5.4.2.5.2 Table 5.14
+     *     OpCode=0b00 (Commissionable)  →  byte value = 0x01
      *   byte 1: Discriminator[7:0]
      *   byte 2: Discriminator[11:8] (lower nibble)
      *   bytes 3-6: Vendor ID and Product ID (little-endian)
      */
-    *p++ = 0x02;                                         /* OpCode=0x00, CM=0x02        */
+    *p++ = 0x01;                                         /* OpCode=0x00, CM=SCM (0x01)  */
     *p++ = (uint8_t)(discriminator & 0xFF);              /* Discriminator[7:0]          */
     *p++ = (uint8_t)((discriminator >> 8) & 0x0F);      /* Discriminator[11:8], 4 bits */
     *p++ = (uint8_t)(vendor_id  & 0xFF);
