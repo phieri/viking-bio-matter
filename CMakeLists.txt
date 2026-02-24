@@ -78,16 +78,9 @@ pico_sdk_init()
 # Include pico-lfs library for LittleFS support
 add_subdirectory(libs/pico-lfs)
 
-# Compiler optimizations - prioritize speed over size
-# -O3: Aggressive optimization for speed
-# -ffast-math: Fast floating point math (safe for this application)
-# -fno-signed-zeros: Allow optimizations assuming no signed zeros
-# -fno-trapping-math: Allow optimizations assuming no FP exceptions
-# -funroll-loops: Unroll loops for speed
+# Compiler optimizations
 add_compile_options(
-    -fno-signed-zeros
-    -fno-trapping-math
-    -funroll-loops
+    -O2
 )
 
 # Note: LTO disabled due to Pico SDK compatibility issues with wrapped functions
