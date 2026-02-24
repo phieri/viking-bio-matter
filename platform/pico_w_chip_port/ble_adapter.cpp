@@ -26,8 +26,8 @@
  *   1. GAP service (0x1800): Device Name "Matter" + Appearance
  *   2. GATT service (0x1801): no mandatory characteristics for peripherals
  *   3. CHIPoBLE service (0xFFF6):
- *      0xFFF7 - Write Without Response (controller → device)
- *      0xFFF8 - Notify (device → controller) + auto-CCCD
+ *      C1 (128-bit UUID) - Write Without Response (controller → device)
+ *      C2 (128-bit UUID) - Indicate + Notify (device → controller) + auto-CCCD
  */
 
 #include <stdio.h>
@@ -127,6 +127,19 @@ static bool     coble_rx_ready       = false;
 
 /* Outgoing message counter (incremented per transmitted message) */
 static uint8_t  coble_tx_counter     = 0;
+
+/* ------------------------------------------------------------------ */
+/* Indication-based TX state (COBLe fragmented sending via indicate)   */
+/* ------------------------------------------------------------------ */
+
+static uint8_t  coble_tx_msg[COBLE_MAX_MSG_SIZE];
+static size_t   coble_tx_msg_len         = 0;
+static size_t   coble_tx_msg_sent        = 0;
+static bool     coble_tx_first_frag      = false;
+static bool     coble_tx_active          = false;
+
+/* Forward declaration for indication-driven fragment sender */
+static void coble_tx_send_next(void);
 
 /* ------------------------------------------------------------------ */
 /* ATT callbacks                                                        */
@@ -313,6 +326,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
             coble_rx_in_progress = false;
             coble_rx_ready       = false;
             coble_rx_offset      = 0;
+            coble_tx_active      = false;
             if (conn_callback) {
                 conn_callback(false);
             }
@@ -332,6 +346,15 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
             break;
         }
 
+        case ATT_EVENT_HANDLE_VALUE_INDICATION_COMPLETE:
+            /* Previous indication was acknowledged — send next fragment */
+            if (coble_tx_active && coble_tx_msg_sent < coble_tx_msg_len) {
+                coble_tx_send_next();
+            } else {
+                coble_tx_active = false;
+            }
+            break;
+
         default:
             break;
     }
@@ -347,23 +370,19 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
  * Format per Matter Core Spec §5.4.2.5.2 (stable across v1.x):
  *   AD 0x01 Flags                               (3 bytes)
  *   AD 0x03 Complete 16-bit UUID list: 0xFFF6   (4 bytes)
- *   AD 0x16 Service Data UUID 0xFFF6           (12 bytes)
+ *   AD 0x16 Service Data UUID 0xFFF6           (13 bytes)
  *
  * The local name is placed in the scan response (built separately) so that
  * the advertisement stays minimal and iOS active-scan receives the device
  * name in the scan response PDU.
  *
- * Service-data payload (7 bytes, Table 5.14):
- *   byte 0: bits[1:0]=CM, bits[3:2]=OpCode
- *             CM   bits[1:0]: 0b00=not commissioning,
- *                             0b01=Standard Commissioning Mode ← we use this
- *                             0b10=Enhanced Commissioning Mode
- *             OpCode bits[3:2]: 0b00=Commissionable, 0b01=Commissioner
- *             → byte value = 0x01  (CM=SCM, OpCode=Commissionable)
+ * Service-data payload (8 bytes, ChipBLEDeviceIdentificationInfo):
+ *   byte 0: OpCode  (0x01 = Device Identification Info)
  *   byte 1: Discriminator[7:0]
- *   byte 2: Discriminator[11:8]  (bits[3:0])
+ *   byte 2: Discriminator[11:8] (low nibble) | AdvVersion (high nibble)
  *   bytes 3-4: Vendor ID  (little-endian)
  *   bytes 5-6: Product ID (little-endian)
+ *   byte 7: AdditionalDataFlag (0x00 = no additional data)
  */
 static void build_matter_adv_data(uint16_t discriminator,
                                    uint16_t vendor_id,
@@ -382,23 +401,27 @@ static void build_matter_adv_data(uint16_t discriminator,
     *p++ = 0xFF;        /* UUID high byte */
 
     /* --- Service Data for UUID 0xFFF6 --- */
-    *p++ = 0x0A;        /* length: 10 bytes (type + UUID + 7 payload bytes) */
+    *p++ = 0x0B;        /* length: 11 bytes (type + UUID + 8 payload bytes) */
     *p++ = 0x16;        /* AD type: Service Data – 16-bit UUID */
     *p++ = 0xF6;        /* UUID low byte  */
     *p++ = 0xFF;        /* UUID high byte */
-    /* Service-data payload (7 bytes, Matter Core Spec §5.4.2.5.2 Table 5.14):
-     *   byte 0: CM=0b01 (Standard Commissioning Mode), OpCode=0b00  → 0x01
+    /* Service-data payload (8 bytes, Matter Core Spec §5.4.2.5.2,
+     * matching ChipBLEDeviceIdentificationInfo in connectedhomeip):
+     *   byte 0: OpCode (0x01 = Device Identification Info)
      *   byte 1: Discriminator[7:0]
-     *   byte 2: Discriminator[11:8] (lower nibble)
-     *   bytes 3-6: Vendor ID and Product ID (little-endian)
+     *   byte 2: Discriminator[11:8] (low nibble) | AdvVersion (high nibble)
+     *   bytes 3-4: Vendor ID (little-endian)
+     *   bytes 5-6: Product ID (little-endian)
+     *   byte 7: AdditionalDataFlag (0x00 = no additional data)
      */
-    *p++ = 0x01;                                         /* OpCode=0x00, CM=SCM (0x01)  */
-    *p++ = (uint8_t)(discriminator & 0xFF);              /* Discriminator[7:0]          */
-    *p++ = (uint8_t)((discriminator >> 8) & 0x0F);      /* Discriminator[11:8], 4 bits */
+    *p++ = 0x01;                                         /* OpCode: DeviceIdentificationInfo */
+    *p++ = (uint8_t)(discriminator & 0xFF);              /* Discriminator[7:0]               */
+    *p++ = (uint8_t)((discriminator >> 8) & 0x0F);      /* Discriminator[11:8], 4 bits      */
     *p++ = (uint8_t)(vendor_id  & 0xFF);
     *p++ = (uint8_t)(vendor_id  >> 8);
     *p++ = (uint8_t)(product_id & 0xFF);
     *p++ = (uint8_t)(product_id >> 8);
+    *p++ = 0x00;                                         /* AdditionalDataFlag: none         */
 
     adv_data_len = (uint8_t)(p - adv_data);
 }
@@ -424,6 +447,90 @@ static void build_scan_response(void) {
     }
 
     scan_rsp_data_len = (uint8_t)(p - scan_rsp_data);
+}
+
+/* ------------------------------------------------------------------ */
+/* Indication-based fragment sender (C++ linkage, used by packet_handler) */
+/* ------------------------------------------------------------------ */
+
+/*
+ * coble_tx_send_next – build and send the next COBLe fragment via
+ * ATT indication.  Called from ble_adapter_send_data() for the first
+ * fragment, and from the ATT_EVENT_HANDLE_VALUE_INDICATION_COMPLETE
+ * handler for subsequent fragments.
+ */
+static void coble_tx_send_next(void) {
+    if (!coble_tx_active || active_con_handle == HCI_CON_HANDLE_INVALID) {
+        coble_tx_active = false;
+        return;
+    }
+
+    uint16_t att_mtu = att_server_get_mtu(active_con_handle);
+    if (att_mtu < 23u) {
+        att_mtu = 23u;
+    }
+    const size_t MAX_ATT_DATA    = (size_t)(att_mtu - 3u);
+    const size_t MAX_DATA_FIRST  = MAX_ATT_DATA - 4u; /* SYN hdr: flags+ctr+len16 */
+    const size_t MAX_DATA_REST   = MAX_ATT_DATA - 1u; /* flags only              */
+
+    uint8_t fragment[256];
+    size_t  frag_hdr = 0;
+    size_t  data_capacity;
+
+    if (coble_tx_first_frag) {
+        uint8_t flags = COBLE_FLAG_SYN;
+        if (coble_tx_msg_sent + MAX_DATA_FIRST >= coble_tx_msg_len) {
+            flags |= COBLE_FLAG_FIN;
+        }
+        fragment[frag_hdr++] = flags;
+        fragment[frag_hdr++] = coble_tx_counter++;
+        fragment[frag_hdr++] = (uint8_t)(coble_tx_msg_len & 0xFF);
+        fragment[frag_hdr++] = (uint8_t)((coble_tx_msg_len >> 8) & 0xFF);
+        data_capacity = MAX_DATA_FIRST;
+        coble_tx_first_frag = false;
+    } else {
+        bool is_last = (coble_tx_msg_sent + MAX_DATA_REST >= coble_tx_msg_len);
+        fragment[frag_hdr++] = is_last ? COBLE_FLAG_FIN : 0x00u;
+        data_capacity = MAX_DATA_REST;
+    }
+
+    size_t chunk = coble_tx_msg_len - coble_tx_msg_sent;
+    if (chunk > data_capacity) {
+        chunk = data_capacity;
+    }
+    memcpy(fragment + frag_hdr, coble_tx_msg + coble_tx_msg_sent, chunk);
+    coble_tx_msg_sent += chunk;
+
+    /* Try indication first (required by Matter spec §4.12.3.3),
+     * fall back to notification if the controller has not subscribed
+     * for indications. */
+    uint8_t err = att_server_indicate(active_con_handle, char_rx_handle,
+                                       fragment, (uint16_t)(frag_hdr + chunk));
+    if (err != ERROR_CODE_SUCCESS) {
+        /* Fallback: try notification */
+        err = att_server_notify(active_con_handle, char_rx_handle,
+                                fragment, (uint16_t)(frag_hdr + chunk));
+        if (err != ERROR_CODE_SUCCESS) {
+            printf("BLE: Send failed (err=0x%02X, sent=%zu/%zu)\n",
+                   (unsigned)err, coble_tx_msg_sent - chunk, coble_tx_msg_len);
+            coble_tx_active = false;
+            return;
+        }
+        /* Notifications don't wait for confirmation — continue immediately */
+        if (coble_tx_msg_sent < coble_tx_msg_len) {
+            coble_tx_send_next();
+        } else {
+            coble_tx_active = false;
+        }
+        return;
+    }
+
+    /* Indication queued; next fragment will be sent from the
+     * ATT_EVENT_HANDLE_VALUE_INDICATION_COMPLETE handler.
+     * If this was the last fragment, the handler will clear coble_tx_active. */
+    if (coble_tx_msg_sent >= coble_tx_msg_len) {
+        /* Last fragment — mark complete on next confirm event */
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -517,14 +624,16 @@ int ble_adapter_init(void) {
 
     /*
      * C2 characteristic (18EE2EF5-263D-4559-959F-4F9C429F9D12):
-     * Device sends Matter responses to the controller via notifications.
-     * Per Matter Core Spec §4.12.3.3 — MUST use the 128-bit UUID.
+     * Device sends Matter responses to the controller via indications.
+     * Per Matter Core Spec §4.12.3.3 — MUST use the 128-bit UUID and
+     * MUST support the Indicate property.  Notify is also included for
+     * compatibility with controllers that prefer notifications.
      * A CCCD is automatically created by BTstack when ATT_PROPERTY_NOTIFY
-     * is specified.
+     * or ATT_PROPERTY_INDICATE is specified.
      */
     char_rx_handle = att_db_util_add_characteristic_uuid128(
         chip_c2_uuid128,
-        ATT_PROPERTY_NOTIFY | ATT_PROPERTY_DYNAMIC,
+        ATT_PROPERTY_INDICATE | ATT_PROPERTY_NOTIFY | ATT_PROPERTY_DYNAMIC,
         ATT_SECURITY_NONE, ATT_SECURITY_NONE,
         NULL, 0);
 
@@ -590,72 +699,28 @@ int ble_adapter_stop_advertising(void) {
  * ble_adapter_send_data – send a raw Matter message over the BLE RX
  * characteristic using COBLe framing (Matter Core Spec §3.6.1).
  *
- * Large messages are fragmented into segments whose payload fits within
- * the current ATT MTU (queried via att_server_get_mtu()).  Falls back to
- * the BLE default (20 bytes) if the MTU has not been negotiated yet.
+ * The message is buffered and sent as one or more ATT indications.
+ * For multi-fragment messages, each subsequent fragment is sent from
+ * the ATT_EVENT_HANDLE_VALUE_INDICATION_COMPLETE callback.  If
+ * indications are not available (controller subscribed for notifications
+ * only), falls back to ATT notifications.
  */
 int ble_adapter_send_data(const uint8_t *data, size_t length) {
     if (!ble_initialized || active_con_handle == HCI_CON_HANDLE_INVALID ||
-        char_rx_handle == 0) {
+        char_rx_handle == 0 || length == 0 || length > COBLE_MAX_MSG_SIZE) {
         return -1;
     }
 
-    /*
-     * Determine the maximum ATT payload per fragment.
-     * ATT MTU includes the 1-byte opcode and 2-byte handle → subtract 3.
-     * Guard the result: att_server_get_mtu() may return 0 before negotiation.
-     */
-    uint16_t att_mtu = att_server_get_mtu(active_con_handle);
-    if (att_mtu < 23u) {
-        att_mtu = 23u;   /* BLE default MTU */
-    }
-    const size_t MAX_ATT_DATA = (size_t)(att_mtu - 3u); /* subtract ATT header */
+    /* Buffer the complete message */
+    memcpy(coble_tx_msg, data, length);
+    coble_tx_msg_len    = length;
+    coble_tx_msg_sent   = 0;
+    coble_tx_first_frag = true;
+    coble_tx_active     = true;
 
-    const size_t MAX_DATA_IN_FIRST = MAX_ATT_DATA - 4u; /* SYN hdr: flags+ctr+len16 */
-    const size_t MAX_DATA_IN_REST  = MAX_ATT_DATA - 1u; /* flags only              */
-
-    uint8_t fragment[256]; /* larger than any supported ATT MTU */
-    size_t  sent     = 0;
-    bool    is_first = true;
-
-    while (sent < length) {
-        size_t frag_hdr = 0;
-        size_t data_capacity;
-
-        if (is_first) {
-            uint8_t flags = COBLE_FLAG_SYN;
-            if (sent + MAX_DATA_IN_FIRST >= length) {
-                flags |= COBLE_FLAG_FIN;
-            }
-            fragment[frag_hdr++] = flags;
-            fragment[frag_hdr++] = coble_tx_counter++;
-            fragment[frag_hdr++] = (uint8_t)(length & 0xFF);
-            fragment[frag_hdr++] = (uint8_t)((length >> 8) & 0xFF);
-            data_capacity = MAX_DATA_IN_FIRST;
-            is_first = false;
-        } else {
-            bool is_last = (sent + MAX_DATA_IN_REST >= length);
-            fragment[frag_hdr++] = is_last ? COBLE_FLAG_FIN : 0x00u;
-            data_capacity = MAX_DATA_IN_REST;
-        }
-
-        size_t chunk = length - sent;
-        if (chunk > data_capacity) {
-            chunk = data_capacity;
-        }
-        memcpy(fragment + frag_hdr, data + sent, chunk);
-        sent += chunk;
-
-        uint8_t err = att_server_notify(active_con_handle, char_rx_handle,
-                                        fragment, (uint16_t)(frag_hdr + chunk));
-        if (err != ERROR_CODE_SUCCESS) {
-            printf("BLE: Notification failed (err=0x%02X, sent=%zu/%zu)\n",
-                   (unsigned)err, sent - chunk, length);
-            return -1;
-        }
-    }
-
-    return 0;
+    /* Send the first fragment */
+    coble_tx_send_next();
+    return coble_tx_active ? 0 : -1;
 }
 
 /*
