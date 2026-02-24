@@ -106,15 +106,6 @@
 /* Maximum single COBLe fragment size (must be >= max ATT MTU) */
 #define COBLE_MAX_FRAGMENT_SIZE 256u
 
-/*
- * Backoff (ms) applied after a real BLE disconnect before advertising
- * restarts.  Prevents rapid connect/disconnect loops (e.g. iOS 26 issue).
- * Override at compile time: -DBLE_RECONNECT_BACKOFF_MS=0 to disable.
- */
-#ifndef BLE_RECONNECT_BACKOFF_MS
-#define BLE_RECONNECT_BACKOFF_MS  100
-#endif
-
 /* ------------------------------------------------------------------ */
 /* Internal state                                                       */
 /* ------------------------------------------------------------------ */
@@ -208,11 +199,16 @@ static bool     coble_tx_active          = false;
  * BLE transport capabilities response.
  *
  * Built when the capabilities request (magic bytes 0x65 0x6C) arrives on C1.
- * Sent as a C2 indication when the central subsequently subscribes (writes
- * CCCD = 0x0002).  Cleared on disconnect.
+ * Sent as a C2 indication once both conditions are met:
+ *   (a) the request has been received (ble_caps_resp_ready == true), AND
+ *   (b) the central has subscribed (char_rx_cccd_value == 0x0002).
+ * Either condition arriving second triggers att_server_request_can_send_now_event();
+ * the actual send happens in the ATT_EVENT_CAN_SEND_NOW handler.
+ * Cleared on disconnect.
  */
 static uint8_t  ble_caps_resp[BLE_CAPS_RESP_LEN];
-static bool     ble_caps_resp_ready = false;
+static bool     ble_caps_resp_ready    = false;
+static bool     ble_caps_send_pending  = false;
 
 /* Forward declaration for indication-driven fragment sender */
 static void coble_tx_send_next(void);
@@ -304,25 +300,17 @@ static int att_write_callback(hci_con_handle_t connection_handle,
                                                   " (disabled)");
         }
         /*
-         * Send the queued BLE transport capabilities response as a C2
-         * indication now that the central has subscribed.  This mirrors
-         * connectedhomeip BLEEndPoint::HandleSubscribeReceived().
+         * If the capabilities response is already queued (caps request arrived
+         * before CCCD subscription), request a CAN_SEND_NOW event so the
+         * response is sent as a C2 indication.  Using request_can_send_now
+         * rather than calling att_server_indicate() here avoids a BTstack
+         * constraint: sending a new indication packet while still processing
+         * the current write callback is not safe.
          */
         if (char_rx_cccd_value == 0x0002 && ble_caps_resp_ready &&
                 active_con_handle != HCI_CON_HANDLE_INVALID) {
-            uint8_t err = att_server_indicate(active_con_handle, char_rx_handle,
-                                              ble_caps_resp, sizeof(ble_caps_resp));
-            if (err != ERROR_CODE_SUCCESS) {
-                err = att_server_notify(active_con_handle, char_rx_handle,
-                                        ble_caps_resp, sizeof(ble_caps_resp));
-            }
-            if (err == ERROR_CODE_SUCCESS) {
-                ble_caps_resp_ready = false;
-                printf("BLE BTP: Caps RESP sent on subscribe\n");
-            } else {
-                printf("BLE BTP: Caps RESP send failed (err=0x%02X)\n",
-                       (unsigned)err);
-            }
+            ble_caps_send_pending = true;
+            att_server_request_can_send_now_event(active_con_handle);
         }
         return 0;
     }
@@ -490,6 +478,18 @@ static void handle_capabilities_request(const uint8_t *buf, uint16_t len) {
            "(version=%u frag_size=%u window=%u)\n",
            (unsigned)BLE_CAPS_VERSION, (unsigned)frag_size,
            (unsigned)window);
+
+    /*
+     * connectedhomeip BLEEndPoint::Connect() subscribes to C2 *before*
+     * writing the capabilities request to C1.  If the CCCD was already
+     * written when we arrive here, trigger the send now via CAN_SEND_NOW
+     * rather than waiting for a CCCD write that will never come.
+     */
+    if (char_rx_cccd_value == 0x0002 &&
+            active_con_handle != HCI_CON_HANDLE_INVALID) {
+        ble_caps_send_pending = true;
+        att_server_request_can_send_now_event(active_con_handle);
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -599,17 +599,18 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
             coble_tx_active      = false;
             coble_tx_counter     = 1;   /* peripheral TX seq starts at 1 */
             char_rx_cccd_value   = 0;   /* reset subscription for next session */
-            ble_caps_resp_ready  = false;
+            ble_caps_resp_ready   = false;
+            ble_caps_send_pending = false;
             /* Notify higher layers */
             if (conn_callback) {
                 conn_callback(false);
             }
-            /* Small backoff before restarting advertising */
-#if BLE_RECONNECT_BACKOFF_MS > 0
-            sleep_ms(BLE_RECONNECT_BACKOFF_MS);
-#endif
             /* Explicitly re-enable advertising so iOS can reconnect and
-             * retry commissioning. */
+             * retry commissioning.
+             * Note: sleep_ms() must NOT be called here — this callback runs
+             * inside cyw43_arch_poll() and a blocking sleep would stall the
+             * entire BLE/WiFi driver, preventing HCI commands from being
+             * processed and corrupting BTstack's internal state machine. */
             if (adv_configured) {
                 gap_advertisements_enable(1);
                 printf("BLE: Advertising restarted after disconnect\n");
@@ -632,6 +633,36 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
             }
             break;
         }
+
+        case ATT_EVENT_CAN_SEND_NOW:
+            /*
+             * Sent by BTstack when it is safe to enqueue a new indication or
+             * notification.  Requested via att_server_request_can_send_now_event()
+             * from either the CCCD write handler or handle_capabilities_request(),
+             * whichever fires second.
+             */
+            if (ble_caps_send_pending && ble_caps_resp_ready &&
+                    active_con_handle != HCI_CON_HANDLE_INVALID) {
+                uint8_t err = att_server_indicate(active_con_handle,
+                                                  char_rx_handle,
+                                                  ble_caps_resp,
+                                                  sizeof(ble_caps_resp));
+                if (err != ERROR_CODE_SUCCESS) {
+                    err = att_server_notify(active_con_handle, char_rx_handle,
+                                            ble_caps_resp, sizeof(ble_caps_resp));
+                }
+                if (err == ERROR_CODE_SUCCESS) {
+                    ble_caps_send_pending = false;
+                    ble_caps_resp_ready   = false;
+                    printf("BLE BTP: Caps RESP sent\n");
+                } else {
+                    printf("BLE BTP: Caps RESP send failed (err=0x%02X), retrying\n",
+                           (unsigned)err);
+                    /* Re-request CAN_SEND_NOW to retry on next opportunity */
+                    att_server_request_can_send_now_event(active_con_handle);
+                }
+            }
+            break;
 
         case ATT_EVENT_HANDLE_VALUE_INDICATION_COMPLETE:
             /* Previous indication was acknowledged — send next fragment */
