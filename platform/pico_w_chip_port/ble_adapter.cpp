@@ -179,6 +179,10 @@ static size_t   coble_rx_total_len   = 0;
 static bool     coble_rx_in_progress = false;
 static bool     coble_rx_ready       = false;
 
+/* Track the last received BTP sequence number for piggybacked ACKs. */
+static uint8_t  coble_rx_last_seq    = 0;
+static bool     coble_rx_need_ack    = false;
+
 /* Outgoing message counter (incremented per transmitted fragment).
  * Peripheral TX sequence numbers start at 1 per the BTP spec
  * (connectedhomeip BtpEngine::Init with expect_first_ack=true sets
@@ -284,9 +288,12 @@ static int att_write_callback(hci_con_handle_t connection_handle,
                                uint16_t offset,
                                uint8_t *buffer,
                                uint16_t buffer_size) {
-    (void)connection_handle;
     (void)transaction_mode;
     (void)offset;
+
+    /* Log every write for diagnostics (helps debug iOS connect/disconnect) */
+    printf("BLE: ATT write handle=0x%04X size=%u\n",
+           (unsigned)att_handle, (unsigned)buffer_size);
 
     /* ---- C2 CCCD: record subscription; send queued caps response ---- */
     if (att_handle == char_rx_cccd_handle) {
@@ -302,15 +309,22 @@ static int att_write_callback(hci_con_handle_t connection_handle,
         /*
          * If the capabilities response is already queued (caps request arrived
          * before CCCD subscription), request a CAN_SEND_NOW event so the
-         * response is sent as a C2 indication.  Using request_can_send_now
-         * rather than calling att_server_indicate() here avoids a BTstack
-         * constraint: sending a new indication packet while still processing
-         * the current write callback is not safe.
+         * response is sent as a C2 indication.  Accept any non-zero CCCD
+         * value (indications=0x0002, notifications=0x0001, or both=0x0003)
+         * since iOS may use either subscription type.  Using
+         * request_can_send_now rather than calling att_server_indicate()
+         * here avoids a BTstack constraint: sending a new indication while
+         * still processing the current write callback is not safe.
+         *
+         * Use connection_handle from the callback argument rather than
+         * active_con_handle to avoid any ordering race between the
+         * LE_CONNECTION_COMPLETE event and the first ATT write.
          */
-        if (char_rx_cccd_value == 0x0002 && ble_caps_resp_ready &&
-                active_con_handle != HCI_CON_HANDLE_INVALID) {
+        if ((char_rx_cccd_value & 0x0003) != 0 && ble_caps_resp_ready) {
+            hci_con_handle_t h = (active_con_handle != HCI_CON_HANDLE_INVALID)
+                                 ? active_con_handle : connection_handle;
             ble_caps_send_pending = true;
-            att_server_request_can_send_now_event(active_con_handle);
+            att_server_request_can_send_now_event(h);
         }
         return 0;
     }
@@ -338,9 +352,11 @@ static int att_write_callback(hci_con_handle_t connection_handle,
         offset2++;
     }
 
-    /* Sequence number is always present */
+    /* Sequence number is always present – record it for piggybacked ACK */
     if (offset2 >= buffer_size) return 0;
-    offset2++;  /* skip seq_num */
+    coble_rx_last_seq = buffer[offset2];
+    coble_rx_need_ack = true;
+    offset2++;  /* advance past seq_num */
 
     if (flags & COBLE_FLAG_START) {
         /* First fragment: read total message length */
@@ -485,7 +501,7 @@ static void handle_capabilities_request(const uint8_t *buf, uint16_t len) {
      * written when we arrive here, trigger the send now via CAN_SEND_NOW
      * rather than waiting for a CCCD write that will never come.
      */
-    if (char_rx_cccd_value == 0x0002 &&
+    if ((char_rx_cccd_value & 0x0003) != 0 &&
             active_con_handle != HCI_CON_HANDLE_INVALID) {
         ble_caps_send_pending = true;
         att_server_request_can_send_now_event(active_con_handle);
@@ -596,6 +612,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
             coble_rx_in_progress = false;
             coble_rx_ready       = false;
             coble_rx_offset      = 0;
+            coble_rx_need_ack    = false;
             coble_tx_active      = false;
             coble_tx_counter     = 1;   /* peripheral TX seq starts at 1 */
             char_rx_cccd_value   = 0;   /* reset subscription for next session */
@@ -619,8 +636,8 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
         }
 
         case HCI_EVENT_LE_META: {
-            if (hci_event_le_meta_get_subevent_code(packet) ==
-                    HCI_SUBEVENT_LE_CONNECTION_COMPLETE) {
+            uint8_t sub = hci_event_le_meta_get_subevent_code(packet);
+            if (sub == HCI_SUBEVENT_LE_CONNECTION_COMPLETE) {
                 active_con_handle =
                     hci_subevent_le_connection_complete_get_connection_handle(
                         packet);
@@ -631,8 +648,29 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
                     conn_callback(true);
                 }
             }
+#ifdef HCI_SUBEVENT_LE_ENHANCED_CONNECTION_COMPLETE_V1
+            /* BLE 5.0 controllers may use the Enhanced variant instead of
+             * the plain LE Connection Complete.  Handle both so that the
+             * connection handle is recorded regardless of CYW43 behaviour. */
+            else if (sub == HCI_SUBEVENT_LE_ENHANCED_CONNECTION_COMPLETE_V1) {
+                active_con_handle =
+                    hci_subevent_le_enhanced_connection_complete_v1_get_connection_handle(
+                        packet);
+                printf("BLE: Client connected via enhanced (handle=0x%04X)\n",
+                       (unsigned)active_con_handle);
+                current_state = BLE_STATE_CONNECTED;
+                if (conn_callback) {
+                    conn_callback(true);
+                }
+            }
+#endif
             break;
         }
+
+        case ATT_EVENT_MTU_EXCHANGE_COMPLETE:
+            printf("BLE: MTU exchanged, new MTU=%u\n",
+                   (unsigned)att_event_mtu_exchange_complete_get_MTU(packet));
+            break;
 
         case ATT_EVENT_CAN_SEND_NOW:
             /*
@@ -788,9 +826,9 @@ static void coble_tx_send_next(void) {
         att_mtu = 23u;
     }
     const size_t MAX_ATT_DATA    = (size_t)(att_mtu - 3u);
-    /* First fragment header: flags(1) + seq_num(1) + total_len(2) = 4 bytes */
+    /* First fragment header: flags(1) + [ack(1)] + seq_num(1) + total_len(2) = 4-5 bytes */
     const size_t MAX_DATA_FIRST  = MAX_ATT_DATA - 4u;
-    /* Non-first fragment header: flags(1) + seq_num(1) = 2 bytes */
+    /* Non-first fragment header: flags(1) + [ack(1)] + seq_num(1) = 2-3 bytes */
     const size_t MAX_DATA_REST   = MAX_ATT_DATA - 2u;
 
     uint8_t fragment[COBLE_MAX_FRAGMENT_SIZE];
@@ -802,18 +840,42 @@ static void coble_tx_send_next(void) {
         if (coble_tx_msg_sent + MAX_DATA_FIRST >= coble_tx_msg_len) {
             flags |= COBLE_FLAG_END;
         }
+        /* Piggyback ACK on the first outgoing fragment when we have an
+         * unacknowledged received sequence number.  This tells the central
+         * that we received its data up to coble_rx_last_seq. */
+        if (coble_rx_need_ack) {
+            flags |= COBLE_FLAG_ACK;
+        }
         fragment[frag_hdr++] = flags;
+        if (coble_rx_need_ack) {
+            fragment[frag_hdr++] = coble_rx_last_seq;   /* ack counter */
+            coble_rx_need_ack = false;
+        }
         fragment[frag_hdr++] = coble_tx_counter++;   /* seq_num */
         fragment[frag_hdr++] = (uint8_t)(coble_tx_msg_len & 0xFF);
         fragment[frag_hdr++] = (uint8_t)((coble_tx_msg_len >> 8) & 0xFF);
         data_capacity = MAX_DATA_FIRST;
+        /* Adjust capacity if ACK byte was added */
+        if (flags & COBLE_FLAG_ACK) {
+            data_capacity = (data_capacity > 1) ? data_capacity - 1 : 0;
+        }
         coble_tx_first_frag = false;
     } else {
         bool is_last = (coble_tx_msg_sent + MAX_DATA_REST >= coble_tx_msg_len);
-        /* Middle fragment uses kContinueMessage (0x02); last uses kEndMessage (0x04) */
-        fragment[frag_hdr++] = is_last ? COBLE_FLAG_END : COBLE_FLAG_CONTINUE;
+        uint8_t flags = is_last ? COBLE_FLAG_END : COBLE_FLAG_CONTINUE;
+        if (coble_rx_need_ack) {
+            flags |= COBLE_FLAG_ACK;
+        }
+        fragment[frag_hdr++] = flags;
+        if (coble_rx_need_ack) {
+            fragment[frag_hdr++] = coble_rx_last_seq;
+            coble_rx_need_ack = false;
+        }
         fragment[frag_hdr++] = coble_tx_counter++;   /* seq_num always present */
         data_capacity = MAX_DATA_REST;
+        if (flags & COBLE_FLAG_ACK) {
+            data_capacity = (data_capacity > 1) ? data_capacity - 1 : 0;
+        }
     }
 
     size_t chunk = coble_tx_msg_len - coble_tx_msg_sent;
