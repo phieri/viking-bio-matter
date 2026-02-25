@@ -17,6 +17,8 @@ extern int cluster_level_control_read(uint8_t endpoint, uint32_t attr_id,
                                       attribute_value_t *value, attribute_type_t *type);
 extern int cluster_temperature_read(uint8_t endpoint, uint32_t attr_id,
                                    attribute_value_t *value, attribute_type_t *type);
+extern int cluster_basic_read(uint8_t endpoint, uint32_t attr_id,
+                              attribute_value_t *value, attribute_type_t *type);
 
 /**
  * Initialize read handler
@@ -94,6 +96,10 @@ static int route_attribute_read(const attribute_path_t *path,
             
         case 0x0402: // TemperatureMeasurement
             result = cluster_temperature_read(path->endpoint, path->attribute_id, value, type);
+            break;
+            
+        case 0x0028: // BasicInformation
+            result = cluster_basic_read(path->endpoint, path->attribute_id, value, type);
             break;
             
         default:
@@ -316,6 +322,11 @@ int read_handler_encode_response(const attribute_report_t *reports, size_t count
                     break;
                 case ATTR_TYPE_UINT32:
                     if (tlv_encode_uint32(&writer, 2, report->value.uint32_val) < 0) {
+                        return -1;
+                    }
+                    break;
+                case ATTR_TYPE_UTF8_STRING:
+                    if (tlv_encode_string(&writer, 2, report->value.string_val.str) < 0) {
                         return -1;
                     }
                     break;

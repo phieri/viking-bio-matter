@@ -89,6 +89,10 @@ typedef union {
     int16_t int16_val;
     uint16_t uint16_val;
     uint32_t uint32_val;
+    struct {
+        const char *str;
+        uint16_t    len;
+    } string_val;
 } attribute_value_t;
 
 /**
@@ -100,7 +104,8 @@ typedef enum {
     ATTR_TYPE_INT16,
     ATTR_TYPE_UINT16,
     ATTR_TYPE_UINT32,
-    ATTR_TYPE_ARRAY
+    ATTR_TYPE_ARRAY,
+    ATTR_TYPE_UTF8_STRING
 } attribute_type_t;
 
 /**

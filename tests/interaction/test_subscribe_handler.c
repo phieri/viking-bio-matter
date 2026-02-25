@@ -48,6 +48,24 @@ int cluster_temperature_read(uint8_t endpoint, uint32_t attr_id,
     return 0;
 }
 
+int cluster_diagnostics_read(uint8_t endpoint, uint32_t attr_id,
+                             attribute_value_t *value, attribute_type_t *type) {
+    (void)endpoint; (void)attr_id; (void)value; (void)type;
+    return -1;
+}
+
+int cluster_basic_read(uint8_t endpoint, uint32_t attr_id,
+                       attribute_value_t *value, attribute_type_t *type) {
+    if (endpoint != 0) return -1;
+    if (attr_id == 0x0001) { /* VendorName */
+        *type = ATTR_TYPE_UTF8_STRING;
+        value->string_val.str = "Test Vendor";
+        value->string_val.len = 11;
+        return 0;
+    }
+    return -1;
+}
+
 // Helper to create a SubscribeRequest TLV
 static size_t create_subscribe_request(uint8_t endpoint, uint32_t cluster_id,
                                        uint32_t attr_id, uint16_t min_interval,

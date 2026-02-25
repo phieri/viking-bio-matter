@@ -20,6 +20,8 @@ extern int cluster_temperature_read(uint8_t endpoint, uint32_t attr_id,
                                    attribute_value_t *value, attribute_type_t *type);
 extern int cluster_diagnostics_read(uint8_t endpoint, uint32_t attr_id,
                                    attribute_value_t *value, attribute_type_t *type);
+extern int cluster_basic_read(uint8_t endpoint, uint32_t attr_id,
+                              attribute_value_t *value, attribute_type_t *type);
 
 static bool initialized = false;
 
@@ -64,6 +66,10 @@ static int route_attribute_read(const attribute_path_t *path,
             
         case 0x0033: // GeneralDiagnostics
             result = cluster_diagnostics_read(path->endpoint, path->attribute_id, value, type);
+            break;
+            
+        case 0x0028: // BasicInformation
+            result = cluster_basic_read(path->endpoint, path->attribute_id, value, type);
             break;
             
         default:
@@ -200,6 +206,11 @@ int report_generator_encode_attribute_reports(const attribute_report_t *reports,
                     break;
                 case ATTR_TYPE_UINT32:
                     if (tlv_encode_uint32(&writer, 2, report->value.uint32_val) < 0) {
+                        return -1;
+                    }
+                    break;
+                case ATTR_TYPE_UTF8_STRING:
+                    if (tlv_encode_string(&writer, 2, report->value.string_val.str) < 0) {
                         return -1;
                     }
                     break;
@@ -363,6 +374,11 @@ int report_generator_encode_report(uint32_t subscription_id,
                     break;
                 case ATTR_TYPE_UINT32:
                     if (tlv_encode_uint32(&writer, 2, report->value.uint32_val) < 0) {
+                        return -1;
+                    }
+                    break;
+                case ATTR_TYPE_UTF8_STRING:
+                    if (tlv_encode_string(&writer, 2, report->value.string_val.str) < 0) {
                         return -1;
                     }
                     break;

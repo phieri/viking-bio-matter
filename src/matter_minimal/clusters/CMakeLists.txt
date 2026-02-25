@@ -8,12 +8,18 @@ add_library(matter_clusters STATIC
     temperature.c
     network_commissioning.c
     diagnostics.c
+    basic.c
 )
 
 # Set include directories
 target_include_directories(matter_clusters PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+# Platform config for device identity strings used by the Basic cluster
+target_include_directories(matter_clusters PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../platform/pico_w_chip_port
 )
 
 # Link to interaction model
