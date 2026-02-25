@@ -248,8 +248,9 @@ static uint16_t att_read_callback(hci_con_handle_t connection_handle,
         uint16_t total = sizeof(cccd);
         if (offset >= total) return 0;
         uint16_t remaining = total - offset;
-        if (buffer && remaining <= buffer_size) {
-            memcpy(buffer, cccd + offset, remaining);
+        if (buffer) {
+            uint16_t to_copy = (remaining < buffer_size) ? remaining : buffer_size;
+            memcpy(buffer, cccd + offset, to_copy);
         }
         return remaining;
     }
