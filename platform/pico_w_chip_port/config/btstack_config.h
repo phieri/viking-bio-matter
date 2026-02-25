@@ -34,6 +34,12 @@
 #define MAX_ATT_DB_SIZE 512
 #define MAX_NR_MESH_SUBNETS 0
 
+// ATT Prepared Write support — required for iOS 26+ which uses Reliable Writes
+// (ATT Prepare Write + Execute Write) for CCCD subscription during Matter
+// commissioning.  Without this, btstack_memory_att_prepare_write_get() returns
+// NULL and BTstack rejects every Prepare Write Request, causing iOS to disconnect.
+#define MAX_NR_ATT_PREPARE_WRITES 4
+
 // Use async context for event processing
 #define HAVE_BTSTACK_ASYNC_CONTEXT
 

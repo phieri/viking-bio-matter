@@ -291,12 +291,28 @@ static int att_write_callback(hci_con_handle_t connection_handle,
                                uint16_t offset,
                                uint8_t *buffer,
                                uint16_t buffer_size) {
-    (void)transaction_mode;
     (void)offset;
 
     /* Log every write for diagnostics (helps debug iOS connect/disconnect) */
-    printf("BLE: ATT write handle=0x%04X size=%u\n",
-           (unsigned)att_handle, (unsigned)buffer_size);
+    printf("BLE: ATT write handle=0x%04X size=%u mode=%u\n",
+           (unsigned)att_handle, (unsigned)buffer_size,
+           (unsigned)transaction_mode);
+
+    /*
+     * ATT_TRANSACTION_MODE_VALIDATE (Prepared Write validation phase).
+     *
+     * BTstack calls us with this mode during an ATT Prepare Write Request.
+     * iOS 26+ uses Reliable Writes (Prepare Write + Execute Write) for the
+     * CCCD subscription.  During validation we must return 0 (accept) but
+     * NOT process the write — the actual data commit happens later when
+     * BTstack calls us with ATT_TRANSACTION_MODE_EXECUTE for each queued
+     * write.  Processing here would cause premature side-effects (e.g.
+     * triggering CAN_SEND_NOW before the client has finished its write
+     * transaction) and would leave stale state if the client cancels.
+     */
+    if (transaction_mode == ATT_TRANSACTION_MODE_VALIDATE) {
+        return 0;
+    }
 
     /* ---- C2 CCCD: record subscription; send queued caps response ---- */
     if (att_handle == char_rx_cccd_handle) {
@@ -794,14 +810,14 @@ static void build_matter_adv_data(uint16_t discriminator,
     *p++ = 0xFF;        /* UUID high byte */
     /* Service-data payload (8 bytes, Matter Core Spec §5.4.2.5.2,
      * matching ChipBLEDeviceIdentificationInfo in connectedhomeip):
-     *   byte 0: OpCode (0x01 = Device Identification Info)
+     *   byte 0: OpCode (0x00 = Commissionable Device)
      *   byte 1: Discriminator[7:0]
      *   byte 2: Discriminator[11:8] (low nibble) | AdvVersion (high nibble)
      *   bytes 3-4: Vendor ID (little-endian)
      *   bytes 5-6: Product ID (little-endian)
      *   byte 7: AdditionalDataFlag (0x00 = no additional data)
      */
-    *p++ = 0x01;                                         /* OpCode: DeviceIdentificationInfo */
+    *p++ = 0x00;                                         /* OpCode: Commissionable (Matter §5.4.2.5.2) */
     *p++ = (uint8_t)(discriminator & 0xFF);              /* Discriminator[7:0]               */
     *p++ = (uint8_t)((discriminator >> 8) & 0x0F);      /* Discriminator[11:8], 4 bits      */
     *p++ = (uint8_t)(vendor_id  & 0xFF);
