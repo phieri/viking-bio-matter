@@ -100,6 +100,9 @@
 #define BLE_CAPS_VERSION    4u      /* BTP version 4 (only version in use)   */
 #define BLE_CAPS_WINDOW     6u      /* peripheral receive window size        */
 
+/* BLE device name advertised in the GAP service and scan response */
+#define BLE_DEVICE_NAME     "Viking Bio 20"
+
 /* Maximum reassembled Matter-over-BLE message size */
 #define COBLE_MAX_MSG_SIZE      1024u
 
@@ -793,9 +796,9 @@ static void build_matter_adv_data(uint16_t discriminator,
 static void build_scan_response(void) {
     uint8_t *p = scan_rsp_data;
 
-    /* --- Complete Local Name: "Matter" --- */
-    const char *name     = "Matter";
-    uint8_t     name_len = (uint8_t)(sizeof("Matter") - 1);  /* 6 */
+    /* --- Complete Local Name: BLE_DEVICE_NAME --- */
+    const char *name     = BLE_DEVICE_NAME;
+    uint8_t     name_len = (uint8_t)(sizeof(BLE_DEVICE_NAME) - 1);
     *p++ = name_len + 1;             /* length: 1 (type) + 6 (chars) */
     *p++ = 0x09;                     /* AD type: Complete Local Name  */
     for (uint8_t i = 0; i < name_len; i++) {
@@ -975,7 +978,7 @@ int ble_adapter_init(void) {
      */
     att_db_util_add_service_uuid16(0x1800);
     {
-        static const uint8_t device_name[] = "Matter";
+        static const uint8_t device_name[] = BLE_DEVICE_NAME;
         att_db_util_add_characteristic_uuid16(
             0x2A00,                /* Device Name */
             ATT_PROPERTY_READ,
