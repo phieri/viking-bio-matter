@@ -24,8 +24,7 @@
  *
  * ATT database layout (built with att_db_util):
  *   1. GAP service (0x1800): Device Name "Matter" + Appearance
- *   2. GATT service (0x1801): no mandatory characteristics for peripherals
- *   3. CHIPoBLE service (0xFFF6):
+ *   2. CHIPoBLE service (0xFFF6):
  *      C1 (128-bit UUID) - Write Without Response (controller → device)
  *      C2 (128-bit UUID) - Indicate + Notify (device → controller) + auto-CCCD
  */
@@ -157,25 +156,6 @@ static uint16_t char_rx_handle      = 0;   /* C2 value handle (Notify, device→
 static uint16_t char_rx_cccd_handle = 0;   /* C2 CCCD handle  (= char_rx_handle + 1)        */
 
 /*
- * Service Changed characteristic CCCD handle and value.
- *
- * The Service Changed characteristic (UUID 0x2A05) in the GATT Service
- * (0x1801) is required to prevent iOS from aggressively caching the GATT
- * database.  When this characteristic is present, iOS re-discovers services
- * on every connection instead of relying on a potentially stale cache.
- * Without it, a firmware update that changes the ATT handle layout (e.g.
- * adding or reordering characteristics) causes iOS to use wrong handles,
- * resulting in silent GATT discovery failures and an endless
- * connect/disconnect loop.
- *
- * We never actually send Service Changed indications (the database is
- * stable at runtime); the mere presence of the characteristic is enough
- * to disable iOS GATT caching.
- */
-static uint16_t sc_cccd_handle = 0;
-static uint16_t sc_cccd_value  = 0;
-
-/*
  * C2 Client Characteristic Configuration Descriptor (CCCD) value.
  *
  * BTstack marks the auto-generated CCCD as ATT_PROPERTY_DYNAMIC, meaning
@@ -258,23 +238,21 @@ static uint16_t att_read_callback(hci_con_handle_t connection_handle,
                                    uint8_t *buffer,
                                    uint16_t buffer_size) {
     (void)connection_handle;
-    (void)offset;
 
     if (att_handle == char_rx_cccd_handle) {
-        /* Return the 2-byte CCCD value (little-endian). */
-        if (buffer && buffer_size >= 2) {
-            buffer[0] = (uint8_t)(char_rx_cccd_value & 0xFF);
-            buffer[1] = (uint8_t)(char_rx_cccd_value >> 8);
+        /* Return the 2-byte CCCD value (little-endian), respecting offset. */
+        const uint8_t cccd[2] = {
+            (uint8_t)(char_rx_cccd_value & 0xFF),
+            (uint8_t)(char_rx_cccd_value >> 8)
+        };
+        uint16_t total = sizeof(cccd);
+        if (offset >= total) return 0;
+        uint16_t remaining = total - offset;
+        if (buffer) {
+            uint16_t to_copy = (remaining < buffer_size) ? remaining : buffer_size;
+            memcpy(buffer, cccd + offset, to_copy);
         }
-        return 2;
-    }
-
-    if (att_handle == sc_cccd_handle) {
-        if (buffer && buffer_size >= 2) {
-            buffer[0] = (uint8_t)(sc_cccd_value & 0xFF);
-            buffer[1] = (uint8_t)(sc_cccd_value >> 8);
-        }
-        return 2;
+        return remaining;
     }
 
     (void)buffer;
@@ -371,15 +349,6 @@ static int att_write_callback(hci_con_handle_t connection_handle,
                                  ? active_con_handle : connection_handle;
             ble_caps_send_pending = true;
             att_server_request_can_send_now_event(h);
-        }
-        return 0;
-    }
-
-    /* ---- Service Changed CCCD: record subscription (no indications sent) ---- */
-    if (att_handle == sc_cccd_handle) {
-        if (buffer_size >= 2) {
-            sc_cccd_value = (uint16_t)(buffer[0] |
-                            ((uint16_t)buffer[1] << 8));
         }
         return 0;
     }
@@ -699,7 +668,6 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
             coble_tx_active      = false;
             coble_tx_counter     = 1;   /* peripheral TX seq starts at 1 */
             char_rx_cccd_value   = 0;   /* reset subscription for next session */
-            sc_cccd_value         = 0;   /* reset Service Changed subscription */
             ble_caps_resp_ready   = false;
             ble_caps_send_pending = false;
             /* Notify higher layers */
@@ -1075,33 +1043,23 @@ int ble_adapter_init(void) {
             (uint8_t *)appearance, sizeof(appearance));
     }
 
-    /* 2. GATT service (0x1801): includes Service Changed characteristic.
-     *
-     *    The Service Changed characteristic (UUID 0x2A05) with the Indicate
-     *    property tells iOS (and other BLE clients) that the GATT database
-     *    may change.  When this characteristic is present, iOS does NOT cache
-     *    the GATT database — it performs a fresh service discovery on every
-     *    connection.  Without it, iOS uses a stale cached handle map from a
-     *    previous firmware version, causing silent GATT discovery failures
-     *    and the endless connect → disconnect loop observed with iOS 26.
-     *
-     *    We never actually send Service Changed indications (the database is
-     *    stable at runtime); the mere presence of the characteristic is
-     *    sufficient to disable iOS GATT caching.
-     */
-    att_db_util_add_service_uuid16(0x1801);
-    {
-        static const uint8_t sc_value[] = {0x01, 0x00, 0xFF, 0xFF};
-        uint16_t sc_val_handle = att_db_util_add_characteristic_uuid16(
-            0x2A05,                /* Service Changed */
-            ATT_PROPERTY_INDICATE,
-            ATT_SECURITY_NONE, ATT_SECURITY_NONE,
-            (uint8_t *)sc_value, sizeof(sc_value));
-        sc_cccd_handle = sc_val_handle + 1;
-    }
-
-    /* 3. CHIPoBLE service (0xFFF6 = 0000FFF6-0000-1000-8000-00805F9B34FB).
+    /* 2. CHIPoBLE service (0xFFF6 = 0000FFF6-0000-1000-8000-00805F9B34FB).
      *    Use the 16-bit UUID form — equivalent for Bluetooth SIG base UUIDs.
+     *
+     *    NOTE: The GATT Service (0x1801) with Service Changed characteristic
+     *    is intentionally NOT included.  While the BLE spec recommends it
+     *    for servers whose GATT database may change, including it caused
+     *    iOS 26 to enter an endless connect/disconnect loop during Matter
+     *    commissioning: iOS would complete GATT discovery but immediately
+     *    disconnect (reason 0x13) without ever subscribing to the CHIPoBLE
+     *    C2 characteristic.  The Service Changed characteristic (with its
+     *    INDICATE property and CCCD) appears to trigger a problematic code
+     *    path in iOS 26's CoreBluetooth GATT caching logic when served from
+     *    BTstack's runtime ATT database.  Since the ATT handle layout is
+     *    stable at runtime, removing Service Changed is safe: iOS will cache
+     *    the GATT database and use correct handles for subsequent connections.
+     *    If a firmware update changes the handle layout, the user must remove
+     *    and re-pair the device.
      */
     att_db_util_add_service_uuid16(0xFFF6);
 
