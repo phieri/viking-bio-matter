@@ -255,13 +255,22 @@ int main() {
         
         // Dynamic sleep if no work was done
         if (!work_done) {
-            uint32_t sleep_duration = calculate_next_wakeup(led_tick_off_time, led_tick_active,
-                                                              commissioning_blink_time,
-                                                              ble_adapter_get_state() == BLE_STATE_ADVERTISING);
-            if (sleep_duration > 0) {
-                // Cap sleep at 100ms for responsiveness
-                uint32_t capped_sleep = (sleep_duration < 100) ? sleep_duration : 100;
-                sleep_ms(capped_sleep);
+            // When BLE is connected, skip sleeping entirely so that
+            // cyw43_arch_poll() processes ATT requests (GATT discovery,
+            // CCCD writes, capabilities exchange) without delay.
+            // With pico_cyw43_arch_lwip_poll there are no CYW43 IRQs;
+            // the only way to service BLE traffic is to poll promptly.
+            if (ble_adapter_get_state() == BLE_STATE_CONNECTED) {
+                sleep_ms(1);   // yield but return immediately
+            } else {
+                uint32_t sleep_duration = calculate_next_wakeup(led_tick_off_time, led_tick_active,
+                                                                  commissioning_blink_time,
+                                                                  ble_adapter_get_state() == BLE_STATE_ADVERTISING);
+                if (sleep_duration > 0) {
+                    // Cap sleep at 100ms for responsiveness
+                    uint32_t capped_sleep = (sleep_duration < 100) ? sleep_duration : 100;
+                    sleep_ms(capped_sleep);
+                }
             }
         }
     }
