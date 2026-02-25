@@ -101,7 +101,7 @@
 #define BLE_CAPS_WINDOW     6u      /* peripheral receive window size        */
 
 /* BLE device name advertised in the GAP service and scan response */
-#define BLE_DEVICE_NAME     "Matter"
+#define BLE_DEVICE_NAME     "Viking Bio 20"
 
 /* Maximum reassembled Matter-over-BLE message size */
 #define COBLE_MAX_MSG_SIZE      1024u
