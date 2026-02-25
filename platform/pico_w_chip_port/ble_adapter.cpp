@@ -332,6 +332,27 @@ static int att_write_callback(hci_con_handle_t connection_handle,
         return 0;
     }
 
+    /*
+     * ATT Execute Write signal (att_handle == 0, buffer_size == 0).
+     *
+     * BTstack calls att_write_callback with att_handle=0 after processing an
+     * ATT Prepare Write + Execute Write sequence (commit or cancel).  iOS 26
+     * sends ATT Execute Write as a session-reset step during commissioning,
+     * sometimes BEFORE the CCCD subscription and C1 capabilities write.
+     *
+     * If ble_caps_resp_ready is already set (the caps request was processed
+     * in an ATT_TRANSACTION_MODE_ACTIVE validate call earlier in this
+     * connection), re-trigger CAN_SEND_NOW now that the prepared writes have
+     * been committed so the response is actually sent.
+     */
+    if (att_handle == 0) {
+        if (ble_caps_resp_ready && active_con_handle != HCI_CON_HANDLE_INVALID) {
+            ble_caps_send_pending = true;
+            att_server_request_can_send_now_event(active_con_handle);
+        }
+        return 0;
+    }
+
     /* All other writes must target C1 */
     if (att_handle != char_tx_handle || buffer_size < 1) {
         return 0;
@@ -499,13 +520,20 @@ static void handle_capabilities_request(const uint8_t *buf, uint16_t len) {
            (unsigned)window);
 
     /*
-     * connectedhomeip BLEEndPoint::Connect() subscribes to C2 *before*
-     * writing the capabilities request to C1.  If the CCCD was already
-     * written when we arrive here, trigger the send now via CAN_SEND_NOW
-     * rather than waiting for a CCCD write that will never come.
+     * Always request CAN_SEND_NOW regardless of char_rx_cccd_value.
+     *
+     * On iOS 26+ the CCCD subscription may arrive via ATT Prepare Write
+     * + Execute Write (reliable write), which means char_rx_cccd_value may
+     * still be 0 here even though BTstack has already accepted the write
+     * in its prepare-write buffer.  Equally, BTstack may manage the CCCD
+     * internally without calling att_write_callback, leaving
+     * char_rx_cccd_value == 0 even after subscription.
+     *
+     * We let att_server_indicate() be the final arbiter: if it fails (CCCD
+     * not yet committed / not subscribed), the CAN_SEND_NOW handler retries
+     * automatically until the subscription is in place.
      */
-    if ((char_rx_cccd_value & 0x0003) != 0 &&
-            active_con_handle != HCI_CON_HANDLE_INVALID) {
+    if (active_con_handle != HCI_CON_HANDLE_INVALID) {
         ble_caps_send_pending = true;
         att_server_request_can_send_now_event(active_con_handle);
     }
@@ -1004,15 +1032,21 @@ int ble_adapter_init(void) {
 
     /*
      * C1 characteristic (18EE2EF5-263D-4559-959F-4F9C429F9D11):
-     * Controller writes Matter messages to this characteristic
-     * (Write Without Response).
+     * Controller writes Matter messages to this characteristic.
      * Per Matter Core Spec §4.12.3.2 — MUST use the 128-bit UUID; iOS
      * and other controllers will NOT find this characteristic if a
      * 16-bit shorthand (0xFFF7) is used instead.
+     *
+     * ATT_PROPERTY_WRITE_WITHOUT_RESPONSE: standard BTP Write Command (0x52).
+     * ATT_PROPERTY_WRITE: also accept ATT Write Request (0x12).  iOS 26+
+     * Matter framework uses ATT Write Request for the capabilities exchange
+     * instead of Write Command; without this property BTstack silently rejects
+     * the Write Request and never calls att_write_callback, so no capabilities
+     * response is ever sent and iOS disconnects.
      */
     char_tx_handle = att_db_util_add_characteristic_uuid128(
         chip_c1_uuid128,
-        ATT_PROPERTY_WRITE_WITHOUT_RESPONSE | ATT_PROPERTY_DYNAMIC,
+        ATT_PROPERTY_WRITE_WITHOUT_RESPONSE | ATT_PROPERTY_WRITE | ATT_PROPERTY_DYNAMIC,
         ATT_SECURITY_NONE, ATT_SECURITY_NONE,
         NULL, 0);
 
