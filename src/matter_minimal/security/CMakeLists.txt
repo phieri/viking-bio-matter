@@ -13,6 +13,9 @@ endif()
 add_library(matter_security STATIC
     pase.c
     session_mgr.c
+    attestation.c
+    case.c
+    certificate_store.c
 )
 
 # Include directories
@@ -36,4 +39,7 @@ target_link_libraries(matter_security
 message(STATUS "Matter Security Library configured")
 message(STATUS "  - PASE (SPAKE2+) implementation")
 message(STATUS "  - Session management with AES-128-CCM")
+message(STATUS "  - Device Attestation (test-mode)")
+message(STATUS "  - CASE (Sigma) session establishment (test-mode)")
+message(STATUS "  - Certificate store (NOC/ICAC/RCAC)")
 message(STATUS "  - Max sessions: 5")

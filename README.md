@@ -188,10 +188,48 @@ chip-tool pairing ble-wifi <node-id> <ssid> <password> <discriminator> <pin>
 chip-tool pairing ble-wifi 1 MyHomeWiFi MyPassword123 3912 24890840
 ```
 
+**Using chip-tool for BLE Commissioning:**
+```bash
+# Commission device over BLE (replace PIN with value from serial output)
+chip-tool pairing ble-wifi <node-id> <ssid> <password> <discriminator> <pin>
+
+# Example:
+chip-tool pairing ble-wifi 1 MyHomeWiFi MyPassword123 3912 24890840
+```
+
 **Using Matter Controller Apps:**
 - Google Home, Apple Home, Amazon Alexa, and other Matter controllers support BLE commissioning
 - Simply scan the QR code displayed on the device serial output
 - Or manually enter the setup code
+
+### Device Attestation and CASE (Test-Mode)
+
+> ⚠️ **TEST-MODE ONLY** – See [PRODUCTION_README.md](PRODUCTION_README.md) before deploying.
+
+The firmware includes a prototype Device Attestation and CASE (Sigma) implementation
+that enables the full Matter commissioning flow: BLE PASE → WiFi → Attestation → CASE → NOC.
+
+**Provisioning test attestation credentials:**
+```bash
+# 1. Generate test DAC/PAI/PAA with OpenSSL (see docs/tests/ATT_TEST.md)
+# 2. Upload credentials to device:
+python3 tools/provision_attestation.py \
+    --port /dev/ttyACM0 \
+    --dac  test_certs/dac.der \
+    --pai  test_certs/pai.der \
+    --key  test_certs/dac_key.der
+```
+
+**Verifying the attestation chain (host tool):**
+```bash
+mkdir build-host && cd build-host
+cmake ../host && make -j$(nproc)
+./attestation_verifier chain test_certs/dac.der test_certs/pai.der test_certs/paa.der
+```
+
+For detailed instructions see:
+- [docs/ATT_CASE_IMPLEMENTATION.md](docs/ATT_CASE_IMPLEMENTATION.md) – architecture notes
+- [docs/tests/ATT_TEST.md](docs/tests/ATT_TEST.md) – end-to-end test guide
 
 **Pre-configured WiFi (Optional):**
 Credentials can be stored in flash during initial setup. The device will automatically connect on boot without BLE commissioning.
