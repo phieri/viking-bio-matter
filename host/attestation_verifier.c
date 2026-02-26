@@ -226,9 +226,8 @@ static int verify_chain_openssl(const char *dac_path, const char *pai_path,
     /* Verify DAC → PAI → [PAA] */
     X509_STORE_CTX_init(ctx, store, dac, chain);
     if (paa_path == NULL) {
-        /* Accept self-signed when no PAA provided */
-        X509_STORE_CTX_set_flags(ctx,
-            X509_V_FLAG_PARTIAL_CHAIN | X509_V_FLAG_ALLOW_PROXY_CERTS);
+        /* Accept partial chain when no PAA provided (for testing only) */
+        X509_STORE_CTX_set_flags(ctx, X509_V_FLAG_PARTIAL_CHAIN);
     }
 
     if (X509_verify_cert(ctx) == 1) {

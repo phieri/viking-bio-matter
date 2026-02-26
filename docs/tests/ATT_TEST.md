@@ -73,6 +73,10 @@ Verify the credentials were stored:
 python3 tools/provision_attestation.py --port /dev/ttyACM0 --verify
 ```
 
+> **Note on LittleFS paths**: credentials are stored with flat names (e.g., `/att_dac`)
+> rather than in a `/certs/` subdirectory, because the storage adapter does not
+> automatically create parent directories.
+
 ---
 
 ## 3. Build the Host Attestation Verifier
@@ -156,19 +160,10 @@ Verify NOC was stored:
 
 ---
 
-## 7. CASE Interop Test Script (Python)
+## 7. CASE Interop Testing (TODO)
 
-A minimal Python initiator for testing CASE Sigma exchange without chip-tool:
-
-```bash
-python3 tests/case_initiator_test.py \
-    --host <device-ip> \
-    --noc  test_certs/noc.pem \
-    --icac test_certs/icac.pem \
-    --key  test_certs/noc_key.pem
-```
-
-*(Note: `tests/case_initiator_test.py` is a future addition – see TODO below.)*
+A Python initiator for testing CASE Sigma exchange without chip-tool is planned.
+See the TODO section below.
 
 ---
 

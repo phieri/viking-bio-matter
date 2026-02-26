@@ -27,7 +27,7 @@
 #include "mbedtls/md.h"
 #include "mbedtls/sha256.h"
 #include "mbedtls/platform_util.h"
-#include "mbedtls/error.h"
+/* mbedtls/error.h not included (MBEDTLS_ERROR_C not enabled) */
 
 /* Platform RNG (Pico hardware RNG) */
 #include "pico/rand.h"
@@ -136,10 +136,7 @@ int attestation_init(void) {
         mbedtls_platform_zeroize(key_der, key_der_len);
 
         if (ret != 0) {
-            char errbuf[64];
-            mbedtls_strerror(ret, errbuf, sizeof(errbuf));
-            printf("[ATT] ERROR: Failed to parse private key: %s (%d)\n",
-                   errbuf, ret);
+            printf("[ATT] ERROR: Failed to parse private key: -0x%04x\n", (unsigned)(-ret));
             mbedtls_pk_free(&g_pk_ctx);
         } else {
             g_pk_loaded = true;
@@ -212,9 +209,7 @@ int attestation_sign_challenge(const uint8_t *challenge, size_t challenge_len,
     mbedtls_platform_zeroize(hash, sizeof(hash));
 
     if (ret != 0) {
-        char errbuf[64];
-        mbedtls_strerror(ret, errbuf, sizeof(errbuf));
-        printf("[ATT] ERROR: pk_sign failed: %s (%d)\n", errbuf, ret);
+        printf("[ATT] ERROR: pk_sign failed: -0x%04x\n", (unsigned)(-ret));
         return -1;
     }
 

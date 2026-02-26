@@ -2,11 +2,15 @@
  * storage_attestation.c
  * Platform glue: read/write attestation credential blobs to LittleFS.
  *
- * Attestation credentials are stored under /certs/:
- *   /certs/dac.der     – Device Attestation Certificate
- *   /certs/pai.der     – Product Attestation Intermediate cert
- *   /certs/dac_key.der – DAC private key (EC, DER)
- *   /certs/cd.der      – Certification Declaration (optional)
+ * Attestation credentials use flat LittleFS paths (no subdirectory) because
+ * storage_adapter does not create parent directories automatically.  Paths:
+ *   /att_dac   – Device Attestation Certificate
+ *   /att_pai   – Product Attestation Intermediate cert
+ *   /att_key   – DAC private key (EC, DER)
+ *   /att_cd    – Certification Declaration (optional)
+ *   /att_noc   – Node Operational Certificate
+ *   /att_icac  – Intermediate CA cert (optional)
+ *   /att_rcac  – Root CA cert (optional)
  *
  * WARNING: storing a private key in flash is TEST-MODE ONLY.
  * See PRODUCTION_README.md for production hardening guidance.

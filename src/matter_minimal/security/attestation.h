@@ -16,12 +16,14 @@
 extern "C" {
 #endif
 
-/* LittleFS paths for attestation credentials */
-#define ATT_CERTS_DIR       "/certs"
-#define ATT_DAC_PATH        "/certs/dac.der"
-#define ATT_PAI_PATH        "/certs/pai.der"
-#define ATT_DAC_KEY_PATH    "/certs/dac_key.der"
-#define ATT_CD_PATH         "/certs/cd.der"   /* Certification Declaration (optional) */
+/* LittleFS paths for attestation credentials
+ * Note: use flat paths (no subdirectory) since storage_adapter does not
+ * create parent directories.  All paths start with '/' (root). */
+#define ATT_CERTS_DIR       "/"         /* Not used - flat paths only */
+#define ATT_DAC_PATH        "/att_dac"
+#define ATT_PAI_PATH        "/att_pai"
+#define ATT_DAC_KEY_PATH    "/att_key"
+#define ATT_CD_PATH         "/att_cd"   /* Certification Declaration (optional) */
 
 /* Maximum sizes for attestation blobs */
 #define ATT_MAX_CERT_SIZE   600   /* DER-encoded cert (DAC or PAI) */

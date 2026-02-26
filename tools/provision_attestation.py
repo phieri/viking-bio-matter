@@ -50,10 +50,12 @@ except ImportError:
 
 
 # ── LittleFS paths written on device ────────────────────────────────────────
-PATH_DAC = "/certs/dac.der"
-PATH_PAI = "/certs/pai.der"
-PATH_KEY = "/certs/dac_key.der"
-PATH_CD  = "/certs/cd.der"
+# Note: flat paths (no subdirectory) – storage_adapter does not create
+# parent directories automatically.
+PATH_DAC = "/att_dac"
+PATH_PAI = "/att_pai"
+PATH_KEY = "/att_key"
+PATH_CD  = "/att_cd"
 
 # Maximum sizes (must match firmware ATT_MAX_CERT_SIZE / ATT_MAX_KEY_SIZE)
 MAX_CERT = 600

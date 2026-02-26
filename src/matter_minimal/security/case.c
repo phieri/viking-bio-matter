@@ -37,7 +37,7 @@
 #include "mbedtls/ecp.h"
 #include "mbedtls/bignum.h"
 #include "mbedtls/platform_util.h"
-#include "mbedtls/error.h"
+/* mbedtls/error.h not included (MBEDTLS_ERROR_C not enabled) */
 
 /* Pico hardware RNG */
 #include "pico/rand.h"
@@ -128,8 +128,7 @@ static uint16_t random_session_id(void) {
 }
 
 static void log_mbedtls_err(const char *fn, int ret) {
-    char buf[64]; mbedtls_strerror(ret, buf, sizeof(buf));
-    printf("[CASE] %s: %s (%d)\n", fn, buf, ret);
+    printf("[CASE] %s: -0x%04x\n", fn, (unsigned)(-ret));
 }
 
 static int hkdf_derive(const uint8_t *salt, size_t salt_len,
@@ -420,6 +419,7 @@ int case_handle_sigma1(const uint8_t *in, size_t in_len,
         if (sign_ok == 0) tlv_encode_bytes(&w, 3, sig, sig_len);
         tlv_encode_container_end(&w);
         tbe2_plain_len = tlv_writer_get_length(&w);
+        mbedtls_platform_zeroize(sig, sizeof(sig));
     }
 
     /* ----------------------------------------------------------
@@ -440,6 +440,7 @@ int case_handle_sigma1(const uint8_t *in, size_t in_len,
         }
         ret = ccm_encrypt(tbe2_key, tbe2_plain, tbe2_plain_len, tbe2_enc);
         mbedtls_platform_zeroize(tbe2_key, sizeof(tbe2_key));
+        mbedtls_platform_zeroize(tbe2_plain, tbe2_plain_len);
         if (ret != 0) { log_mbedtls_err("ccm_encrypt TBE2", ret); return -1; }
     }
 
@@ -546,7 +547,9 @@ int case_handle_sigma3(const uint8_t *in, size_t in_len,
                            noc, sizeof(noc), &noc_len) == 0 && noc_len > 0) {
             certificate_store_save_noc(noc, noc_len);
         }
+        mbedtls_platform_zeroize(noc, sizeof(noc));
     }
+    mbedtls_platform_zeroize(tbe3_plain, tbe3_plain_len);
 
     /* Register CASE session in session manager (use I2R key) */
     g_case_ctx.established_session_id = g_case_ctx.responder_session_id;

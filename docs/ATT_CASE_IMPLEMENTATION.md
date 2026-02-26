@@ -37,13 +37,13 @@ BLE PASE → WiFi join → Device Attestation → CASE Sigma → NOC provisionin
 ### Credential Storage (LittleFS)
 
 ```
-/certs/dac.der       ← Device Attestation Certificate (DER)
-/certs/pai.der       ← Product Attestation Intermediate cert (DER)
-/certs/dac_key.der   ← DAC private key (EC PKCS#8 or SEC.1 DER)  [TEST ONLY]
-/certs/cd.der        ← Certification Declaration (optional)
-/certs/noc.der       ← Node Operational Certificate (written after AddNOC)
-/certs/icac.der      ← Intermediate CA cert (optional)
-/certs/rcac.der      ← Root CA cert (optional)
+/att_dac    ← Device Attestation Certificate (DER)
+/att_pai    ← Product Attestation Intermediate cert (DER)
+/att_key    ← DAC private key (EC PKCS#8 or SEC.1 DER)  [TEST ONLY]
+/att_cd     ← Certification Declaration (optional)
+/att_noc    ← Node Operational Certificate (written after AddNOC)
+/att_icac   ← Intermediate CA cert (optional)
+/att_rcac   ← Root CA cert (optional)
 ```
 
 ### Attestation Flow

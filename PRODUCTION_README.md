@@ -20,7 +20,7 @@ The attestation and CASE implementation in this PR is explicitly a
 |---|---|---|
 | **Private key in flash** | DAC private key stored unencrypted in LittleFS (`/certs/dac_key.der`) | Key can be extracted via SWD/JTAG or by reading flash |
 | **Test PAA/DAC/PAI** | Any self-signed test certs work | Not recognized by production Matter controllers |
-| **No Sigma3 NOC chain verify** | `case_handle_sigma3()` skips full X.509 chain verification | A rogue initiator with any valid TBE3 ciphertext could establish a session |
+| **No Sigma3 NOC chain verify** | `case_handle_sigma3()` skips full X.509 chain verification | An attacker who can derive the correct TBE3 decryption key (e.g., via a compromised controller with network access) could establish a CASE session without valid Matter credentials |
 | **Timestamp = 0** | `attestation_generate_attestation_tlv()` uses timestamp 0 | Controllers may warn or reject; certificates may appear expired |
 | **No secure boot** | Firmware can be replaced without attestation | Firmware tampering is undetected |
 | **No CASE resumption** | Each connection re-runs full Sigma exchange | Performance impact for battery-powered controllers |

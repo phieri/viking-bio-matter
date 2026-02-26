@@ -20,10 +20,12 @@
 extern "C" {
 #endif
 
-/* LittleFS paths */
-#define CERT_STORE_NOC_PATH   "/certs/noc.der"
-#define CERT_STORE_ICAC_PATH  "/certs/icac.der"
-#define CERT_STORE_RCAC_PATH  "/certs/rcac.der"
+/* LittleFS paths
+ * Note: use flat paths (no subdirectory) since storage_adapter does not
+ * create parent directories.  All paths start with '/' (root). */
+#define CERT_STORE_NOC_PATH   "/att_noc"
+#define CERT_STORE_ICAC_PATH  "/att_icac"
+#define CERT_STORE_RCAC_PATH  "/att_rcac"
 
 /* Maximum DER certificate size */
 #define CERT_STORE_MAX_CERT_SIZE  600
