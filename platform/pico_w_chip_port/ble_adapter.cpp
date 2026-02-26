@@ -108,6 +108,9 @@
 /* Maximum single COBLe fragment size (must be >= max ATT MTU) */
 #define COBLE_MAX_FRAGMENT_SIZE 256u
 
+/* Maximum number of bytes to hex-dump in BLE-DBG log lines */
+#define BLE_DEBUG_DUMP_BYTES 16u
+
 /* ------------------------------------------------------------------ */
 /* Internal state                                                       */
 /* ------------------------------------------------------------------ */
@@ -252,9 +255,12 @@ static uint16_t att_read_callback(hci_con_handle_t connection_handle,
             uint16_t to_copy = (remaining < buffer_size) ? remaining : buffer_size;
             memcpy(buffer, cccd + offset, to_copy);
         }
+        printf("BLE-DBG: ATT read handle=0x%04X (CCCD) val=0x%04X\n",
+               (unsigned)att_handle, (unsigned)char_rx_cccd_value);
         return remaining;
     }
 
+    printf("BLE-DBG: ATT read handle=0x%04X (no data)\n", (unsigned)att_handle);
     (void)buffer;
     (void)buffer_size;
     return 0;
@@ -302,6 +308,15 @@ static int att_write_callback(hci_con_handle_t connection_handle,
     printf("BLE: ATT write handle=0x%04X size=%u mode=%u\n",
            (unsigned)att_handle, (unsigned)buffer_size,
            (unsigned)transaction_mode);
+    {
+        uint16_t dump_len = (buffer_size < BLE_DEBUG_DUMP_BYTES) ? buffer_size : BLE_DEBUG_DUMP_BYTES;
+        printf("BLE-DBG: ATT write handle=0x%04X len=%u data=",
+               (unsigned)att_handle, (unsigned)buffer_size);
+        for (uint16_t i = 0; i < dump_len; i++) {
+            printf("%02X", (unsigned)buffer[i]);
+        }
+        printf("%s\n", (buffer_size > BLE_DEBUG_DUMP_BYTES) ? "..." : "");
+    }
 
     /*
      * ATT_TRANSACTION_MODE_VALIDATE (Prepared Write validation phase).
@@ -446,6 +461,15 @@ static int att_write_callback(hci_con_handle_t connection_handle,
         coble_rx_in_progress = false;
         printf("BLE COBLe: Complete message received (%zu/%zu bytes)\n",
                coble_rx_offset, coble_rx_total_len);
+        {
+            size_t dump_len = (coble_rx_offset < BLE_DEBUG_DUMP_BYTES) ? coble_rx_offset : BLE_DEBUG_DUMP_BYTES;
+            printf("BLE-DBG: COBLe RX complete len=%zu data=",
+                   coble_rx_offset);
+            for (size_t i = 0; i < dump_len; i++) {
+                printf("%02X", (unsigned)coble_rx_buf[i]);
+            }
+            printf("%s\n", (coble_rx_offset > BLE_DEBUG_DUMP_BYTES) ? "..." : "");
+        }
         /* Notify data callback if registered */
         if (data_callback) {
             data_callback(coble_rx_buf, coble_rx_offset);
@@ -658,6 +682,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
             uint8_t reason = hci_event_disconnection_complete_get_reason(packet);
             printf("BLE: Client disconnected (reason=0x%02X)\n",
                    (unsigned)reason);
+            printf("BLE-DBG: Disconnected reason=0x%02X\n", (unsigned)reason);
             active_con_handle    = HCI_CON_HANDLE_INVALID;
             current_state        = BLE_STATE_ADVERTISING;
             /* Reset COBLe/BTP state for next connection */
@@ -695,6 +720,8 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
                         packet);
                 printf("BLE: Client connected (handle=0x%04X)\n",
                        (unsigned)active_con_handle);
+                printf("BLE-DBG: Connection established handle=0x%04X\n",
+                       (unsigned)active_con_handle);
                 current_state = BLE_STATE_CONNECTED;
                 if (conn_callback) {
                     conn_callback(true);
@@ -721,6 +748,9 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
 
         case ATT_EVENT_MTU_EXCHANGE_COMPLETE:
             printf("BLE: MTU exchanged, new MTU=%u\n",
+                   (unsigned)att_event_mtu_exchange_complete_get_MTU(packet));
+            printf("BLE-DBG: MTU update handle=0x%04X new_mtu=%u\n",
+                   (unsigned)active_con_handle,
                    (unsigned)att_event_mtu_exchange_complete_get_MTU(packet));
             break;
 
@@ -757,8 +787,13 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
         case ATT_EVENT_HANDLE_VALUE_INDICATION_COMPLETE:
             /* Previous indication was acknowledged — send next fragment */
             if (coble_tx_active && coble_tx_msg_sent < coble_tx_msg_len) {
+                printf("BLE-DBG: Indication complete, sending next fragment"
+                       " (sent=%zu/%zu)\n",
+                       coble_tx_msg_sent, coble_tx_msg_len);
                 coble_tx_send_next();
             } else {
+                printf("BLE-DBG: Indication complete, TX done (sent=%zu/%zu)\n",
+                       coble_tx_msg_sent, coble_tx_msg_len);
                 coble_tx_active = false;
             }
             break;
@@ -936,6 +971,12 @@ static void coble_tx_send_next(void) {
     }
     memcpy(fragment + frag_hdr, coble_tx_msg + coble_tx_msg_sent, chunk);
     coble_tx_msg_sent += chunk;
+
+    printf("BLE-DBG: COBLe TX fragment flags=0x%02X seq=%u"
+           " chunk=%zu sent=%zu/%zu\n",
+           (unsigned)fragment[0],
+           (unsigned)((frag_hdr >= 2) ? fragment[frag_hdr - 1] : 0),
+           chunk, coble_tx_msg_sent, coble_tx_msg_len);
 
     /* Try indication first (required by Matter spec §4.12.3.3),
      * fall back to notification if the controller has not subscribed
