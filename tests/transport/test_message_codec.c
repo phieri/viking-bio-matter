@@ -53,7 +53,8 @@ void test_encode_decode_basic_message(void) {
     int result = matter_message_encode(&msg, buffer, sizeof(buffer), &encoded_length);
     TEST_ASSERT(result == MATTER_MSG_SUCCESS, "Encoding failed");
     TEST_ASSERT(encoded_length > 0, "Encoded length is zero");
-    TEST_ASSERT(encoded_length == (MATTER_MIN_HEADER_SIZE + sizeof(payload)), 
+    // 8 (min header) + 6 (exchange header) + 4 (payload) = 18
+    TEST_ASSERT(encoded_length == (MATTER_MIN_HEADER_SIZE + 6 + sizeof(payload)), 
                 "Encoded length mismatch");
     
     // Decode message
@@ -69,8 +70,13 @@ void test_encode_decode_basic_message(void) {
     TEST_ASSERT(decoded_msg.header.source_node_id == 0, "Source node ID should be 0");
     TEST_ASSERT(decoded_msg.header.dest_node_id == 0, "Dest node ID should be 0");
     
-    // Note: Protocol fields (protocol_id, opcode, exchange_id) are not encoded in Phase 2
-    // They are metadata managed by the application layer
+    // Verify protocol fields are preserved (exchange header roundtrip)
+    TEST_ASSERT(decoded_msg.protocol_id == msg.protocol_id,
+                "Protocol ID mismatch");
+    TEST_ASSERT(decoded_msg.protocol_opcode == msg.protocol_opcode,
+                "Protocol opcode mismatch");
+    TEST_ASSERT(decoded_msg.exchange_id == msg.exchange_id,
+                "Exchange ID mismatch");
     
     // Verify payload
     TEST_ASSERT(decoded_msg.payload_length == msg.payload_length, "Payload length mismatch");
@@ -104,8 +110,8 @@ void test_message_header_fields(void) {
     int result = matter_message_encode(&msg, buffer, sizeof(buffer), &encoded_length);
     TEST_ASSERT(result == MATTER_MSG_SUCCESS, "Encoding with node IDs failed");
     
-    // Should be: 8 (min header) + 16 (2 node IDs) = 24 bytes (no payload)
-    TEST_ASSERT(encoded_length == 24, "Encoded length incorrect for message with node IDs");
+    // Should be: 8 (min header) + 16 (2 node IDs) + 6 (exchange header) = 30 bytes (no payload)
+    TEST_ASSERT(encoded_length == 30, "Encoded length incorrect for message with node IDs");
     
     // Decode message
     matter_message_t decoded_msg = {0};
@@ -249,8 +255,8 @@ void test_invalid_message_handling(void) {
                 == MATTER_MSG_ERROR_INVALID_INPUT,
                 "Should reject buffer smaller than min header");
     
-    // Test invalid version
-    buffer[0] = 0x0F;  // Invalid version (max version bits set)
+    // Test invalid version (version is in bits 4-7 per Matter spec)
+    buffer[0] = 0xF0;  // Invalid version (version bits 4-7 = 0xF)
     TEST_ASSERT(matter_message_decode(buffer, 20, &msg)
                 == MATTER_MSG_ERROR_INVALID_VERSION,
                 "Should reject invalid version");

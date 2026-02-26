@@ -82,12 +82,14 @@ void matter_protocol_deinit(void);
  * @param dest_port Destination port
  * @param protocol_id Protocol ID
  * @param opcode Protocol opcode
+ * @param exchange_id Exchange ID (should match request for responses)
  * @param payload Payload data
  * @param payload_len Length of payload
  * @return 0 on success, -1 on failure
  */
 int matter_protocol_send(const char *dest_ip, uint16_t dest_port,
                         uint16_t protocol_id, uint8_t opcode,
+                        uint16_t exchange_id,
                         const uint8_t *payload, size_t payload_len);
 
 #ifdef __cplusplus
