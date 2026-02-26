@@ -103,6 +103,7 @@ set(SOURCES
     platform/pico_w_chip_port/matter_network_subscriber.cpp
     platform/pico_w_chip_port/ble_adapter.cpp
     platform/pico_w_chip_port/btstack_tlv_littlefs.cpp
+    platform/pico_w_chip_port/storage_attestation.c
 )
 
 # Add lwIP mDNS source files (not compiled by default in Pico SDK)

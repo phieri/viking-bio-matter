@@ -88,6 +88,13 @@ typedef struct {
 #define MATTER_SC_OPCODE_PASE_PAKE1             0x22
 #define MATTER_SC_OPCODE_PASE_PAKE2             0x23
 #define MATTER_SC_OPCODE_PASE_PAKE3             0x24
+/* Status report (used to ack PASE/CASE completion) */
+#define MATTER_SC_OPCODE_STATUS_REPORT          0x40
+/* CASE Sigma messages */
+#define MATTER_SC_OPCODE_CASE_SIGMA1            0x30
+#define MATTER_SC_OPCODE_CASE_SIGMA2            0x31
+#define MATTER_SC_OPCODE_CASE_SIGMA3            0x32
+#define MATTER_SC_OPCODE_CASE_SIGMA2_RESUME     0x33
 
 /**
  * Interaction Model Protocol Opcodes

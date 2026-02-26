@@ -8,6 +8,8 @@
 #include "transport/udp_transport.h"
 #include "security/session_mgr.h"
 #include "security/pase.h"
+#include "security/attestation.h"
+#include "security/case.h"
 #include "commissioning/network_commissioning.h"
 #include "interaction/interaction_model.h"
 #include "interaction/read_handler.h"
@@ -53,6 +55,18 @@ int matter_protocol_init(void) {
     if (session_mgr_init() < 0) {
         return -1;
     }
+
+    // 3b. Attestation (test-mode)
+    if (attestation_init() < 0) {
+        // Not fatal – device still operates without attestation certs
+        printf("Matter Protocol: Attestation init failed (certs not provisioned?)\n");
+    }
+
+    // 3c. CASE (test-mode)
+    if (case_init() < 0) {
+        printf("Matter Protocol: CASE init failed\n");
+        return -1;
+    }
     
     // 4. Commissioning layer
     if (commissioning_init() < 0) {
@@ -86,6 +100,53 @@ int matter_protocol_init(void) {
     }
     
     initialized = true;
+    return 0;
+}
+
+/**
+ * Process CASE message (CASE / Sigma protocol on Secure Channel)
+ */
+static int process_case_message(const matter_message_t *msg,
+                                const char *source_ip, uint16_t source_port) {
+    uint8_t response_payload[CASE_SIGMA2_MAX_SIZE];
+    size_t  response_len = 0;
+    int     ret = -1;
+    uint8_t response_opcode = 0;
+
+    switch (msg->protocol_opcode) {
+        case MATTER_SC_OPCODE_CASE_SIGMA1:
+            ret = case_handle_sigma1(msg->payload, msg->payload_length,
+                                     response_payload, sizeof(response_payload),
+                                     &response_len);
+            response_opcode = MATTER_SC_OPCODE_CASE_SIGMA2;
+            break;
+
+        case MATTER_SC_OPCODE_CASE_SIGMA3:
+            ret = case_handle_sigma3(msg->payload, msg->payload_length,
+                                     response_payload, sizeof(response_payload),
+                                     &response_len);
+            if (ret == 0) {
+                printf("Matter Protocol: CASE session established\n");
+            }
+            /* No Sigma4 – session is now active; return success */
+            return (ret == 0) ? 0 : -1;
+
+        default:
+            printf("Matter Protocol: Unknown CASE opcode 0x%02x\n",
+                   msg->protocol_opcode);
+            return -1;
+    }
+
+    if (ret < 0) {
+        return -1;
+    }
+
+    if (response_len > 0) {
+        return matter_protocol_send(source_ip, source_port,
+                                    PROTOCOL_SECURE_CHANNEL,
+                                    response_opcode,
+                                    response_payload, response_len);
+    }
     return 0;
 }
 
@@ -178,6 +239,12 @@ static int route_message(const matter_message_t *msg,
                         const char *source_ip, uint16_t source_port) {
     switch (msg->protocol_id) {
         case PROTOCOL_SECURE_CHANNEL:
+            /* Route CASE Sigma messages to CASE handler */
+            if (msg->protocol_opcode == MATTER_SC_OPCODE_CASE_SIGMA1 ||
+                msg->protocol_opcode == MATTER_SC_OPCODE_CASE_SIGMA2 ||
+                msg->protocol_opcode == MATTER_SC_OPCODE_CASE_SIGMA3) {
+                return process_case_message(msg, source_ip, source_port);
+            }
             return process_pase_message(msg, source_ip, source_port);
         
         case PROTOCOL_INTERACTION_MODEL:
@@ -408,6 +475,8 @@ void matter_protocol_deinit(void) {
     }
     
     // Clean up in reverse order
+    case_deinit();
+    attestation_deinit();
     commissioning_deinit();
     udp_transport_deinit();
     
