@@ -53,7 +53,7 @@ void test_encode_decode_basic_message(void) {
     int result = matter_message_encode(&msg, buffer, sizeof(buffer), &encoded_length);
     TEST_ASSERT(result == MATTER_MSG_SUCCESS, "Encoding failed");
     TEST_ASSERT(encoded_length > 0, "Encoded length is zero");
-    // 8 (min header) + 6 (exchange header) + 4 (payload) = 18
+    // MATTER_MIN_HEADER_SIZE (8) + exchange header (6) + payload (4) = 18
     TEST_ASSERT(encoded_length == (MATTER_MIN_HEADER_SIZE + 6 + sizeof(payload)), 
                 "Encoded length mismatch");
     

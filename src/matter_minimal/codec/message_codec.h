@@ -48,6 +48,19 @@ extern "C" {
 #define MATTER_MSG_VERSION              0x00  // Version 0 (current)
 
 /**
+ * Exchange Header Flags (Matter Core Spec §4.5.2)
+ *   Bit 0: I  – Initiator (1 = message sent by initiator)
+ *   Bit 1: A  – Acknowledgement (ack counter present)
+ *   Bit 2: R  – Reliability (reliable delivery requested)
+ *   Bit 3: SX – Secured Extensions (reserved)
+ *   Bit 4: V  – Vendor Protocol (vendor ID present after protocol ID)
+ */
+#define MATTER_EXCH_FLAG_INITIATOR      0x01
+#define MATTER_EXCH_FLAG_ACK            0x02
+#define MATTER_EXCH_FLAG_RELIABILITY    0x04
+#define MATTER_EXCH_FLAG_VENDOR         0x10
+
+/**
  * Matter Message Header Structure
  * Minimum 8 bytes, up to 24 bytes with optional node IDs
  */

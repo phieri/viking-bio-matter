@@ -202,7 +202,8 @@ int matter_message_encode(const matter_message_t *msg, uint8_t *buffer,
     }
     
     // Encode exchange header (Matter Core Spec §4.5.2)
-    buffer[offset++] = 0x00;                              // Exchange flags (responder, no ack)
+    // I=0 (responder), A=0 (no ack), R=0 (no reliability), V=0
+    buffer[offset++] = 0x00;                              // Exchange flags
     buffer[offset++] = msg->protocol_opcode;              // Protocol opcode
     write_le16(&buffer[offset], msg->exchange_id);        // Exchange ID
     offset += 2;
@@ -307,10 +308,10 @@ int matter_message_decode(const uint8_t *buffer, size_t buffer_size,
         msg->protocol_id     = read_le16(&buffer[offset + 4]);
 
         size_t exch_hdr_len = 6;
-        /* Vendor Protocol flag (bit 4) → 2-byte vendor ID appended */
-        if (exch_flags & 0x10) exch_hdr_len += 2;
-        /* Ack flag (bit 1) → 4-byte acknowledged counter appended */
-        if (exch_flags & 0x02) exch_hdr_len += 4;
+        /* Vendor Protocol flag → 2-byte vendor ID appended */
+        if (exch_flags & MATTER_EXCH_FLAG_VENDOR) exch_hdr_len += 2;
+        /* Ack flag → 4-byte acknowledged counter appended */
+        if (exch_flags & MATTER_EXCH_FLAG_ACK) exch_hdr_len += 4;
 
         if (exch_hdr_len <= remaining) {
             offset += exch_hdr_len;
