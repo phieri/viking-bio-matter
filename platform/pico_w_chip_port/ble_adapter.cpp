@@ -382,7 +382,8 @@ static int att_write_callback(hci_con_handle_t connection_handle,
      * been committed so the response is actually sent.
      */
     if (att_handle == 0) {
-        if (ble_caps_resp_ready && active_con_handle != HCI_CON_HANDLE_INVALID) {
+        if (ble_caps_resp_ready && active_con_handle != HCI_CON_HANDLE_INVALID
+                && (char_rx_cccd_value & 0x0003) != 0) {
             ble_caps_send_pending = true;
             att_server_request_can_send_now_event(active_con_handle);
         }
@@ -565,20 +566,20 @@ static void handle_capabilities_request(const uint8_t *buf, uint16_t len) {
            (unsigned)window);
 
     /*
-     * Always request CAN_SEND_NOW regardless of char_rx_cccd_value.
+     * Only request CAN_SEND_NOW when the central has already subscribed
+     * to C2 (CCCD != 0).  iOS 26 sends the capabilities request BEFORE
+     * subscribing to C2.  If we trigger CAN_SEND_NOW now, the indication
+     * or notification may succeed at the BTstack API level but the central
+     * never receives it (CCCD not committed), causing an endless
+     * connect → caps miss → disconnect loop.
      *
-     * On iOS 26+ the CCCD subscription may arrive via ATT Prepare Write
-     * + Execute Write (reliable write), which means char_rx_cccd_value may
-     * still be 0 here even though BTstack has already accepted the write
-     * in its prepare-write buffer.  Equally, BTstack may manage the CCCD
-     * internally without calling att_write_callback, leaving
-     * char_rx_cccd_value == 0 even after subscription.
-     *
-     * We let att_server_indicate() be the final arbiter: if it fails (CCCD
-     * not yet committed / not subscribed), the CAN_SEND_NOW handler retries
-     * automatically until the subscription is in place.
+     * When the CCCD subscription arrives later, the CCCD write handler
+     * (above) checks ble_caps_resp_ready and triggers CAN_SEND_NOW at
+     * that point — guaranteeing the caps response is only sent after the
+     * central is ready to receive it.
      */
-    if (active_con_handle != HCI_CON_HANDLE_INVALID) {
+    if (active_con_handle != HCI_CON_HANDLE_INVALID &&
+            (char_rx_cccd_value & 0x0003) != 0) {
         ble_caps_send_pending = true;
         att_server_request_can_send_now_event(active_con_handle);
     }

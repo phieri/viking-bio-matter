@@ -145,6 +145,7 @@ static int process_case_message(const matter_message_t *msg,
         return matter_protocol_send(source_ip, source_port,
                                     PROTOCOL_SECURE_CHANNEL,
                                     response_opcode,
+                                    msg->exchange_id,
                                     response_payload, response_len);
     }
     return 0;
@@ -182,6 +183,7 @@ static int process_pase_message(const matter_message_t *msg,
         return matter_protocol_send(source_ip, source_port,
                                    PROTOCOL_SECURE_CHANNEL,
                                    response_opcode,
+                                   msg->exchange_id,
                                    response_payload, response_len);
     }
     
@@ -207,6 +209,7 @@ static int process_read_request(const matter_message_t *msg,
     return matter_protocol_send(source_ip, source_port,
                                PROTOCOL_INTERACTION_MODEL,
                                OP_REPORT_DATA,
+                               msg->exchange_id,
                                response_payload, response_len);
 }
 
@@ -229,6 +232,7 @@ static int process_subscribe_request(const matter_message_t *msg,
     return matter_protocol_send(source_ip, source_port,
                                PROTOCOL_INTERACTION_MODEL,
                                OP_SUBSCRIBE_RESPONSE,
+                               msg->exchange_id,
                                response_payload, response_len);
 }
 
@@ -338,6 +342,7 @@ int matter_protocol_task(void) {
  */
 int matter_protocol_send(const char *dest_ip, uint16_t dest_port,
                         uint16_t protocol_id, uint8_t opcode,
+                        uint16_t exchange_id,
                         const uint8_t *payload, size_t payload_len) {
     if (!initialized || !dest_ip || !payload) {
         return -1;
@@ -356,7 +361,7 @@ int matter_protocol_send(const char *dest_ip, uint16_t dest_port,
     msg.header.message_counter = matter_message_get_next_counter();
     msg.protocol_id = protocol_id;
     msg.protocol_opcode = opcode;
-    msg.exchange_id = matter_message_get_next_exchange_id();
+    msg.exchange_id = exchange_id;
     msg.payload = payload;
     msg.payload_length = payload_len;
     

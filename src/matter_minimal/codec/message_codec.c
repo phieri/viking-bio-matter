@@ -150,8 +150,8 @@ int matter_message_encode(const matter_message_t *msg, uint8_t *buffer,
         header_size += 8;
     }
     
-    // Add protocol header (4 bytes) and payload
-    size_t total_size = header_size + 4 + msg->payload_length;
+    // Exchange header: flags(1) + opcode(1) + exchange_id(2) + protocol_id(2) = 6
+    size_t total_size = header_size + 6 + msg->payload_length;
     
     if (total_size > buffer_size) {
         return MATTER_MSG_ERROR_BUFFER_TOO_SMALL;
@@ -182,7 +182,7 @@ int matter_message_encode(const matter_message_t *msg, uint8_t *buffer,
     write_le16(&buffer[offset], msg->header.session_id);
     offset += 2;
     
-    // Encode security flags (1 byte) - reserved for Phase 3
+    // Encode security flags (1 byte)
     buffer[offset++] = msg->header.security_flags;
     
     // Encode message counter (4 bytes, little-endian)
@@ -201,9 +201,14 @@ int matter_message_encode(const matter_message_t *msg, uint8_t *buffer,
         offset += 8;
     }
     
-    // For Phase 2, protocol info (protocol_id, opcode, exchange_id) is metadata
-    // In a full implementation, this would be encoded in the secured payload
-    // For now, we just copy the payload directly
+    // Encode exchange header (Matter Core Spec §4.5.2)
+    // I=0 (responder), A=0 (no ack), R=0 (no reliability), V=0
+    buffer[offset++] = 0x00;                              // Exchange flags
+    buffer[offset++] = msg->protocol_opcode;              // Protocol opcode
+    write_le16(&buffer[offset], msg->exchange_id);        // Exchange ID
+    offset += 2;
+    write_le16(&buffer[offset], msg->protocol_id);        // Protocol ID
+    offset += 2;
     
     // Copy payload
     if (msg->payload_length > 0 && msg->payload != NULL) {
@@ -279,11 +284,43 @@ int matter_message_decode(const uint8_t *buffer, size_t buffer_size,
         msg->header.dest_node_id = 0;
     }
     
-    // For Phase 2, protocol info is metadata not encoded in message
-    // Set to default values - application layer will set these
-    msg->protocol_id = 0;
-    msg->protocol_opcode = 0;
-    msg->exchange_id = 0;
+    /*
+     * Parse the exchange header (protocol message header) that follows
+     * the message header.  For unsecured messages (session_id == 0) the
+     * exchange header is in plaintext.  For secured messages it is inside
+     * the encrypted payload and must be parsed after decryption; we set
+     * defaults here and let the caller re-parse after decryption.
+     *
+     * Exchange header layout (Matter Core Spec §4.5.2):
+     *   byte 0     : Exchange Flags
+     *   byte 1     : Protocol Opcode
+     *   byte 2-3   : Exchange ID (little-endian)
+     *   byte 4-5   : Protocol ID (little-endian)
+     *   [byte 6-7] : Protocol Vendor ID (if Vendor flag set)
+     *   [byte N..N+3]: Acknowledged Message Counter (if Ack flag set)
+     */
+    size_t remaining = buffer_size - offset;
+
+    if (msg->header.session_id == 0 && remaining >= 6) {
+        uint8_t exch_flags   = buffer[offset];
+        msg->protocol_opcode = buffer[offset + 1];
+        msg->exchange_id     = read_le16(&buffer[offset + 2]);
+        msg->protocol_id     = read_le16(&buffer[offset + 4]);
+
+        size_t exch_hdr_len = 6;
+        /* Vendor Protocol flag → 2-byte vendor ID appended */
+        if (exch_flags & MATTER_EXCH_FLAG_VENDOR) exch_hdr_len += 2;
+        /* Ack flag → 4-byte acknowledged counter appended */
+        if (exch_flags & MATTER_EXCH_FLAG_ACK) exch_hdr_len += 4;
+
+        if (exch_hdr_len <= remaining) {
+            offset += exch_hdr_len;
+        }
+    } else {
+        msg->protocol_id = 0;
+        msg->protocol_opcode = 0;
+        msg->exchange_id = 0;
+    }
     
     // Remaining data is payload
     msg->payload = &buffer[offset];

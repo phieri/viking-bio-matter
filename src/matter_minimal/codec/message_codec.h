@@ -26,22 +26,39 @@ extern "C" {
 
 /**
  * Matter Message Header Flags (1 byte)
- * Based on Matter Core Specification Section 4.7
+ * Per Matter Core Specification Section 4.4.1.2:
+ *   Bits 0-1: DSIZ   – Destination Node ID encoding
+ *   Bit 2:    S      – Source Node ID present
+ *   Bit 3:    Reserved
+ *   Bits 4-7: Version (currently 0)
  */
-#define MATTER_MSG_FLAG_VERSION_MASK    0x0F  // Bits 0-3: Message version
-#define MATTER_MSG_FLAG_VERSION_SHIFT   0
-#define MATTER_MSG_FLAG_S               0x10  // Bit 4: Source Node ID present
-#define MATTER_MSG_FLAG_DSIZ_MASK       0x60  // Bits 5-6: Destination Node ID size
-#define MATTER_MSG_FLAG_DSIZ_SHIFT      5
+#define MATTER_MSG_FLAG_VERSION_MASK    0xF0  // Bits 4-7: Message format version
+#define MATTER_MSG_FLAG_VERSION_SHIFT   4
+#define MATTER_MSG_FLAG_S               0x04  // Bit 2: Source Node ID present
+#define MATTER_MSG_FLAG_DSIZ_MASK       0x03  // Bits 0-1: Destination Node ID size
+#define MATTER_MSG_FLAG_DSIZ_SHIFT      0
 #define MATTER_MSG_FLAG_DSIZ_NONE       0x00  // No destination ID
-#define MATTER_MSG_FLAG_DSIZ_8B         0x20  // 8-byte destination ID
-#define MATTER_MSG_FLAG_DSIZ_16B        0x40  // 16-byte destination ID (reserved)
-#define MATTER_MSG_FLAG_DSIZ_64B        0x60  // 64-bit destination ID
+#define MATTER_MSG_FLAG_DSIZ_8B         0x01  // 64-bit unicast destination node ID
+#define MATTER_MSG_FLAG_DSIZ_16B        0x02  // 16-bit group ID
+#define MATTER_MSG_FLAG_DSIZ_64B        0x03  // 64-bit destination ID (reserved)
 
 /**
  * Matter Message Version
  */
 #define MATTER_MSG_VERSION              0x00  // Version 0 (current)
+
+/**
+ * Exchange Header Flags (Matter Core Spec §4.5.2)
+ *   Bit 0: I  – Initiator (1 = message sent by initiator)
+ *   Bit 1: A  – Acknowledgement (ack counter present)
+ *   Bit 2: R  – Reliability (reliable delivery requested)
+ *   Bit 3: SX – Secured Extensions (reserved)
+ *   Bit 4: V  – Vendor Protocol (vendor ID present after protocol ID)
+ */
+#define MATTER_EXCH_FLAG_INITIATOR      0x01
+#define MATTER_EXCH_FLAG_ACK            0x02
+#define MATTER_EXCH_FLAG_RELIABILITY    0x04
+#define MATTER_EXCH_FLAG_VENDOR         0x10
 
 /**
  * Matter Message Header Structure
